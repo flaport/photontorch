@@ -8,10 +8,13 @@ from .terms import Source
 from .terms import Detector
 
 
-# Mirrors
+## Mirrors
 
 from .mirrors import Mirror
 from .mirrors import SlantedMirror
+
+## Directional Couplers
+from .directionalcouplers import DirectionalCoupler
 
 
 ## Waveguides
