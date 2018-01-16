@@ -27,7 +27,7 @@ class Waveguide(Component):
     A waveguide is not trainable (for now)
 
     '''
-    def __init__(self, length=1e-6, neff=4.0, wl=1.55e-6, name=None):
+    def __init__(self, length=1e-6, neff=4.0, loss=0, wl=1.55e-6, name=None):
         '''
         Waveguide Initialization
 
@@ -35,6 +35,7 @@ class Waveguide(Component):
         ----------
         length : float. Length of the waveguide in meter.
         neff = 4.0 : float. Effective index of the waveguide 
+        loss = 0 : float. Loss in the waveguide [dB]
         wl = 1.55e-6 : float. Wavelength of the simulation
         name : str. Name of the specific waveguide
         '''
@@ -43,6 +44,7 @@ class Waveguide(Component):
         self.length = float(length)
         self.neff = float(neff)
         self.wl = float(wl)
+        self.loss = loss
 
     @property
     def delays(self):
@@ -53,12 +55,12 @@ class Waveguide(Component):
     def rS(self):
         ''' real part of the scattering matrix '''
         # e = exp(2j*pi*neff*length/wl)
-        re = np.cos(2*pi*self.neff*self.length/self.wl)
+        re = 10**(-self.loss/10)*np.cos(2*pi*self.neff*self.length/self.wl)
         return self.new_variable([[0,1],[1,0]])*re
 
     @property
     def iS(self):
         ''' imaginary part of the scattering matrix '''
         # e = exp(2j*pi*neff*length/wl)
-        ie = np.sin(2*pi*self.neff*self.length/self.wl)
+        ie = 10**(-self.loss/10)*np.sin(2*pi*self.neff*self.length/self.wl)
         return self.new_variable([[0,1],[1,0]])*ie
