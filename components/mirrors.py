@@ -24,6 +24,13 @@ class Mirror(Component):
     A mirror is a memory-less component with one input and one output.
 
     A mirror has one trainable parameter: the reflectivity R.
+
+    Connections
+    -----------
+    mirror['ij']:
+        |
+    i --|-- j
+        |
     '''
     def __init__(self, R=0.5, R_bounds=(0,1), name=None):
         '''
@@ -47,7 +54,7 @@ class Mirror(Component):
             self.R_min = self.new_variable([R_bounds[0]], 'float')
             self.R_max = self.new_variable([R_bounds[1]], 'float')
             self.trainable = True
-    
+
     @property
     def R(self):
         ''' Reflectivity of the Mirror '''
@@ -57,7 +64,7 @@ class Mirror(Component):
         ''' Reflectivity of the mirror '''
         R_bounds = (self.R_min, self.R_max) if self.trainable else None
         self.__init__(self.R.data.numpy()[0], R_bounds, self.name)
-    
+
     @property
     def rS(self):
         r = self.R**0.5
@@ -78,8 +85,18 @@ class SlantedMirror(Mirror):
     A slanted mirror is a memory-less component with 4 ports.
 
     A slanted mirror has one trainable parameter: the reflectivity R.
+
+
+    Connections
+    -----------
+    slanted_mirror['ijkl']:
+           j
+           |/
+       i --/-- k
+          /|
+           l
     '''
-    
+
     @property
     def rS(self):
         r = self.R**0.5

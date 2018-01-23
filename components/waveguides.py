@@ -23,8 +23,14 @@ class Waveguide(Component):
     '''
     A waveguide is a Component where each of the two nodes
     introduces a delay corresponding to the length of the waveguide.
-    
+
     A waveguide is not trainable (for now)
+
+    Connections
+    -----------
+    waveguide['ij']:
+
+    i ---- j
 
     '''
     def __init__(self, length=1e-6, neff=4.0, loss=0, wl=1.55e-6, name=None):
@@ -34,7 +40,7 @@ class Waveguide(Component):
         Parameters
         ----------
         length : float. Length of the waveguide in meter.
-        neff = 4.0 : float. Effective index of the waveguide 
+        neff = 4.0 : float. Effective index of the waveguide
         loss = 0 : float. Loss in the waveguide [dB]
         wl = 1.55e-6 : float. Wavelength of the simulation
         name : str. Name of the specific waveguide
