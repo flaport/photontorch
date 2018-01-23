@@ -13,6 +13,9 @@ from .terms import Detector
 from .mirrors import Mirror
 from .mirrors import SlantedMirror
 
+## Grating Couplers
+from .gratingcouplers import GratingCoupler
+
 ## Directional Couplers
 from .directionalcouplers import DirectionalCoupler
 
