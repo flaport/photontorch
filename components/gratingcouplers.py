@@ -1,4 +1,3 @@
-
 ''' Grating Couplers Module '''
 
 #############
@@ -34,7 +33,7 @@ class GratingCoupler(Component):
        i
         \
          \
-    _|¯|_|¯|_|¯|___ j
+    _|-|_|-|_|-|___ j
     '''
     def __init__(self, R=0.0, R_in=0.0, Tmax=1.0, BW=0.06e-6, wl0=1.55e-6, wl=1.55e-6, name=None):
         '''
@@ -62,11 +61,11 @@ class GratingCoupler(Component):
     def rS(self):
         ''' Real part of S matrix '''
         sigma = fwhm2sigma*self.BW
-        loss = self.Tmax*np.exp(-(self.wl0-self.wl)**2/(2*sigma**2))
-        return self.new_variable([[0,1],[1,0]])*loss
+        loss = np.sqrt(self.Tmax*np.exp(-(self.wl0-self.wl)**2/(2*sigma**2)))
+        return self.new_variable([[0,loss],[loss,0]])
 
     @property
     def iS(self):
         ''' Imag part of S matrix '''
-        return self.new_variable([[0,0],[0,0]])
+        return self.new_variable([[self.R_in,0],[0,self.R]])
 
