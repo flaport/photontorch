@@ -10,6 +10,7 @@ from .components import Network
 from .components import Detector
 from .components import Waveguide
 from .components import SlantedMirror
+from .components import GratingCoupler
 from .components import DirectionalCoupler
 
 
