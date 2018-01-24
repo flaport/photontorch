@@ -30,7 +30,7 @@ class DirectionalCoupler(Mirror):
     dircoup['ijkl']:
      j        l
       \______/
-      /¯¯¯¯¯¯\
+      /------\
      i        k
     '''
 

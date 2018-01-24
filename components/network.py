@@ -26,7 +26,7 @@ from ..utils.autograd import block_diag
 #############
 
 class Network(Component):
-    def __init__(self, *args, dt=1e-10, name=None):
+    def __init__(self, *args, **kwargs):
         '''
         Initialization of the network.
         
@@ -69,10 +69,10 @@ class Network(Component):
         given corresponds to the number of ports in the component.
         '''
 
-        Component.__init__(self, name=name)
+        Component.__init__(self, name=kwargs.pop('name','nw'))
         # parse arguments
         self.s, self.components = self._parse_args(args)
-        self.dt = dt
+        self.dt = kwargs.pop('dt',1e-10)
 
     def initialize(self, dt=None):
         '''
