@@ -16,8 +16,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 ## Relative
-from .component import Component
 from .connector import Connector
+from ..components.component import Component
 from ..utils.autograd import block_diag
 
 
@@ -72,9 +72,8 @@ class Network(Component):
         Component.__init__(self, name=kwargs.pop('name','nw'))
         # parse arguments
         self.s, self.components = self._parse_args(args)
-        self.dt = kwargs.pop('dt',1e-10)
 
-    def initialize(self, dt=None):
+    def initialize(self, env):
         '''
         Initializer of the network. The initializer should be called before
         doing the forward pass through the network. It creates all the internal variables
@@ -84,12 +83,21 @@ class Network(Component):
         the parameters of the network.
         '''
 
+        ### Initialize components in the network
+
+        for comp in self.components:
+            comp.initialize(env)
+
+
+        ### Initialize network
+        
+        super(Network, self).initialize(env)
+
+        # gradients
         self.zero_grad()
 
-        if dt is not None:
-            self.dt = dt
-        else:
-            dt = self.dt
+        # timestep
+        dt = self.env.dt
 
         # delays
         delays = (self.delays/dt + 0.5).int()
