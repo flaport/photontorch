@@ -10,9 +10,6 @@ from torch.nn import Module
 from torch.nn import Parameter
 from torch.autograd import Variable
 
-## Relative
-from .connector import Connector
-
 ## Other
 import numpy as np
 
@@ -37,6 +34,10 @@ class Component(Module):
         if name is None:
             name = self.__class__.__name__.lower()
         self.name = name
+    
+    def initialize(self, env):
+        ''' Initialize Component For a simulation by giving it the simulation environment '''
+        self.env = env
     
     @staticmethod
     def new_parameter(numpy_array, dtype='float'):
@@ -115,3 +116,14 @@ class Component(Module):
 
     def __getitem__(self, s):
         return Connector(s, [self])
+
+
+
+###################
+## Other imports ##
+###################
+
+# These imports need to happen here because otherwise we have circular imports...
+
+## Relative
+from ..network.connector import Connector
