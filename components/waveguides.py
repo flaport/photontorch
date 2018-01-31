@@ -33,7 +33,7 @@ class Waveguide(Component):
     i ---- j
 
     '''
-    def __init__(self, length=1e-6, neff=4.0, loss=0, wl=1.55e-6, name=None):
+    def __init__(self, length=1e-6, neff=4.0, loss=0, name=None):
         '''
         Waveguide Initialization
 
@@ -49,7 +49,6 @@ class Waveguide(Component):
         # Handle inputs
         self.length = float(length)
         self.neff = float(neff)
-        self.wl = float(wl)
         self.loss = loss
 
     @property
@@ -61,12 +60,12 @@ class Waveguide(Component):
     def rS(self):
         ''' real part of the scattering matrix '''
         # e = exp(2j*pi*neff*length/wl)
-        re = 10**(-self.loss/10)*np.cos(2*pi*self.neff*self.length/self.wl)
+        re = 10**(-self.loss/10)*np.cos(2*pi*self.neff*self.length/self.env.wl)
         return self.new_variable([[0,1],[1,0]])*re
 
     @property
     def iS(self):
         ''' imaginary part of the scattering matrix '''
         # e = exp(2j*pi*neff*length/wl)
-        ie = 10**(-self.loss/10)*np.sin(2*pi*self.neff*self.length/self.wl)
+        ie = 10**(-self.loss/10)*np.sin(2*pi*self.neff*self.length/self.env.wl)
         return self.new_variable([[0,1],[1,0]])*ie

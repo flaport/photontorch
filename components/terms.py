@@ -47,3 +47,13 @@ class Detector(Term):
     @property
     def detectors_at(self):
         return self.new_variable([1], 'byte')
+
+
+#######################
+## Source + Detector ##
+#######################
+class SourceDetector(Source, Detector):
+    '''
+    A SourceDetector is a Term where power is inserted and power is saved.
+    '''
+    pass

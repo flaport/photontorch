@@ -23,7 +23,3 @@ from .directionalcouplers import DirectionalCoupler
 ## Waveguides
 
 from .waveguides import Waveguide
-
-
-## Network
-from .network import Network
