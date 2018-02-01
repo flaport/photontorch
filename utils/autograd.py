@@ -11,7 +11,9 @@ from torch.autograd import Function
 
 ## Other
 import numpy as np
-from scipy.linalg import block_diag as _block_diag
+
+## Relative
+from .tensor import zeros
 
 
 ###################
@@ -47,15 +49,15 @@ class PseudoInverse(Function):
     '''
     @staticmethod
     def forward(ctx, input, rcond=1e-8):
-        ''' 
-        The forward method calculates the pseudo-inverse and 
+        '''
+        The forward method calculates the pseudo-inverse and
         saves the necessary variables for a backward pass
         '''
         cutoff = rcond*input.max()
         # numpy way:
-        # np_inverse = np.linalg.pinv(np.array(input.numpy(), dtype=np.float32), rcond=rcond)
+        # np_inverse = np.linalg.pinv(np.array(input.cpu().numpy(), dtype=np.float32), rcond=rcond)
         # inverse = torch.from_numpy(np_inverse)
-        
+
         # torch way
         U,S,V = torch.svd(input)
         selection = (torch.abs(S) <= cutoff)
@@ -84,7 +86,7 @@ class PseudoInverse(Function):
         # to transpose the inverse, for the desired backward pass to work.
         # So far, I have no idea why this is the case.
         inverse = Variable(ctx.inverse, requires_grad=True).transpose(1,0) # we need a variable to work with
-        
+
         # return the gradient
         return -inverse.mm(grad_output.mm(inverse))
 
@@ -125,22 +127,31 @@ class BlockDiag(Function):
     '''
     @staticmethod
     def forward(ctx, *inputs):
-        ''' 
+        '''
         The forward method creates the block diagonal matrix and
         saves the locations of the submatrices for the backward pass
         '''
-        # assume all inputs are square
-        # TODO: implement a check for this
-        ctx.start_indices = list(np.cumsum([0]+[input.size(0) for input in inputs]))
-        tensor = torch.from_numpy(_block_diag(*(input.numpy() for input in inputs)))
-        return tensor
+        # we assume all inputs are square. TODO: implement a check for this
+        # Get total size of block diagonal matrix
+        sizes = [m.size(0) for m in inputs]
+        idxs = list(np.cumsum([0]+sizes))
+        total_size = int(idxs[-1])
+        # Get start and end indices of blocks in matrix
+        ctx.idxs = zip(idxs[:-1], idxs[1:])
+        # Get type of new matrix and create empty new matrix with total_size as shape
+        M = zeros(total_size, total_size, type=inputs[0].type())
+        # Fill Blocks
+        for (i, j), matrix in zip(ctx.idxs, inputs):
+            M[i:j,i:j] = matrix
+        return M
+
     @staticmethod
-    def backward(ctx, block_diag):
+    def backward(ctx, M):
         '''
         The backward pass selects the relevant submatrices of the gradient
         '''
         outputs = []
-        for i,j in zip(ctx.start_indices[:-1], ctx.start_indices[1:]):
+        for i,j in ctx.idxs:
             output = block_diag[i:j,i:j]
             outputs.append(output)
         return tuple(outputs)
