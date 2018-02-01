@@ -4,3 +4,8 @@
 ## custom torch differentiable functions
 
 from .autograd import block_diag
+
+
+## Custom Tensor Functions
+
+from .tensor import zeros
