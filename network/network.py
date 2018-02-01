@@ -48,8 +48,8 @@ class Network(Component):
             last port of dircoup is connected to first port of wg2.
 
         2. Second option:
-        args is a list of list with args[i][0] of type component and args[i][1] of type str.
-        Also follows the einstein summation convention.
+        args is a list of list with args[i][0] of type component and args[i][1] of type
+        str. Also follows the einstein summation convention.
         e.g.
         nw = Network(
             (wg1, 'ij'),
@@ -65,7 +65,7 @@ class Network(Component):
 
         Note
         ----
-        The initializer of the network does not check of the number of indices
+        The initializer of the network does not check if the number of indices
         given corresponds to the number of ports in the component.
         '''
 
@@ -79,8 +79,8 @@ class Network(Component):
         doing the forward pass through the network. It creates all the internal variables
         necessary.
 
-        The Initializer should in principle also be called after every training Epoch to update
-        the parameters of the network.
+        The Initializer should in principle also be called after every training Epoch to 
+        update the parameters of the network.
         '''
 
         ### Initialize components in the network
@@ -100,9 +100,15 @@ class Network(Component):
         dt = self.env.dt
 
         # delays
-        delays = (self.delays/dt + 0.5).int()
-        if (delays[self.delays>0] < 10).any():
-            warnings.warn('Some delays are too short. Try using a larger timestep')
+        # delays can be turned off for frequency calculations
+        # with constant input sources
+        delays_in_seconds = self.delays * float(self.env.use_delays)
+        # resulting delays in terms of the simulation timestep:
+        delays = (delays_in_seconds/dt + 0.5).int()
+        # Check if simulation timestep is too big:
+        if (delays[delays_in_seconds>0] < 10).any(): # This bound is rather arbitrary...
+            warnings.warn('Simulation timestep might be too large, resulting'
+                          'in too short delays. Try using a smaller timestep')
 
         # detector locations
         detectors_at = self.detectors_at
@@ -123,7 +129,6 @@ class Network(Component):
         mcml = (mc.unsqueeze(1)).mm(ml.unsqueeze(0))
         mlmc = (ml.unsqueeze(1)).mm(mc.unsqueeze(0))
         mlml = (ml.unsqueeze(1)).mm(ml.unsqueeze(0))
-
 
         # subsets of scattering matrix:
         rS,iS = self.rS, self.iS
