@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from .connector import Connector
 from ..components.component import Component
 from ..utils.autograd import block_diag
+from ..utils.tensor import zeros
 
 
 #############
@@ -114,10 +115,10 @@ class Network(Component):
             self.forward = forward
             return # Stop initialization here.
 
-        # gradients
+        ## gradients
         self.zero_grad()
 
-        # delays
+        ## delays
         # delays can be turned off for frequency calculations
         # with constant input sources
         delays_in_seconds = self.delays * float(self.env.use_delays)
@@ -128,20 +129,19 @@ class Network(Component):
             warnings.warn('Simulation timestep might be too large, resulting'
                           'in too short delays. Try using a smaller timestep')
 
-        # detector locations
+        ## detector locations
         detectors_at = self.detectors_at
 
-        # source locations
+        ## source locations
         sources_at = self.sources_at
 
-        # location of memory-containing nodes:
-        mc = (sources_at | detectors_at | (delays > 0))
-        # location of memory-less nodes:
-        ml = mc.ne(1) # negation of mc
-        # number of memory-containing nodes:
-        nmc = int(mc.sum())
-        # number of memory-less nodes:
-        nml = int(ml.sum())
+
+        ## locations of memory-containing and memory-less nodes:
+
+        mc = (sources_at | detectors_at | (delays > 0)) # memory-containing nodes:
+        ml = mc.ne(1) # negation of mc: memory-less nodes
+        self.nmc = nmc = int(mc.sum()) # number of memory-containing nodes:
+        nml = int(ml.sum()) # number of memory-less nodes:
 
         # This extra step is necessary for CUDA.
         # CUDA does not allow matrix multiplication of ByteTensors.
@@ -165,6 +165,9 @@ class Network(Component):
             mlmc = mlmc.byte()
             mlml = mlml.byte()
 
+
+        ## S-matrix subsets
+
         # subsets of scattering matrix:
         rS,iS = self.rS, self.iS
         rSmcmc = rS[mcmc].view(nmc,nmc)
@@ -178,12 +181,14 @@ class Network(Component):
         Cmlmc = C[mlmc].view(nml,nmc)
         Cmlml = C[mlml].view(nml,nml)
 
-        # helper matrices
+        ## helper matrices
         # P = I - Cmlml@Smlml
         rP = self.new_variable(np.eye(nml),'float') - (Cmlml).mm(rSmlml)
         iP = -(Cmlml).mm(iSmlml)
 
-        # reduced connection matrix
+
+        ## reduced connection matrix
+
         # C = Cmcml@Smlml@inv(P)@Cmlmc + Cmcmc (we do this in 5 steps)
 
         # 1. Calculation of inv(P) = X + i*Y
@@ -209,31 +214,38 @@ class Network(Component):
         self._rC = rx + Cmcmc
         self._iC = ix
 
-        # reduced scattering matrix
+
+        ## reduced scattering matrix
+
         self._rS = rSmcmc
         self._iS = iSmcmc
 
-        # reduced delays vector
+        ## reduced delays vector
         self._delays = delays[mc]
 
-        # reduced location of detectors
+        ## reduced location of detectors
         self._detectors_at = detectors_at[mc]
 
-        # reduced location of sources
+        ## reduced location of sources
         self._sources_at = sources_at[mc]
 
-        # source input weights
+        ## source input weights
+
         self._rsourceweights = self._sources_at.float().unsqueeze(1)
         self._isourceweights = torch.zeros_like(self._rsourceweights)
 
-        # buffer
-        buffer = np.zeros((int(self._delays.max())+2, int(mc.sum())))
-        buffermask = np.zeros_like(buffer)
+
+    def new_buffer(self):
+        ''' Create buffer to keep the hidden states of the Network (RNN) '''
+        type = 'torch.cuda.FloatTensor' if self._cuda else 'torch.FloatTensor'
+        buffer = zeros(int(self._delays.max())+2, self.nmc, type=type)
+        buffermask = torch.zeros_like(buffer)
         for i, d in enumerate(self._delays):
             buffermask[int(d), i] = 1.0
-        self._rbuffer = self.new_variable(buffer.copy())
-        self._ibuffer = self.new_variable(buffer.copy())
-        self._buffermask  = self.new_variable(buffermask)
+        rbuffer = Variable(buffer.clone())
+        ibuffer = Variable(buffer)
+        buffermask  = Variable(buffermask)
+        return rbuffer, ibuffer, buffermask
 
     def forward(self, source):
         # handle input
@@ -246,6 +258,8 @@ class Network(Component):
             ((self._rsourceweights).mm(isource) + (self._isourceweights).mm(rsource)).transpose(1,0),
         )
 
+        rbuffer, ibuffer, buffermask = self.new_buffer()
+
         # initialize return vector
         detected = torch.zeros_like(rsource)
 
@@ -253,12 +267,12 @@ class Network(Component):
         for i, (r_s, i_s) in enumerate(zip(rsource, isource)):
             # get input state
             rx, ix = (
-                torch.sum(self._buffermask*self._rbuffer, dim=0) + r_s,
-                torch.sum(self._buffermask*self._ibuffer, dim=0) + i_s,
+                torch.sum(buffermask*rbuffer, dim=0) + r_s,
+                torch.sum(buffermask*ibuffer, dim=0) + i_s,
             )
 
             # connect memory-less components
-            # r_x and i_x need to be calculated at the same time because of dependencies on each other
+            # rx and ix need to be calculated at the same time because of dependencies on each other
             # the .mm function does not work here (2Dx1D not supported). Using torch.matmul instead
             rx, ix = (
                 torch.matmul(self._rC,rx) - torch.matmul(self._iC,ix),
@@ -269,7 +283,7 @@ class Network(Component):
             detected[i] = torch.pow(rx,2) + torch.pow(ix,2)
 
             # connect memory-containing components
-            # r_x and i_x need to be calculated at the same time because of dependencies on each other
+            # rx and ix need to be calculated at the same time because of dependencies on each other
             # the .mm function does not work here (2Dx1D not supported). Using torch.matmul instead
             rx, ix = (
                 torch.matmul(self._rS,rx) - torch.matmul(self._iS,ix),
@@ -277,10 +291,10 @@ class Network(Component):
             )
 
             # update buffer
-            self._rbuffer = torch.cat((rx.unsqueeze(0), self._rbuffer[0:-1]), dim=0)
-            self._ibuffer = torch.cat((ix.unsqueeze(0), self._ibuffer[0:-1]), dim=0)
+            rbuffer = torch.cat((rx.unsqueeze(0), rbuffer[0:-1]), dim=0)
+            ibuffer = torch.cat((ix.unsqueeze(0), ibuffer[0:-1]), dim=0)
 
-        return detected[self._detectors_at].view(-1,int(torch.sum(self.detectors_at)))
+        return detected[self._detectors_at].view(-1,int(torch.sum(self._detectors_at)))
 
 
     def parameters(self):
