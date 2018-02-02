@@ -73,6 +73,8 @@ class Network(Component):
         # parse arguments
         self.s, self.components = self._parse_args(args)
 
+        self.num_ports = np.sum(comp.num_ports for comp in self.components)
+
     def cuda(self):
         ''' Transform Network to live on the GPU '''
         components = [comp.cuda() for comp in self.components]
@@ -96,16 +98,21 @@ class Network(Component):
         The Initializer should in principle also be called after every training Epoch to
         update the parameters of the network.
         '''
-
-        ### Initialize components in the network
-
+        ## Initialize components in the network
         for comp in self.components:
             comp.initialize(env)
 
-
-        ### Initialize network
-
+        ## Initialize network
         super(Network, self).initialize(env)
+
+        ## Check if network is fully connected
+        C = self.C
+        fully_connected = (self.C.sum(0) > 0).all() or (self.C.sum(1) > 0).all()
+        if not fully_connected:
+            def forward(*args, **kwargs):
+                raise ValueError('Network not Fully Connected')
+            self.forward = forward
+            return # Stop initialization here.
 
         # gradients
         self.zero_grad()
@@ -166,7 +173,6 @@ class Network(Component):
         iSmlml = iS[mlml].view(nml,nml)
 
         # subsets of connection matrix:
-        C = self.C
         Cmcmc = C[mcmc].view(nmc,nmc)
         Cmcml = C[mcml].view(nmc,nml)
         Cmlmc = C[mlmc].view(nml,nmc)
@@ -327,20 +333,24 @@ class Network(Component):
 
     @property
     def C(self):
-        Ns = np.cumsum([0]+[comp.delays.size(0) for comp in self.components])
+        Ns = np.cumsum([0]+[comp.num_ports for comp in self.components])
+        free_idxs = [comp.free_idxs for comp in self.components]
 
         C = block_diag(*(comp.C for comp in self.components))
 
         # add loops
         for i, j1, j2 in self._parse_loops(self.s):
-            i = Ns[i] + j1
-            j = Ns[i] + j2
+            idxs = free_idxs[i]
+            i = Ns[i] + idxs[j1]
+            j = Ns[i] + idxs[j2]
             C[i,j] = C[j,i] = 1.0
 
         # add connections
         for i1, j1, i2, j2  in self._parse_connections(self.s):
-            i = Ns[i1] + j1
-            j = Ns[i2] + j2
+            idxs1 = free_idxs[i1]
+            idxs2 = free_idxs[i2]
+            i = Ns[i1] + idxs1[j1]
+            j = Ns[i2] + idxs2[j2]
             C[i,j] = C[j,i] = 1.0
 
         return C

@@ -33,6 +33,9 @@ class Waveguide(Component):
     i ---- j
 
     '''
+
+    num_ports = 2
+
     def __init__(self, length=1e-6, neff=4.0, loss=0, name=None):
         '''
         Waveguide Initialization

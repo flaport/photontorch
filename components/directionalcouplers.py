@@ -34,6 +34,8 @@ class DirectionalCoupler(Mirror):
      i        k
     '''
 
+    num_ports = 4
+
     @property
     def rS(self):
         t = (1-self.R)**0.5

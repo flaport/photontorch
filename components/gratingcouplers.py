@@ -35,6 +35,9 @@ class GratingCoupler(Component):
          \
     _|-|_|-|_|-|___ j
     '''
+
+    num_ports = 2
+
     def __init__(self, R=0.0, R_in=0.0, Tmax=1.0, BW=0.06e-6, wl0=1.55e-6, name=None):
         '''
         Mirror initialization

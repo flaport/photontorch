@@ -13,6 +13,9 @@ from torch.autograd import Variable
 ## Other
 import numpy as np
 
+## Relative
+from ..utils import where
+
 
 ###############
 ## Component ##
@@ -22,6 +25,9 @@ class Component(Module):
     '''
     Generic component, defined by a scattering matrix and a connection matrix.
     '''
+
+    num_ports = 1 # Number of ports of the component
+
     def __init__(self, name=None):
         '''
         Initialization of the component.
@@ -99,7 +105,7 @@ class Component(Module):
         Connection matrix of the component.
         Should return a Variable containing a torch.FloatTensor consisting of only ones and zeros.
         '''
-        return self.new_variable(np.zeros(self.rS.size()), 'float')
+        return self.new_variable(np.zeros((self.num_ports, self.num_ports)), 'float')
 
     @property
     def delays(self):
@@ -108,7 +114,7 @@ class Component(Module):
         Should return a Variable containing a torch.FloatTensor
         containing the delays for each node in the component
         '''
-        return self.new_variable([0]*self.rS.size(0), 'float')
+        return self.new_variable(np.zeros(self.num_ports), 'float')
 
     @property
     def sources_at(self):
@@ -117,7 +123,7 @@ class Component(Module):
         Should return a Variable containing a torch.ByteTensor
         containing the locations of the sources in the component
         '''
-        return self.new_variable([0]*self.rS.size(0), 'byte')
+        return self.new_variable(np.zeros(self.num_ports), 'byte')
 
     @property
     def detectors_at(self):
@@ -126,7 +132,13 @@ class Component(Module):
         Should return a Variable containing a torch.ByteTensor
         containing the locations of the detectors in the component
         '''
-        return self.new_variable([0]*self.rS.size(0), 'byte')
+        return self.new_variable(np.zeros(self.num_ports), 'byte')
+
+    @property
+    def free_idxs(self):
+        ''' Get Free indices for connections '''
+        C = self.C
+        return where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1).data)
 
     def __repr__(self):
         return self.name
