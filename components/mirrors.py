@@ -45,15 +45,16 @@ class Mirror(Component):
         '''
         Component.__init__(self, name=name)
         if R_bounds is None:
-            self.W_R = self.new_variable([-np.log(1/R-1)], 'float')
-            self.R_min = 0
-            self.R_max = 1
-            self.trainable = False
+            self.R_min = self.R_max = R
         else:
-            self.W_R = self.new_parameter([-np.log(1/R-1)],'float')
-            self.R_min = self.new_variable([R_bounds[0]], 'float')
-            self.R_max = self.new_variable([R_bounds[1]], 'float')
-            self.trainable = True
+            self.R_min = R_bounds[0]
+            self.R_max = R_bounds[1]
+
+        self.W_R = self.new_parameter(
+            [-np.log(1/R-1)],
+            dtype='float',
+            requires_grad=((R_bounds is None) or self.R_min == self.R_max),
+        )
 
     @property
     def R(self):
@@ -61,9 +62,9 @@ class Mirror(Component):
         return (self.R_max-self.R_min)*torch.sigmoid(self.W_R) + self.R_min
     @R.setter
     def R(self, value):
-        ''' Reflectivity of the mirror '''
-        R_bounds = (self.R_min, self.R_max) if self.trainable else None
-        self.__init__(self.R.data.numpy()[0], R_bounds, self.name)
+        ''' Set Reflectivity of the mirror manually (not recommended) '''
+        R_bounds = (self.R_min, self.R_max)
+        self.__init__(self.R.data.cpu().numpy()[0], R_bounds, self.name)
 
     @property
     def rS(self):

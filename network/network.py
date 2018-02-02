@@ -29,15 +29,15 @@ class Network(Component):
     def __init__(self, *args, **kwargs):
         '''
         Initialization of the network.
-        
+
         Parameters
         ----------
         There are three accepted forms for the arguments of a new network:
-        
+
         1. First option:
         s = args[0] of type str
         components = args[1:] of type component
-        
+
         s is a string specifying how the components are connected. It follows
         the einstein summation convention.
         e.g.
@@ -73,13 +73,27 @@ class Network(Component):
         # parse arguments
         self.s, self.components = self._parse_args(args)
 
+    def cuda(self):
+        ''' Transform Network to live on the GPU '''
+        components = [comp.cuda() for comp in self.components]
+        new = self.__class__(','.join(self.s), *components)
+        new._cuda = True
+        return new
+
+    def cpu(self):
+        ''' Transform Network to live on the CPU '''
+        components = [comp.cpu() for comp in self.components]
+        new = self.__class__(','.join(self.s), *components)
+        new._cuda = False
+        return new
+
     def initialize(self, env):
         '''
         Initializer of the network. The initializer should be called before
         doing the forward pass through the network. It creates all the internal variables
         necessary.
 
-        The Initializer should in principle also be called after every training Epoch to 
+        The Initializer should in principle also be called after every training Epoch to
         update the parameters of the network.
         '''
 
@@ -90,21 +104,18 @@ class Network(Component):
 
 
         ### Initialize network
-        
+
         super(Network, self).initialize(env)
 
         # gradients
         self.zero_grad()
-
-        # timestep
-        dt = self.env.dt
 
         # delays
         # delays can be turned off for frequency calculations
         # with constant input sources
         delays_in_seconds = self.delays * float(self.env.use_delays)
         # resulting delays in terms of the simulation timestep:
-        delays = (delays_in_seconds/dt + 0.5).int()
+        delays = (delays_in_seconds/self.env.dt + 0.5).int()
         # Check if simulation timestep is too big:
         if (delays[delays_in_seconds>0] < 10).any(): # This bound is rather arbitrary...
             warnings.warn('Simulation timestep might be too large, resulting'
@@ -124,11 +135,28 @@ class Network(Component):
         nmc = int(mc.sum())
         # number of memory-less nodes:
         nml = int(ml.sum())
+
+        # This extra step is necessary for CUDA.
+        # CUDA does not allow matrix multiplication of ByteTensors.
+        if self._cuda:
+            mc = mc.float()
+            ml = ml.float()
+
         # combined locations:
         mcmc = (mc.unsqueeze(1)).mm(mc.unsqueeze(0))
         mcml = (mc.unsqueeze(1)).mm(ml.unsqueeze(0))
         mlmc = (ml.unsqueeze(1)).mm(mc.unsqueeze(0))
         mlml = (ml.unsqueeze(1)).mm(ml.unsqueeze(0))
+
+        # This extra step is necessary for CUDA:
+        # Indexing has to happen with ByteTensors.
+        if self._cuda:
+            mc = mc.byte()
+            ml = ml.byte()
+            mcmc = mcmc.byte()
+            mcml = mcml.byte()
+            mlmc = mlmc.byte()
+            mlml = mlml.byte()
 
         # subsets of scattering matrix:
         rS,iS = self.rS, self.iS
@@ -204,17 +232,17 @@ class Network(Component):
     def forward(self, source):
         # handle input
         rsource, isource = (
-            self.new_variable(np.real(source)).unsqueeze(0), 
+            self.new_variable(np.real(source)).unsqueeze(0),
             self.new_variable(np.imag(source)).unsqueeze(0),
         )
-        rsource, isource = ( 
+        rsource, isource = (
             ((self._rsourceweights).mm(rsource) - (self._isourceweights).mm(isource)).transpose(1,0),
             ((self._rsourceweights).mm(isource) + (self._isourceweights).mm(rsource)).transpose(1,0),
         )
-        
+
         # initialize return vector
         detected = torch.zeros_like(rsource)
-        
+
         # solve
         for i, (r_s, i_s) in enumerate(zip(rsource, isource)):
             # get input state
@@ -222,7 +250,7 @@ class Network(Component):
                 torch.sum(self._buffermask*self._rbuffer, dim=0) + r_s,
                 torch.sum(self._buffermask*self._ibuffer, dim=0) + i_s,
             )
-            
+
             # connect memory-less components
             # r_x and i_x need to be calculated at the same time because of dependencies on each other
             # the .mm function does not work here (2Dx1D not supported). Using torch.matmul instead
@@ -230,10 +258,10 @@ class Network(Component):
                 torch.matmul(self._rC,rx) - torch.matmul(self._iC,ix),
                 torch.matmul(self._rC,ix) + torch.matmul(self._iC,rx),
             )
-            
+
             # get output state
             detected[i] = torch.pow(rx,2) + torch.pow(ix,2)
-            
+
             # connect memory-containing components
             # r_x and i_x need to be calculated at the same time because of dependencies on each other
             # the .mm function does not work here (2Dx1D not supported). Using torch.matmul instead
@@ -241,7 +269,7 @@ class Network(Component):
                 torch.matmul(self._rS,rx) - torch.matmul(self._iS,ix),
                 torch.matmul(self._rS,ix) + torch.matmul(self._iS,rx),
             )
-            
+
             # update buffer
             self._rbuffer = torch.cat((rx.unsqueeze(0), self._rbuffer[0:-1]), dim=0)
             self._ibuffer = torch.cat((ix.unsqueeze(0), self._ibuffer[0:-1]), dim=0)
@@ -260,12 +288,12 @@ class Network(Component):
 
     def plot(self, detected):
         if isinstance(detected, Variable):
-            detected = detected.data.numpy()
+            detected = detected.data.cpu().numpy()
         if isinstance(detected, torch.Tensor):
-            detected = detected.numpy()
+            detected = detected.cpu().numpy()
         if len(detected.shape) == 1:
             detected = detected[:,None]
-        t = np.arange(detected.shape[0])*self.dt
+        t = np.arange(detected.shape[0])*self.env.dt
         f = (int(np.log10(max(t))+0.5)//3)*3-3
         t *= 10**-f
         prefix = {12:'T',9:'G',6:'M',3:'k',0:'',-3:'m',-6:'$\mu$',-9:'n',-12:'p',-15:'f'}[f]
@@ -278,7 +306,7 @@ class Network(Component):
     @property
     def delays(self):
         return torch.cat([comp.delays for comp in self.components])
-    
+
     @property
     def detectors_at(self):
         return torch.cat([comp.detectors_at for comp in self.components])
@@ -286,17 +314,17 @@ class Network(Component):
     @property
     def sources_at(self):
         return torch.cat([comp.sources_at for comp in self.components])
-    
+
     @property
     def rS(self):
         ''' Combined real part of the S-matrix of all the components in the network '''
         return block_diag(*(comp.rS for comp in self.components))
-    
+
     @property
     def iS(self):
         ''' Combined imaginary part of the S-matrix of all the components in the network '''
         return block_diag(*(comp.iS for comp in self.components))
-    
+
     @property
     def C(self):
         Ns = np.cumsum([0]+[comp.delays.size(0) for comp in self.components])
@@ -328,8 +356,8 @@ class Network(Component):
         else:
             components, s = zip(*args)
         return s, components
-    
-    @staticmethod    
+
+    @staticmethod
     def _parse_loops(S):
         loops = []
         for i, s in enumerate(S):
