@@ -25,7 +25,7 @@ class Component(Module):
     def __init__(self, name=None):
         '''
         Initialization of the component.
-        
+
         Note
         ----
         This is a parent class, not intended to be used directly.
@@ -34,28 +34,48 @@ class Component(Module):
         if name is None:
             name = self.__class__.__name__.lower()
         self.name = name
-    
+        self._cuda = False
+
     def initialize(self, env):
         ''' Initialize Component For a simulation by giving it the simulation environment '''
         self.env = env
-    
-    @staticmethod
-    def new_parameter(numpy_array, dtype='float'):
+
+    def cuda(self):
+        ''' Transform component to live on the GPU '''
+        new = super(Component, self).cuda()
+        new._cuda = True
+        return new
+
+    def cpu(self):
+        ''' Transform component to live on the CPU '''
+        new = super(Component, self).cpu()
+        new._cuda = False
+        return new
+
+    def new_tensor(self, numpy_array, dtype='float'):
+        '''
+        Tensor constructor.
+        '''
+        dtype = {'byte':'uint8','float':'float32','double':'float64'}.get(dtype, dtype)
+        tensor = torch.from_numpy(np.asarray(numpy_array, dtype=dtype))
+        if self._cuda:
+            return tensor.cuda()
+        return tensor
+
+
+    def new_parameter(self, numpy_array, dtype='float', requires_grad=True):
         '''
         Parameter constructor.
         Parameters are trainable [requires_grad=True]
         '''
-        dtype = {'byte':'uint8','float':'float32','double':'float64'}.get(dtype, dtype)
-        return Parameter(torch.from_numpy(np.array(numpy_array, dtype=dtype)), requires_grad=True)
-    
-    @staticmethod
-    def new_variable(numpy_array, dtype='float'):
+        return Parameter(self.new_tensor(numpy_array, dtype=dtype), requires_grad=requires_grad)
+
+    def new_variable(self, numpy_array, dtype='float', requires_grad=False):
         '''
         Variable constructor
         Variables are not trainable [requires_grad=False]
         '''
-        dtype = {'byte':'uint8','float':'float32','double':'float64'}.get(dtype, dtype)
-        return Variable(torch.from_numpy(np.array(numpy_array, dtype=dtype)), requires_grad=False)
+        return Variable(self.new_tensor(numpy_array, dtype=dtype), requires_grad=requires_grad)
 
     @property
     def rS(self):
@@ -85,7 +105,7 @@ class Component(Module):
     def delays(self):
         '''
         The delay introduced by the component.
-        Should return a Variable containing a torch.FloatTensor 
+        Should return a Variable containing a torch.FloatTensor
         containing the delays for each node in the component
         '''
         return self.new_variable([0]*self.rS.size(0), 'float')
@@ -94,7 +114,7 @@ class Component(Module):
     def sources_at(self):
         '''
         The locations of the sources in the component.
-        Should return a Variable containing a torch.ByteTensor 
+        Should return a Variable containing a torch.ByteTensor
         containing the locations of the sources in the component
         '''
         return self.new_variable([0]*self.rS.size(0), 'byte')
@@ -103,7 +123,7 @@ class Component(Module):
     def detectors_at(self):
         '''
         The locations of the detectors in the component.
-        Should return a Variable containing a torch.ByteTensor 
+        Should return a Variable containing a torch.ByteTensor
         containing the locations of the detectors in the component
         '''
         return self.new_variable([0]*self.rS.size(0), 'byte')

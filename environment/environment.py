@@ -4,7 +4,9 @@
 ## Imports ##
 #############
 
+import torch
 import numpy as np
+import warnings
 
 
 #################
@@ -25,7 +27,7 @@ class Environment(object):
         name='',
     ):
         ''' Environment __init__
-        
+
         Arguments
         ---------
         t_start (float) [s]: start time of the simulation
@@ -50,7 +52,7 @@ class Environment(object):
 
         # wavelength
         self.wl = wl
-        
+
         # use delays
         # (set to False to speed up frequency calculations with constant source)
         self.use_delays = use_delays
@@ -64,7 +66,7 @@ class Environment(object):
     @num_timesteps.setter
     def num_timesteps(self, value):
         self.t = np.arange(self.t_start, value*self.dt, self.dt)
-    
+
     @property
     def dt(self):
         return self._dt
@@ -72,18 +74,17 @@ class Environment(object):
     def dt(self, value):
         self._dt = value
         self.t = np.arange(self.t_start, self.t_end, value)
-    
+
     @property
     def t_start(self):
         return self.t[0]
     @t_start.setter
     def t_start(self, value):
         self.t = np.arange(value, self.t_end, self.dt)
-    
+
     @property
     def t_end(self):
         return self.t[-1] + self.dt
     @t_end.setter
     def t_end(self, value):
         self.t = np.arange(self.t_start, value, self.dt)
-        
