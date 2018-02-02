@@ -18,6 +18,9 @@ class Term(Component):
     '''
     A term is a memory-less component with one single input. It terminates an unconnected node.
     '''
+
+    num_ports = 1
+
     @property
     def rS(self):
         return self.new_variable([[0]], 'float')

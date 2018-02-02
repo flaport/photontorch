@@ -32,6 +32,9 @@ class Mirror(Component):
     i --|-- j
         |
     '''
+
+    num_ports = 2
+
     def __init__(self, R=0.5, R_bounds=(0,1), name=None):
         '''
         Mirror initialization
@@ -53,7 +56,7 @@ class Mirror(Component):
         self.W_R = self.new_parameter(
             [-np.log(1/R-1)],
             dtype='float',
-            requires_grad=((R_bounds is None) or self.R_min == self.R_max),
+            requires_grad=((R_bounds is None) or self.R_min != self.R_max),
         )
 
     @property
@@ -97,6 +100,8 @@ class SlantedMirror(Mirror):
           /|
            l
     '''
+
+    num_ports = 4
 
     @property
     def rS(self):
