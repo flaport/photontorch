@@ -152,6 +152,6 @@ class BlockDiag(Function):
         '''
         outputs = []
         for i,j in ctx.idxs:
-            output = block_diag[i:j,i:j]
+            output = M[i:j,i:j]
             outputs.append(output)
         return tuple(outputs)
