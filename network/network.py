@@ -20,6 +20,7 @@ from .connector import Connector
 from ..components.component import Component
 from ..utils.autograd import block_diag
 from ..utils.tensor import zeros
+from ..utils.tensor import where
 
 
 #############
@@ -211,90 +212,109 @@ class Network(Component):
         rx, ix = (rx).mm(Cmlmc), (ix).mm(Cmlmc)
 
         # 5. C = x + Cmcmc
-        self._rC = rx + Cmcmc
-        self._iC = ix
+        rC = rx + Cmcmc
+        iC = ix
 
+        ## other locations
+        others_at = where((sources_at | detectors_at)[mc].ne(1).data)
 
-        ## reduced scattering matrix
+        ## locations and number of detectors
+        self.num_detectors = int(torch.sum(detectors_at))
+        detectors_at = where(detectors_at[mc].data)#list(np.where(detectors_at[mc].data.cpu().numpy())[0])
 
-        self._rS = rSmcmc
-        self._iS = iSmcmc
+        ## locations and number of sources
+        self.num_sources = int(torch.sum(sources_at))
+        sources_at = where(sources_at[mc].data)#list(np.where(sources_at[mc].data.cpu().numpy())[0])
 
-        ## reduced delays vector
-        self._delays = delays[mc]
+        ## Create and reorder reduced matrices.
+        ## The reordering yields a small performance upgrade in the forward pass
+        new_order = torch.cat((sources_at, others_at, detectors_at))
+        self._delays = delays[mc][new_order] # Reduced delay vector
+        self._rS = rSmcmc[new_order][:,new_order] # real part of reduced S-matrix
+        self._iS = iSmcmc[new_order][:,new_order] # imag part of reduced S-matrix
+        self._rC = rC[new_order][:,new_order] # real part of reduced C-matrix
+        self._iC = iC[new_order][:,new_order] # imag part of reduced C-matrix
 
-        ## reduced location of detectors
-        self._detectors_at = detectors_at[mc]
-
-        ## reduced location of sources
-        self._sources_at = sources_at[mc]
-
-        ## source input weights
-
-        self._rsourceweights = self._sources_at.float().unsqueeze(1)
-        self._isourceweights = torch.zeros_like(self._rsourceweights)
-
-
-    def new_buffer(self):
-        ''' Create buffer to keep the hidden states of the Network (RNN) '''
+    def new_buffer(self, num_batches=1):
+        '''
+        Create buffer to keep the hidden states of the Network (RNN)
+        The buffer has shape (# batches, # time, # mc nodes)
+        '''
         type = 'torch.cuda.FloatTensor' if self._cuda else 'torch.FloatTensor'
         buffer = zeros(int(self._delays.max())+2, self.nmc, type=type)
         buffermask = torch.zeros_like(buffer)
         for i, d in enumerate(self._delays):
             buffermask[int(d), i] = 1.0
+        buffermask = Variable(torch.cat([buffermask.unsqueeze(0)]*num_batches, dim=0))
+        buffer = torch.cat([buffer.unsqueeze(0)]*num_batches, dim=0)
         rbuffer = Variable(buffer.clone())
         ibuffer = Variable(buffer)
-        buffermask  = Variable(buffermask)
         return rbuffer, ibuffer, buffermask
 
     def forward(self, source):
-        # handle input
-        rsource, isource = (
-            self.new_variable(np.real(source)).unsqueeze(0),
-            self.new_variable(np.imag(source)).unsqueeze(0),
-        )
-        rsource, isource = (
-            ((self._rsourceweights).mm(rsource) - (self._isourceweights).mm(isource)).transpose(1,0),
-            ((self._rsourceweights).mm(isource) + (self._isourceweights).mm(rsource)).transpose(1,0),
-        )
+        ''' Forward pass of the network '''
 
-        rbuffer, ibuffer, buffermask = self.new_buffer()
+        ## Handle input: make source to have shape (# batches, # time, # sources)
+        _rsource = self.new_variable(np.real(source))
+        _isource = self.new_variable(np.imag(source))
+        if _rsource.dim() == 1:
+            # batch with size 1:
+            _rsource = _rsource.unsqueeze(0)
+            _isource = _isource.unsqueeze(0)
+        if _rsource.dim() == 2:
+            # same input for all sources
+            _rsource = torch.cat([_rsource.unsqueeze(-1)]*self.num_sources, dim=-1)
+            _isource = torch.cat([_isource.unsqueeze(-1)]*self.num_sources, dim=-1)
 
-        # initialize return vector
-        detected = torch.zeros_like(rsource)
+        # Get number of batches:
+        num_batches = _rsource.size(0)
+
+        ## initialize return vector with shape (# batches, # time, # mc nodes)
+        detected = self.new_variable(np.zeros((num_batches, self.env.num_timesteps, self.nmc)))
+
+        ## make source to have shape (# batches, # time, # mc nodes)
+        ## NOTE: This is beneficial for performance, but not good for RAM usage
+        ## Since we are basically keeping an array mostly full with 0's in memory...
+        rsource = torch.zeros_like(detected)
+        isource = torch.zeros_like(detected)
+        rsource[:, :, :self.num_sources] = _rsource
+        isource[:, :, :self.num_sources] = _isource
+
+        ## Get new buffer
+        rbuffer, ibuffer, buffermask = self.new_buffer(num_batches)
+
+        # initialize intermediate state
+        self.rx = rx = self.new_variable(np.zeros((rsource.size(0),1,self.nmc)))
+        ix = self.new_variable(np.zeros((rsource.size(0),1,self.nmc)))
 
         # solve
-        for i, (r_s, i_s) in enumerate(zip(rsource, isource)):
-            # get input state
-            rx, ix = (
-                torch.sum(buffermask*rbuffer, dim=0) + r_s,
-                torch.sum(buffermask*ibuffer, dim=0) + i_s,
-            )
-
-            # connect memory-less components
-            # rx and ix need to be calculated at the same time because of dependencies on each other
-            # the .mm function does not work here (2Dx1D not supported). Using torch.matmul instead
-            rx, ix = (
-                torch.matmul(self._rC,rx) - torch.matmul(self._iC,ix),
-                torch.matmul(self._rC,ix) + torch.matmul(self._iC,rx),
-            )
-
-            # get output state
-            detected[i] = torch.pow(rx,2) + torch.pow(ix,2)
-
+        for i in range(self.env.num_timesteps):
             # connect memory-containing components
             # rx and ix need to be calculated at the same time because of dependencies on each other
-            # the .mm function does not work here (2Dx1D not supported). Using torch.matmul instead
             rx, ix = (
-                torch.matmul(self._rS,rx) - torch.matmul(self._iS,ix),
-                torch.matmul(self._rS,ix) + torch.matmul(self._iS,rx),
+                torch.matmul(rx,self._rS) - torch.matmul(ix,self._iS),
+                torch.matmul(ix,self._rS) + torch.matmul(rx,self._iS),
             )
 
             # update buffer
-            rbuffer = torch.cat((rx.unsqueeze(0), rbuffer[0:-1]), dim=0)
-            ibuffer = torch.cat((ix.unsqueeze(0), ibuffer[0:-1]), dim=0)
+            rbuffer = torch.cat((rx, rbuffer[:,0:-1,:]), dim=1)
+            ibuffer = torch.cat((ix, ibuffer[:,0:-1,:]), dim=1)
 
-        return detected[self._detectors_at].view(-1,int(torch.sum(self._detectors_at)))
+            # get input state
+            rx = torch.sum(buffermask*rbuffer, dim=1, keepdim=True) + rsource[:,i:i+1,:]
+            ix = torch.sum(buffermask*ibuffer, dim=1, keepdim=True) + isource[:,i:i+1,:]
+
+            # connect memory-less components
+            # rx and ix need to be calculated at the same time because of dependencies on each other
+            rx, ix = (
+                torch.matmul(rx,self._rC) - torch.matmul(ix,self._iC),
+                torch.matmul(ix,self._rC) + torch.matmul(rx,self._iC),
+            )
+
+            # get output state
+            detected[:,i:i+1,:] = torch.pow(rx,2) + torch.pow(ix,2)
+
+        return detected[:,:,-self.num_detectors:]
 
 
     def parameters(self):
