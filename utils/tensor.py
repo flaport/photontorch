@@ -73,7 +73,7 @@ def where(bytetensor):
     Get indices of places where bytetensor > 0.
     NOTE: Only works for 1D ByteTensors for now.
     '''
-    idxs = torch.zeros_like(bytetensor)
+    idxs = torch.zeros_like(bytetensor).long()
     torch.arange(0, idxs.size(0), 1, out=idxs)
     idxs = idxs[bytetensor]
     return idxs
