@@ -12,12 +12,14 @@ from torch.autograd import Variable
 
 ## Others
 import warnings
+import functools
 import numpy as np
 import matplotlib.pyplot as plt
 
 ## Relative
 from .connector import Connector
 from ..components.component import Component
+from ..components.terms import Term
 from ..components.terms import Detector
 from ..utils.autograd import block_diag
 from ..utils.tensor import zeros
@@ -74,9 +76,23 @@ class Network(Component):
 
         Component.__init__(self, name=kwargs.pop('name','nw'))
         # parse arguments
-        self.s, self.components = self._parse_args(args)
+        s, components = self._parse_args(args)
+        self.s = s
+        self.components = tuple(components)
 
         self.num_ports = np.sum(comp.num_ports for comp in self.components)
+        self.initialized = False
+
+    def terminate(self, term=None):
+        ''' Add Terms to open connections '''
+        if term is None:
+            term = Term()
+        connector = Connector(','.join(self.s), self.components)
+        idxs = connector.idxs
+        print(idxs)
+        for i in idxs:
+            connector = connector*term[i]
+        return Network(connector, name=self.name)
 
     def cuda(self):
         ''' Transform Network to live on the GPU '''
@@ -101,6 +117,9 @@ class Network(Component):
         The Initializer should in principle also be called after every training Epoch to
         update the parameters of the network.
         '''
+        ## begin initialization:
+        self.initialized = False
+
         ## Initialize components in the network
         for comp in self.components:
             comp.initialize(env)
@@ -240,6 +259,18 @@ class Network(Component):
             buffermask[0, int(d), i] = 1.0
         self.buffermask = Variable(buffermask)
 
+        self.initialized = True
+
+    def require_initializion(func):
+        ''' Some functions require the Network to be initialized '''
+        @functools.wraps(func)
+        def wrapped(self, *args, **kwargs):
+            if not self.initialized:
+                raise ValueError('Network not fully initialized. Is the network fully terminated?')
+            return func(self, *args, **kwargs)
+        return wrapped
+
+    @require_initializion
     def new_buffer(self, num_batches=1):
         '''
         Create buffer to keep the hidden states of the Network (RNN)
@@ -251,6 +282,7 @@ class Network(Component):
         ibuffer = Variable(buffer)
         return rbuffer, ibuffer
 
+    @require_initializion
     def handle_source(self, source):
         '''
         Make a FloatTensor with size (# batches, # time, # sources)
@@ -272,7 +304,7 @@ class Network(Component):
         source[:,:,:self.num_sources,1] = _isource
         return source
 
-
+    @require_initializion
     def forward(self, source):
         '''
         Forward pass of the network.
