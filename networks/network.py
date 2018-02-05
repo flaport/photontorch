@@ -117,9 +117,6 @@ class Network(Component):
             self.forward = forward
             return # Stop initialization here.
 
-        ## gradients
-        self.zero_grad()
-
         ## delays
         # delays can be turned off for frequency calculations
         # with constant input sources
@@ -321,17 +318,17 @@ class Network(Component):
             for p in comp.parameters():
                 yield p
 
-    def plot(self, t, detected, label='', type='time'):
+    def plot(self, x, detected, label='', type='time'):
         if isinstance(detected, Variable):
             detected = detected.data.cpu().numpy()
         if isinstance(detected, torch.Tensor):
             detected = detected.cpu().numpy()
         if len(detected.shape) == 1:
             detected = detected[:,None]
-        f = (int(np.log10(max(t))+0.5)//3)*3-3
-        t *= 10**-f
+        f = (int(np.log10(max(x))+0.5)//3)*3-3
+        x = x*10**-f # no inplace operation, since that would change the original x...
         prefix = {12:'T',9:'G',6:'M',3:'k',0:'',-3:'m',-6:'$\mu$',-9:'n',-12:'p',-15:'f'}[f]
-        plots = plt.plot(t, detected)
+        plots = plt.plot(x, detected)
         if type=='time':
             plt.xlabel("time [%ss]"%prefix)
         elif type in ['wl','wls','wavelength','wavelengths']:

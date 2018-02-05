@@ -23,7 +23,7 @@ from ..utils import where
 
 class Component(Module):
     '''
-    Generic component, defined by a scattering matrix and a connection matrix.
+    Generic component.
     '''
 
     num_ports = 1 # Number of ports of the component
@@ -45,6 +45,7 @@ class Component(Module):
     def initialize(self, env):
         ''' Initialize Component For a simulation by giving it the simulation environment '''
         self.env = env
+        self.zero_grad()
         if (self.sources_at & self.detectors_at).any():
             raise ValueError('Sources and Detectors cannot be combined in the same node.')
 
