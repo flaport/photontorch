@@ -45,6 +45,8 @@ class Component(Module):
     def initialize(self, env):
         ''' Initialize Component For a simulation by giving it the simulation environment '''
         self.env = env
+        if (self.sources_at & self.detectors_at).any():
+            raise ValueError('Sources and Detectors cannot be combined in the same node.')
 
     def cuda(self):
         ''' Transform component to live on the GPU '''
@@ -155,7 +157,7 @@ class Component(Module):
 ## Other imports ##
 ###################
 
-# These imports need to happen here because otherwise we have circular imports...
+# This import needs to happen in the end to prevent circular imports.
 
 ## Relative
-from ..network.connector import Connector
+from ..networks.connector import Connector

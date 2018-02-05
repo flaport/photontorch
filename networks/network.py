@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 ## Relative
 from .connector import Connector
 from ..components.component import Component
+from ..components.terms import Detector
 from ..utils.autograd import block_diag
 from ..utils.tensor import zeros
 from ..utils.tensor import where
@@ -320,24 +321,30 @@ class Network(Component):
             for p in comp.parameters():
                 yield p
 
-    def plot(self, detected, label=''):
+    def plot(self, t, detected, label='', type='time'):
         if isinstance(detected, Variable):
             detected = detected.data.cpu().numpy()
         if isinstance(detected, torch.Tensor):
             detected = detected.cpu().numpy()
         if len(detected.shape) == 1:
             detected = detected[:,None]
-        t = np.arange(detected.shape[0])*self.env.dt
         f = (int(np.log10(max(t))+0.5)//3)*3-3
         t *= 10**-f
         prefix = {12:'T',9:'G',6:'M',3:'k',0:'',-3:'m',-6:'$\mu$',-9:'n',-12:'p',-15:'f'}[f]
         plots = plt.plot(t, detected)
-        plt.xlabel("time [%ss]"%prefix)
+        if type=='time':
+            plt.xlabel("time [%ss]"%prefix)
+        elif type in ['wl','wls','wavelength','wavelengths']:
+            plt.xlabel('wavelength [%sm]'%prefix)
         plt.ylabel("intensity [a.u.]")
-        for i, plot in enumerate(plots):
-            plot.set_label(label + ': ' + str(i) if label != '' else str(i))
+        names = [comp.name for comp in self.components if isinstance(comp, Detector)]
+        for i, (name, plot) in enumerate(zip(names, plots)):
+            if name == '' or name is None:
+                name = str(i)
+            plot.set_label(label + ': ' + name if label != '' else name)
         plt.legend()
         return plots
+
 
     @property
     def delays(self):
