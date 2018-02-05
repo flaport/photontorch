@@ -24,6 +24,7 @@ class Environment(object):
         use_delays=True,
         num_timesteps=None,
         t = None,
+        cuda = None,
         name='',
     ):
         ''' Environment __init__
@@ -34,9 +35,13 @@ class Environment(object):
         t_end (float) [s]: end time of the simulation (not included)
         dt (float) [s]: timestep of the simulation
         wl (float) [m]: wavelength of the simulation
-        delays (bool) : if delays are necessary in the simulation
+        use_delays (bool) : if delays are necessary in the simulation.
+                            You can set this to false in frequency domain simulations
+                            with constant input source.
         num_timesteps (int) : number of timesteps in the simulation (overrules t_end)
         t (array): time array (overrules t_start, t_end, dt and num_timesteps)
+        cuda (True, False, None): whether to use cuda in the simulation.
+                                  If `None`, the default of the network is used.
         name (str) : name of the environment
         '''
 
@@ -56,6 +61,12 @@ class Environment(object):
         # use delays
         # (set to False to speed up frequency calculations with constant source)
         self.use_delays = use_delays
+
+        # use CUDA or not
+        self.cuda = cuda
+        if cuda and not torch.cuda.is_available():
+            warnings.warn('CUDA requested, but is not available. Rollback to CPU')
+            self.cuda = False
 
         # name
         self.name = name
