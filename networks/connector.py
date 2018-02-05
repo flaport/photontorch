@@ -92,14 +92,14 @@ class Connector(object):
     def __mul__(self, other):
         if isinstance(other, Connector):
             s = ','.join(self.s.split(',')+other.s.split(','))
-            return Connector(s, self.components+other.components)
+            return Connector(s, tuple(self.components)+tuple(other.components))
         else:
             raise ValueError('Cannot connect %s and %s'(repr(self), repr(other)))
 
     def __imul__(self, other):
         if isinstance(other, Connector):
             self.s = ','.join(self.s.split(',')+other.s.split(','))
-            self.components += other.components
+            self.components += tuple(other.components)
         else:
             raise ValueError('Cannot connect components %s and %s'(repr(self), repr(other)))
 
