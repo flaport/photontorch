@@ -12,9 +12,11 @@ from torch.autograd import Variable
 
 ## Other
 import numpy as np
+from copy import deepcopy
 
 ## Relative
 from ..utils import where
+from ..networks.connector import Connector
 
 
 ###############
@@ -44,10 +46,26 @@ class Component(Module):
 
     def initialize(self, env):
         ''' Initialize Component For a simulation by giving it the simulation environment '''
-        self.env = env
+        self._env = env
+        if env.cuda is not None:
+            if env.cuda and not self._cuda:
+                self.cuda()
+            elif not env.cuda and self._cuda:
+                self.cpu()
         self.zero_grad()
         if (self.sources_at & self.detectors_at).any():
             raise ValueError('Sources and Detectors cannot be combined in the same node.')
+
+    @property
+    def env(self):
+        '''
+        Alternative initializer. This is here as a safeguard for when env would be
+        set manually.
+        '''
+        return self._env
+    @env.setter
+    def env(self, value):
+        self.initialize(env)
 
     def cuda(self):
         ''' Transform component to live on the GPU '''
@@ -143,6 +161,25 @@ class Component(Module):
         C = self.C
         return where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1).data)
 
+    def copy(self):
+        new = self.__class__.__new__(self.__class__)
+        new.__dict__['env'] = None
+        for k, v in self.__dict__.items():
+            if k == 'components': # special way of copying subcomponent of a network
+                new.__dict__[k] = tuple([comp.copy() for comp in v])
+            elif isinstance(v, Component):
+                new.__dict__[k] = v.copy()
+            elif isinstance(v, Variable):
+                # Do nothing to variables that are not parameters or leafs
+                # NOTE: parameters are in the ordered_dict _parameters and will
+                # be copied by the deepcopy below.
+                pass
+            else:
+                new.__dict__[k] = deepcopy(v)
+        if new.__dict__['env'] is not None:
+            new.initialize(new.env)
+        return new
+
     def __repr__(self):
         return self.name
 
@@ -161,4 +198,3 @@ class Component(Module):
 # This import needs to happen in the end to prevent circular imports.
 
 ## Relative
-from ..networks.connector import Connector
