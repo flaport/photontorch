@@ -235,26 +235,29 @@ class Network(Component):
         self._rC = rC[new_order][:,new_order] # real part of reduced C-matrix
         self._iC = iC[new_order][:,new_order] # imag part of reduced C-matrix
 
+        # Create buffermask
+        type = 'torch.cuda.FloatTensor' if self._cuda else 'torch.FloatTensor'
+        buffermask = zeros(1, int(self._delays.max())+2, self.nmc, type=type)
+        for i, d in enumerate(self._delays):
+            buffermask[0, int(d), i] = 1.0
+        self.buffermask = Variable(buffermask)
+
     def new_buffer(self, num_batches=1):
         '''
         Create buffer to keep the hidden states of the Network (RNN)
         The buffer has shape (# batches, # time, # mc nodes)
         '''
         type = 'torch.cuda.FloatTensor' if self._cuda else 'torch.FloatTensor'
-        buffer = zeros(int(self._delays.max())+2, self.nmc, type=type)
-        buffermask = torch.zeros_like(buffer)
-        for i, d in enumerate(self._delays):
-            buffermask[int(d), i] = 1.0
-        buffermask = Variable(torch.cat([buffermask.unsqueeze(0)]*num_batches, dim=0))
-        buffer = torch.cat([buffer.unsqueeze(0)]*num_batches, dim=0)
+        buffer = zeros(num_batches, self.buffermask.size(1), self.buffermask.size(2), type=type)
         rbuffer = Variable(buffer.clone())
         ibuffer = Variable(buffer)
-        return rbuffer, ibuffer, buffermask
+        return rbuffer, ibuffer
 
-    def forward(self, source):
-        ''' Forward pass of the network '''
-
-        ## Handle input: make source to have shape (# batches, # time, # sources)
+    def handle_source(self, source):
+        '''
+        Make a FloatTensor with size (# batches, # time, # sources)
+        '''
+        type = 'torch.cuda.FloatTensor' if self._cuda else 'torch.FloatTensor'
         _rsource = self.new_variable(np.real(source))
         _isource = self.new_variable(np.imag(source))
         if _rsource.dim() == 1:
@@ -266,53 +269,44 @@ class Network(Component):
             _rsource = torch.cat([_rsource.unsqueeze(-1)]*self.num_sources, dim=-1)
             _isource = torch.cat([_isource.unsqueeze(-1)]*self.num_sources, dim=-1)
 
-        # Get number of batches:
-        num_batches = _rsource.size(0)
+        source = Variable(zeros(_rsource.size(0), _rsource.size(1), self.nmc, 2, type=type))
+        source[:,:,:self.num_sources,0] = _rsource
+        source[:,:,:self.num_sources,1] = _isource
+        return source
 
-        ## initialize return vector with shape (# batches, # time, # mc nodes)
-        detected = self.new_variable(np.zeros((num_batches, self.env.num_timesteps, self.nmc)))
 
-        ## make source to have shape (# batches, # time, # mc nodes)
-        ## NOTE: This is beneficial for performance, but not good for RAM usage
-        ## Since we are basically keeping an array mostly full with 0's in memory...
-        rsource = torch.zeros_like(detected)
-        isource = torch.zeros_like(detected)
-        rsource[:, :, :self.num_sources] = _rsource
-        isource[:, :, :self.num_sources] = _isource
+    def forward(self, source):
+        '''
+        Forward pass of the network.
+        source should be a FloatTensor of size (# batches, # time, # sources).
+        '''
+
+        detected = self.new_variable(np.zeros((source.size(0), self.env.num_timesteps, self.nmc)))
 
         ## Get new buffer
-        rbuffer, ibuffer, buffermask = self.new_buffer(num_batches)
-
-        # initialize intermediate state
-        self.rx = rx = self.new_variable(np.zeros((rsource.size(0),1,self.nmc)))
-        ix = self.new_variable(np.zeros((rsource.size(0),1,self.nmc)))
+        rbuffer, ibuffer = self.new_buffer(source.size(0))
 
         # solve
         for i in range(self.env.num_timesteps):
-            # connect memory-containing components
-            # rx and ix need to be calculated at the same time because of dependencies on each other
-            rx, ix = (
-                torch.matmul(rx,self._rS) - torch.matmul(ix,self._iS),
-                torch.matmul(ix,self._rS) + torch.matmul(rx,self._iS),
-            )
-
-            # update buffer
-            rbuffer = torch.cat((rx, rbuffer[:,0:-1,:]), dim=1)
-            ibuffer = torch.cat((ix, ibuffer[:,0:-1,:]), dim=1)
 
             # get input state
-            rx = torch.sum(buffermask*rbuffer, dim=1, keepdim=True) + rsource[:,i:i+1,:]
-            ix = torch.sum(buffermask*ibuffer, dim=1, keepdim=True) + isource[:,i:i+1,:]
+            rx = (torch.sum(self.buffermask*rbuffer, dim=1) + source[:,i,:,0]).t()
+            ix = (torch.sum(self.buffermask*ibuffer, dim=1) + source[:,i,:,1]).t()
 
             # connect memory-less components
             # rx and ix need to be calculated at the same time because of dependencies on each other
-            rx, ix = (
-                torch.matmul(rx,self._rC) - torch.matmul(ix,self._iC),
-                torch.matmul(ix,self._rC) + torch.matmul(rx,self._iC),
-            )
+            rx, ix = (self._rC).mm(rx) - (self._iC).mm(ix), (self._rC).mm(ix) + (self._iC).mm(rx)
 
             # get output state
-            detected[:,i:i+1,:] = torch.pow(rx,2) + torch.pow(ix,2)
+            detected[:,i,:] = (torch.pow(rx,2) + torch.pow(ix,2)).t()
+
+            # connect memory-containing components
+            # rx and ix need to be calculated at the same time because of dependencies on each other
+            rx, ix = (self._rS).mm(rx) - (self._iS).mm(ix), (self._rS).mm(ix) + (self._iS).mm(rx)
+
+            # update buffer
+            rbuffer = torch.cat((rx.t().unsqueeze(1), rbuffer[:,0:-1,:]), dim=1)
+            ibuffer = torch.cat((ix.t().unsqueeze(1), ibuffer[:,0:-1,:]), dim=1)
 
         return detected[:,:,-self.num_detectors:]
 
@@ -326,7 +320,7 @@ class Network(Component):
             for p in comp.parameters():
                 yield p
 
-    def plot(self, detected):
+    def plot(self, detected, label=''):
         if isinstance(detected, Variable):
             detected = detected.data.cpu().numpy()
         if isinstance(detected, torch.Tensor):
@@ -337,11 +331,13 @@ class Network(Component):
         f = (int(np.log10(max(t))+0.5)//3)*3-3
         t *= 10**-f
         prefix = {12:'T',9:'G',6:'M',3:'k',0:'',-3:'m',-6:'$\mu$',-9:'n',-12:'p',-15:'f'}[f]
-        plt.plot(t, detected)
+        plots = plt.plot(t, detected)
         plt.xlabel("time [%ss]"%prefix)
         plt.ylabel("intensity [a.u.]")
-        labels = ['output %i'%i for i in range(detected.shape[1])]
-        plt.legend(labels)
+        for i, plot in enumerate(plots):
+            plot.set_label(label + ': ' + str(i) if label != '' else str(i))
+        plt.legend()
+        return plots
 
     @property
     def delays(self):
