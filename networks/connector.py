@@ -10,7 +10,7 @@ CHARS = ''.join([chr(i) for i in range(128)])
 
 class Connector(object):
     '''
-    The connector object is an abstract object that is invoked 
+    The connector object is an abstract object that is invoked
     while connecting components into a network.
 
     It is merely there as an aid for connecting components together
@@ -36,7 +36,7 @@ class Connector(object):
     useful attribute
     ----------------
     get the free indices of a connector by calling the .idxs attribute:
-    
+
     In[1]:  conn.idxs
     Out[1]: 'ijkl'
 
@@ -67,7 +67,7 @@ class Connector(object):
             return
         self.s = s
         self.components = components
-    
+
     @property
     def idxs(self):
         return self._idxs(self.s)
