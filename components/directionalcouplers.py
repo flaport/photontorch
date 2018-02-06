@@ -29,10 +29,10 @@ class DirectionalCoupler(Mirror):
     Connections
     ------------
     dircoup['ijkl']:
-     j        l
+     k        l
       \______/
       /------\
-     i        k
+     i        j
 
     Note
     ----
@@ -44,7 +44,7 @@ class DirectionalCoupler(Mirror):
     @property
     def rS(self):
         t = (1-self.R)**0.5
-        return self.new_variable([[0,0,1,0],[0,0,0,1],[1,0,0,0],[0,1,0,0]])*t
+        return self.new_variable([[0,1,0,0],[1,0,0,0],[0,0,0,1],[0,0,1,0]])*t
 
     @property
     def iS(self):
@@ -56,13 +56,15 @@ class RealisticDirectionalCoupler(Component):
     '''
     A directional coupler is a memory-less component with 4 ports.
 
+    The realistic directional coupler is based on the CapheModel of Umar Khan
+
     Connections
     ------------
     dircoup['ijkl']:
-     j        l
+     k        l
       \______/
       /------\
-     i        k
+     i        j
 
     Notes
     -----
@@ -116,7 +118,7 @@ class RealisticDirectionalCoupler(Component):
         kappa0 = self.k0 + self.de1_k0*dwl + 0.5*self.de2_k0*dwl**2
         kappa1 = pi*dn/wl
         tau = np.cos(kappa0 + kappa1*self.length)
-        return self.new_variable([[0,0,1,0],[0,0,0,1],[1,0,0,0],[0,1,0,0]])*tau
+        return self.new_variable([[0,1,0,0],[1,0,0,0],[0,0,0,1],[0,0,1,0]])*tau
 
     @property
     def iS(self):

@@ -43,7 +43,7 @@ class AllPass(Network):
         ring_wg : waveguide for the ring
         dircoup : directional coupler for the connection to the ring
         '''
-        connector = dircoup['ijkl']*ring_wg['jl']
+        connector = dircoup['ikjl']*ring_wg['jl']
 
         i,j = connector.idxs
         if in_wg is not None:
@@ -99,15 +99,16 @@ class AddDrop(Network):
         dircoup1 : bottom directional coupler for the connection to the ring
         dircoup2 : top directional coupler for the connection to the ring
         '''
-        connector = dircoup1['wxyz']*dircoup2['efgh']
-        connector = half_ring_wg['be']*half_ring_wg['dg']*connector
+        connector = dircoup1['abcd']*dircoup2['efgh']
+        connector = half_ring_wg['ce']*half_ring_wg['df']*connector
 
-        for i,j, wg in zip('wxyz',connector.idxs,[in_wg, drop_wg, pass_wg, add_wg]):
+        for i,j, wg in zip('wxyz',connector.idxs,[in_wg, pass_wg, drop_wg, add_wg]):
             if wg is not None:
                 connector = wg[i+j]*connector
 
-        for i, term in zip(connector.idxs,[in_term, drop_term, pass_term, add_term]):
+        for i, term in zip(connector.idxs,[in_term, pass_term, drop_term, add_term]):
             if term is not None:
                 connector = term[i]*connector
+        print(connector)
 
         Network.__init__(self, connector)
