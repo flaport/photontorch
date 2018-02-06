@@ -76,9 +76,7 @@ class Network(Component):
 
         Component.__init__(self, name=kwargs.pop('name','nw'))
         # parse arguments
-        s, components = self._parse_args(args)
-        self.s = s
-        self.components = tuple(components)
+        self.s, self.components = self._parse_args(args)
 
         self.num_ports = np.sum(comp.num_ports for comp in self.components)
         self.initialized = False
@@ -87,24 +85,23 @@ class Network(Component):
         ''' Add Terms to open connections '''
         if term is None:
             term = Term()
-        connector = Connector(','.join(self.s), self.components)
+        connector = Connector(self.s, self.components)
         idxs = connector.idxs
-        print(idxs)
         for i in idxs:
             connector = connector*term[i]
         return Network(connector, name=self.name)
 
     def cuda(self):
         ''' Transform Network to live on the GPU '''
-        components = [comp.cuda() for comp in self.components]
-        new = self.__class__(','.join(self.s), *components)
+        new = self.copy()
+        new.components = tuple([comp.cuda() for comp in new.components])
         new._cuda = True
         return new
 
     def cpu(self):
         ''' Transform Network to live on the CPU '''
-        components = [comp.cpu() for comp in self.components]
-        new = self.__class__(','.join(self.s), *components)
+        new = self.copy()
+        new.components = tuple([comp.cpu() for comp in new.components])
         new._cuda = False
         return new
 
@@ -129,7 +126,7 @@ class Network(Component):
 
         ## Check if network is fully connected
         C = self.C
-        fully_connected = (self.C.sum(0) > 0).all() or (self.C.sum(1) > 0).all()
+        fully_connected = ((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).all()
         if not fully_connected:
             def forward(*args, **kwargs):
                 raise ValueError('Network not Fully Connected')
@@ -199,38 +196,42 @@ class Network(Component):
         Cmlmc = C[mlmc].view(nml,nmc)
         Cmlml = C[mlml].view(nml,nml)
 
-        ## helper matrices
-        # P = I - Cmlml@Smlml
-        rP = self.new_variable(np.eye(nml),'float') - (Cmlml).mm(rSmlml)
-        iP = -(Cmlml).mm(iSmlml)
 
+        if nml: # Only do the following steps if there is at least one ml node:
+            ## helper matrices
+            # P = I - Cmlml@Smlml
+            rP = self.new_variable(np.eye(nml),'float') - (Cmlml).mm(rSmlml)
+            iP = -(Cmlml).mm(iSmlml)
 
-        ## reduced connection matrix
+            ## reduced connection matrix
 
-        # C = Cmcml@Smlml@inv(P)@Cmlmc + Cmcmc (we do this in 5 steps)
+            # C = Cmcml@Smlml@inv(P)@Cmlmc + Cmcmc (we do this in 5 steps)
 
-        # 1. Calculation of inv(P) = X + i*Y
-        # note that real(inv(P)) != inv(real(P)) in most cases!
-        # for a matrix P = rP + i*iP, with rP invertible it is easy to check that
-        # the inverse is given by inv(P) = X + i*Y, with
-        # X = inv(rP + iP@inv(rP)@iP)
-        # Y = -X@iP@inv(rP)
-        inv_rP = torch.inverse(rP)
-        X = torch.inverse(rP + (iP).mm(inv_rP).mm(iP))
-        Y = -(X).mm(iP).mm(inv_rP)
+            # 1. Calculation of inv(P) = X + i*Y
+            # note that real(inv(P)) != inv(real(P)) in most cases!
+            # for a matrix P = rP + i*iP, with rP invertible it is easy to check that
+            # the inverse is given by inv(P) = X + i*Y, with
+            # X = inv(rP + iP@inv(rP)@iP)
+            # Y = -X@iP@inv(rP)
+            inv_rP = torch.inverse(rP)
+            X = torch.inverse(rP + (iP).mm(inv_rP).mm(iP))
+            Y = -(X).mm(iP).mm(inv_rP)
 
-        # 2. x = Cmcml@Smlml
-        rx, ix = (Cmcml).mm(rSmlml), (Cmcml).mm(iSmlml)
+            # 2. x = Cmcml@Smlml
+            rx, ix = (Cmcml).mm(rSmlml), (Cmcml).mm(iSmlml)
 
-        # 3. x = x@invP [rx and ix calculated at the same time: they depend on each other]
-        rx, ix = (rx).mm(X) - (ix).mm(Y), (rx).mm(Y) + (ix).mm(X)
+            # 3. x = x@invP [rx and ix calculated at the same time: they depend on each other]
+            rx, ix = (rx).mm(X) - (ix).mm(Y), (rx).mm(Y) + (ix).mm(X)
 
-        # 4. x = x@Cmlmc
-        rx, ix = (rx).mm(Cmlmc), (ix).mm(Cmlmc)
+            # 4. x = x@Cmlmc
+            rx, ix = (rx).mm(Cmlmc), (ix).mm(Cmlmc)
 
-        # 5. C = x + Cmcmc
-        rC = rx + Cmcmc
-        iC = ix
+            # 5. C = x + Cmcmc
+            rC = rx + Cmcmc
+            iC = ix
+        else:
+            rC = Cmcmc
+            iC = torch.zeros_like(Cmcmc)
 
         ## other locations
         others_at = where((sources_at | detectors_at)[mc].ne(1).data)
@@ -405,14 +406,14 @@ class Network(Component):
         C = block_diag(*(comp.C for comp in self.components))
 
         # add loops
-        for i, j1, j2 in self._parse_loops(self.s):
-            idxs = free_idxs[i]
-            i = Ns[i] + idxs[j1]
-            j = Ns[i] + idxs[j2]
+        for k, j1, j2 in self._parse_loops():
+            idxs = free_idxs[k]
+            i = Ns[k] + idxs[j1]
+            j = Ns[k] + idxs[j2]
             C[i,j] = C[j,i] = 1.0
 
         # add connections
-        for i1, j1, i2, j2  in self._parse_connections(self.s):
+        for i1, j1, i2, j2  in self._parse_connections():
             idxs1 = free_idxs[i1]
             idxs2 = free_idxs[i2]
             i = Ns[i1] + idxs1[j1]
@@ -424,17 +425,18 @@ class Network(Component):
     @staticmethod
     def _parse_args(args):
         if isinstance(args[0], str):
-            s = args[0].split(',')
-            components = args[1:]
+            s = args[0]
+            components = tuple(args[1:])
         elif isinstance(args[0], Connector):
-            s = args[0].s.split(',')
-            components = args[0].components
+            s = args[0].s
+            components = tuple(args[0].components)
         else:
             components, s = zip(*args)
+            s = ','.join(s)
         return s, components
 
-    @staticmethod
-    def _parse_loops(S):
+    def _parse_loops(self):
+        S = self.s.split(',')
         loops = []
         for i, s in enumerate(S):
             for j1, c1 in enumerate(s[:-1]):
@@ -443,8 +445,8 @@ class Network(Component):
                         loops += [(i,j1,j2)]
         return loops
 
-    @staticmethod
-    def _parse_connections(S):
+    def _parse_connections(self):
+        S = self.s.split(',')
         connections = []
         for i1, s1 in enumerate(S[:-1]):
             for i2, s2 in enumerate(S[i1+1:], start=i1+1):
