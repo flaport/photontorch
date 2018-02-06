@@ -49,8 +49,7 @@ class DirectionalCoupler(Mirror):
     @property
     def iS(self):
         r = self.R**0.5
-        return self.new_variable([[0,0,0,1],[0,0,1,0],[0,1,0,0],[1,0,0,0]])*r
-
+        return self.new_variable([[0,0,1,0],[0,0,0,1],[1,0,0,0],[0,1,0,0]])*r
 
 class RealisticDirectionalCoupler(Component):
     '''
