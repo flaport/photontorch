@@ -53,21 +53,19 @@ class Mirror(Component):
             self.R_min = R_bounds[0]
             self.R_max = R_bounds[1]
 
-        self.W_R = self.new_parameter(
-            [-np.log(1/R-1)],
-            dtype='float',
-            requires_grad=((R_bounds is None) or self.R_min != self.R_max),
-        )
+        if self.R_min != self.R_max:
+            self.W_R = self.new_parameter([-np.log(1/R-1)], dtype='float')
 
     @property
     def R(self):
         ''' Reflectivity of the Mirror '''
+        if self.R_min == self.R_max:
+            return self.R_min
         return (self.R_max-self.R_min)*torch.sigmoid(self.W_R) + self.R_min
     @R.setter
     def R(self, value):
         ''' Set Reflectivity of the mirror manually (not recommended) '''
-        R_bounds = (self.R_min, self.R_max)
-        self.__init__(self.R.data.cpu().numpy()[0], R_bounds, self.name)
+        raise AttributeError('Setting R manually is not allowed. Try making a new component')
 
     @property
     def rS(self):
