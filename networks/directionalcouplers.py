@@ -94,8 +94,13 @@ class DirectionalCouplerWithLength(Component):
         return iS
 
 class DirectionalCouplerNetwork(Network, Component):
-    def __init__(self, shape, dircoup=None, terms=None, name='dircoupnw'):
+    def __init__(self, shape, dircoup=None, terms=None, initialize_randomly='seed', name='dircoupnw'):
         Component.__init__(self, name=name)
+
+        if initialize_randomly:
+            if initialize_randomly == 'seed':
+                initialize_randomly = 1
+            r = np.random.RandomState(seed=initialize_randomly)
 
         if dircoup is None:
             wg0 = Waveguide(length=10e-6, neff=2.86, name='wg0')
@@ -112,16 +117,20 @@ class DirectionalCouplerNetwork(Network, Component):
         self.components_array = np.zeros((I,J), dtype=object)
         for i in range(I):
             for j in range(J):
-                self.components_array[i,j] = self.dircoup.copy()
+                dircoup_copy = self.dircoup.copy()
+                if initialize_randomly:
+                    dircoup_copy.dircoup.R = r.rand()
+                self.components_array[i,j] = dircoup_copy
 
         if terms is None:
             terms = {}
         num_terms = 8 + 2*(I-2) + 2*(J-2)
         self.term_array = np.zeros(num_terms, dtype=object)
         for i in range(num_terms):
-            self.term_array[i] = Term()
+            self.term_array[i] = terms.get('default',Term)(name=str(i))
         for k, v in terms.items():
-            self.term_array[k] = v
+            if type(k) is int:
+                self.term_array[k] = v
 
     def copy(self):
         new = self.__class__(shape=self.shape, dircoup=self.dircoup, name=self.name)
