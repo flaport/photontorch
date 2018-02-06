@@ -7,6 +7,7 @@
 import torch
 import numpy as np
 import warnings
+from copy import deepcopy
 
 
 #################
@@ -15,18 +16,8 @@ import warnings
 
 class Environment(object):
     ''' Simulation Environment '''
-    def __init__(
-        self,
-        t_start=0,
-        t_end=1e-12,
-        dt=1e-14,
-        wl=1.55e-6,
-        use_delays=True,
-        num_timesteps=None,
-        t = None,
-        cuda = None,
-        name='',
-    ):
+    def __init__(self, **kwargs):
+
         ''' Environment __init__
 
         Arguments
@@ -45,8 +36,17 @@ class Environment(object):
         name (str) : name of the environment
         '''
 
-        # time array:
+        # wavelength
+        self.wl = kwargs.pop('wl', 1.55e-6)
+
+        # time data:
+        dt = kwargs.pop('dt', 1e-14)
+        num_timesteps = kwargs.pop('num_timesteps', None)
+        t_start = kwargs.pop('t_start', 0)
+        t_end = kwargs.pop('t_end',1e-12)
+
         self._dt = dt # dt has to be stored seperatly for the extreme case of len(t) < 1
+        t = kwargs.pop('t', None)
         if t is not None:
             self.t = np.array(t)
             self._dt = t[1] - t[0]
@@ -55,21 +55,22 @@ class Environment(object):
         else:
             self.t = np.arange(t_start, num_timesteps*dt, dt)
 
-        # wavelength
-        self.wl = wl
-
         # use delays
         # (set to False to speed up frequency calculations with constant source)
-        self.use_delays = use_delays
+        self.use_delays = kwargs.pop('use_delays', True)
 
         # use CUDA or not
-        self.cuda = cuda
-        if cuda and not torch.cuda.is_available():
+        self.cuda = kwargs.pop('cuda', None)
+        if self.cuda and not torch.cuda.is_available():
             warnings.warn('CUDA requested, but is not available. Rollback to CPU')
             self.cuda = False
 
         # name
-        self.name = name
+        self.name = kwargs.pop('name', 'env')
+
+        # other keyword arguments are added to the attributes like so:
+        for k, v in kwargs.items():
+            self.__dict__[k] = v
 
     @property
     def num_timesteps(self):
@@ -99,3 +100,17 @@ class Environment(object):
     @t_end.setter
     def t_end(self, value):
         self.t = np.arange(self.t_start, value, self.dt)
+
+    def copy(self, **kwargs):
+        new = deepcopy(self)
+        for kw, val in kwargs.items():
+            if hasattr(new, kw):
+                setattr(new, kw, val)
+        if 'dt' in kwargs:
+            new.dt = kwargs['dt']
+        return new
+
+    def __repr__(self):
+        return self.name + '(wl=%.2e, dt=%.2e)'%(self.wl, self.dt)
+
+
