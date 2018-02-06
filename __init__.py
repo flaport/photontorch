@@ -18,6 +18,7 @@ from .components.mirrors import SlantedMirror
 
 # Waveguides
 from .components.waveguides import Waveguide
+from .components.waveguides import Connection
 
 # Grating Couplers
 from .components.gratingcouplers import GratingCoupler
@@ -38,7 +39,7 @@ from .networks.rings import AddDrop
 
 ## Environment
 
-from .environment import Environment
+from .environment.environment import Environment
 
 
 ## Useful utils

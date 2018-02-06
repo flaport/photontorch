@@ -17,6 +17,7 @@ from copy import deepcopy
 ## Relative
 from ..utils import where
 from ..networks.connector import Connector
+from ..environment.environment import Environment
 
 
 ###############
@@ -43,6 +44,7 @@ class Component(Module):
             name = self.__class__.__name__.lower()
         self.name = name
         self._cuda = False
+        self._env = Environment() # Set default environment
 
     def initialize(self, env):
         ''' Initialize Component For a simulation by giving it the simulation environment '''
@@ -188,13 +190,3 @@ class Component(Module):
 
     def __getitem__(self, s):
         return Connector(s, [self])
-
-
-
-###################
-## Other imports ##
-###################
-
-# This import needs to happen in the end to prevent circular imports.
-
-## Relative

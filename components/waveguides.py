@@ -11,15 +11,14 @@ import torch
 import numpy as np
 
 ## Relative
-from .component import Component
+from .connection import Connection
 from ..utils.constants import pi, c
-
 
 ###############
 ## Waveguide ##
 ###############
 
-class Waveguide(Component):
+class Waveguide(Connection):
     '''
     A waveguide is a Component where each of the two nodes
     introduces a delay corresponding to the length of the waveguide.
@@ -34,8 +33,6 @@ class Waveguide(Component):
 
     '''
 
-    num_ports = 2
-
     def __init__(self, length=1e-6, neff=2.86, loss=0, name=None):
         '''
         Waveguide Initialization
@@ -47,7 +44,7 @@ class Waveguide(Component):
         loss = 0 : float. Loss in the waveguide [dB/m]
         name : str. Name of the specific waveguide
         '''
-        Component.__init__(self, name=name)
+        Connection.__init__(self, name=name)
         # Handle inputs
         self.length = float(length)
         self.neff = float(neff)
