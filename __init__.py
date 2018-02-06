@@ -36,6 +36,9 @@ from .networks.network import Network
 from .networks.rings import AllPass
 from .networks.rings import AddDrop
 
+# Directional Coupler Networks
+from .networks.directionalcouplers import DirectionalCouplerWithLength
+
 
 ## Environment
 
