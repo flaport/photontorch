@@ -67,7 +67,7 @@ class Component(Module):
         return self._env
     @env.setter
     def env(self, value):
-        self.initialize(env)
+        self.initialize(value)
 
     def cuda(self):
         ''' Transform component to live on the GPU '''
