@@ -65,7 +65,7 @@ class Mirror(Component):
     @R.setter
     def R(self, value):
         ''' Set Reflectivity of the mirror manually (not recommended) '''
-        raise AttributeError('Setting R manually is not allowed. Try making a new component')
+        self.W_R = self.new_parameter([-np.log(1/value-1)], dtype='float')
 
     @property
     def rS(self):
