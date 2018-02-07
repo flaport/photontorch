@@ -6,6 +6,7 @@
 
 ## Relative
 from .network import Network
+from .directionalcouplers import DirectionalCouplerNetwork
 from ..components.waveguides import Waveguide
 from ..components.directionalcouplers import DirectionalCoupler
 
@@ -112,3 +113,59 @@ class AddDrop(Network):
         print(connector)
 
         Network.__init__(self, connector)
+
+
+class RingNetwork(DirectionalCouplerNetwork):
+    ''' A network of rings made out of directional couplers and waveguides.
+    A directional coupler is repeated periodically in a grid, with the ports flipped
+    in odd locations to make rings in the network. The ports are connected by waveguides
+
+    Network
+    -------
+         1    2    3    4
+        ..   ..   ..   ..
+         1    1    1    1
+    0 : 0 2--2 0--0 2--2 0 : 5
+         3    3    3    3
+         |    |    |    |
+         3    3    3    3
+    11: 0 2--2 0--0 2--2 0 : 6
+         1    1    1    1
+        ..   ..   ..   ..
+        10    9    8    7
+
+    Legend
+    ------
+        0: -> term locations
+        1
+       0 2 -> directional coupler
+        3
+       -- or | -> waveguides
+
+    Note
+    ----
+    Because of the connection order of the directional coupler (0<->1 and 2<->3), this
+    network does contain loops and can thus be used as a reservoir.
+    '''
+    def _parse_connections(self):
+        connections = []
+        I,J = self.shape
+        for i in range(I):
+            for j in range(J):
+                if i < I-1:
+                    if i%2 == 0:
+                        top = (i*J+j,3)
+                        bottom = ((i+1)*J+j,3)
+                    if i%2 == 1:
+                        top = (i*J+j,1)
+                        bottom = ((i+1)*J+j,1)
+                    connections.append(top + bottom)
+                if j < J-1:
+                    if j%2 == 0:
+                        left = (i*J+j,2)
+                        right = (i*J+j+1,2)
+                    if j%2 == 1:
+                        left = (i*J+j,0)
+                        right = (i*J+j+1,0)
+                    connections.append(left + right)
+        return connections
