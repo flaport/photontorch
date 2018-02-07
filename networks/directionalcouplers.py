@@ -7,6 +7,7 @@
 ## Other
 import torch
 import numpy as np
+from collections import OrderedDict
 
 ## Relative
 from .network import Network
@@ -24,7 +25,8 @@ class DirectionalCouplerWithLength(Component):
     '''
     A directional coupler with length is a memory-containing component with 4 ports.
 
-    A directional coupler has one trainable parameter: the coupling R.
+    It is merely a holder of a directional coupler and a waveguide, and combines both
+    in a 4-port component.
 
     Connections
     ------------
@@ -50,7 +52,7 @@ class DirectionalCouplerWithLength(Component):
         Parameters
         ----------
         dircoup : DirectionalCoupler instance without length
-        wg : gives the full length of the directional coupler
+        wg : yields the full length and the resulting delays of the directional coupler
         '''
         Component.__init__(self, name=None)
         self.wg = wg
@@ -60,6 +62,20 @@ class DirectionalCouplerWithLength(Component):
         ''' Initialize Component '''
         self.wg.initialize(env)
         self.dircoup.initialize(env)
+
+    def cuda(self):
+        new = self.copy()
+        new.dircoup = new.dircoup.cuda()
+        new.wg = new.wg.cuda()
+        new._cuda = True
+        return new
+
+    def cpu(self):
+        new = self.copy()
+        new.dircoup = new.dircoup.cpu()
+        new.wg = new.wg.cpu()
+        new._cuda = False
+        return new
 
     @property
     def delays(self):
@@ -94,83 +110,173 @@ class DirectionalCouplerWithLength(Component):
         return iS
 
 class DirectionalCouplerNetwork(Network, Component):
-    def __init__(self, shape, dircoup=None, terms=None, initialize_randomly='seed', name='dircoupnw'):
+    ''' A network of directional couplers.
+    A directional coupler with normal port ordering is repeated periodically in a grid,
+    with the ports connected by waveguides:
+
+    Network
+    -------
+         1    2    3    4
+        ..   ..   ..   ..
+         1    1    1    1
+    0 : 0 2--0 2--0 2--0 2 : 5
+         3    3    3    3
+         |    |    |    |
+         1    1    1    1
+    11: 0 2--0 2--0 2--0 2 : 6
+         3    3    3    3
+        ..   ..   ..   ..
+        10    9    8    7
+
+    Legend
+    ------
+        0: -> term locations
+        1
+       0 2 -> directional coupler
+        3
+        -- or | -> waveguides
+
+    Note
+    ----
+    Because of the connection order of the directional coupler (0<->1 and 2<->3), this
+    network does not contain any loops and can thus be used as a weight matrix.
+    '''
+    def __init__(self, shape, dircoup, wg, terms={}, initialize_randomly=True, name='dircoupnw'):
+        ''' DirectionalCouplerNetwork __init__
+
+        Arguments
+        ---------
+        dircoup : DirectionalCoupler : zero length directional coupler.
+        wg : Waveguide : a waveguide containing all the properties of a single directional
+                         coupler arm, such as the length and the effective index.
+        terms : A dictionary with source and Detector locations in the form
+                terms = {3:Source(), 15:Detector(), ...}.
+                any other not specified terms will be terminated by terms['default'].
+                If the 'default' key is not specified in terms, the other free nodes will
+                be terminated by a Term().
+        initialize_randomly :
+            If False:   the directional couplers in the network will
+                        all have the same coupling specified by the coupling of the
+                        provided directional coupler.
+            If True:    the network will be initialized with a random seed.
+            If integer: the network will be intitialized with that integer as seed.
+
+        Note
+        ----
+        The directional coupler and the waveguide will be combined in a
+        DirectionalCouplerWithLength. This conversion happens internally and is not
+        required up front.
+        '''
+
         Component.__init__(self, name=name)
 
-        if initialize_randomly:
-            if initialize_randomly == 'seed':
-                initialize_randomly = 1
-            r = np.random.RandomState(seed=initialize_randomly)
-
-        if dircoup is None:
-            wg0 = Waveguide(length=10e-6, neff=2.86, name='wg0')
-            dc0 = DirectionalCoupler(R=0.5)
-            self.dircoup = DirectionalCouplerWithLength(dircoup=dc0, wg=wg0, name='+')
-        else:
-            self.dircoup = dircoup.copy()
-            self.dircoup.name = '+'
-
+        # Handle shape of network
         I,J = shape
         if I < 2 or J < 2:
             raise ValueError('2D Network is required.')
 
-        self.components_array = np.zeros((I,J), dtype=object)
+        # Get random state for random initialization
+        if initialize_randomly is True:
+            random_state = np.random.RandomState()
+        else:
+            random_state = np.random.RandomState(seed=int(initialize_randomly))
+
+        # Get directional coupler with length
+        self.dircoup = DirectionalCouplerWithLength(dircoup=dircoup, wg=wg)
+
+        # Create directional coupler array
+        self.dircoup_array = np.zeros((I,J), dtype=object)
         for i in range(I):
             for j in range(J):
+                # Create copy of directional coupler:
                 dircoup_copy = self.dircoup.copy()
-                if initialize_randomly:
-                    dircoup_copy.dircoup.R = r.rand()
-                self.components_array[i,j] = dircoup_copy
+                dircoup_copy.name = '+'
+                if initialize_randomly is not False: # initialize_randomly can be 0
+                    dircoup_copy.dircoup.R = random_state.rand()
+                # Put copy in dircoup array
+                self.dircoup_array[i,j] = dircoup_copy
 
-        if terms is None:
-            terms = {}
-        num_terms = 8 + 2*(I-2) + 2*(J-2)
-        self.term_array = np.zeros(num_terms, dtype=object)
-        for i in range(num_terms):
-            self.term_array[i] = terms.get('default',Term)(name=str(i))
-        for k, v in terms.items():
-            if type(k) is int:
-                self.term_array[k] = v
+        # Create term array
+        self.num_terms = 8 + 2*(I-2) + 2*(J-2)
+        self.terms = OrderedDict(terms)
+
+    def cuda(self):
+        ''' Transform Network to live on the GPU '''
+        new = self.copy()
+        I, J = self.shape
+        for i in range(I):
+            for j in range(J):
+                new.dircoup_array[i,j] = new.dircoup_array[i,j].cuda()
+        terms = OrderedDict()
+        for k, v in new.terms.items():
+            terms[k] = v.cuda()
+        new.terms = terms
+        new._cuda = True
+        return new
+
+    def cpu(self):
+        ''' Transform Network to live on the CPU '''
+        new = self.copy()
+        I, J = self.shape
+        for i in range(I):
+            for j in range(J):
+                new.dircoup_array[i,j] = new.dircoup_array[i,j].cpu()
+        terms = OrderedDict()
+        for k, v in new.terms.items():
+            terms[k] = v.cpu()
+        new.terms = terms
+        new._cuda = False
+        return new
 
     def copy(self):
-        new = self.__class__(shape=self.shape, dircoup=self.dircoup, name=self.name)
-        new.term_array = self.term_array()
+        ''' Copy the directional coupler network '''
+        new = self.__class__(
+            shape=self.shape,
+            dircoup=self.dircoup.dircoup,
+            wg=self.dircoup.wg,
+            name=self.name,
+        )
+        new.terms = self.terms
         return new
 
     def terminate(self, term=None):
-        raise NotImplementedError
+        ''' Directional Coupler Networks are terminated by default '''
+        if term is None:
+            term = Term()
+        for t in range(self.num_terms):
+            if t not in self.terms:
+                term = term.copy()
+                term.name = 't'+str(t)
+                self.terms[t] = term
+        return self
 
     @property
     def shape(self):
-        return self.components_array.shape
+        return self.dircoup_array.shape
 
     @property
     def components(self):
-        return tuple(self.components_array.ravel()) + tuple(self.term_array)
-    @components.setter
-    def components(self, value):
-        I, J = self.shape
-        K = self.term_array.shape[0]
-        for i in range(I):
-            for j in range(J):
-                self.components_array[i,j] = value[i*J+j]
-        for k in range(K):
-            self.term_array[k] = value[-K+k]
+        return tuple(self.dircoup_array.ravel()) + tuple(self.terms.values())
 
     @property
     def C(self):
         Ns = np.cumsum([0]+[comp.num_ports for comp in self.components])
+        free_idxs = [comp.free_idxs for comp in self.components]
         C = block_diag(*(comp.C for comp in self.components))
+
         # add connections
         for i1, j1, i2, j2  in self._parse_connections():
-            i = Ns[i1] + j1
-            j = Ns[i2] + j2
+            idxs1 = free_idxs[i1]
+            idxs2 = free_idxs[i2]
+            i = Ns[i1] + idxs1[j1]
+            j = Ns[i2] + idxs2[j2]
             C[i,j] = C[j,i] = 1.0
 
-        K = self.term_array.shape[0]
+        # add terms
+        K = len(self.terms)
         idxs = where(((C.sum(0)>0) | (C.sum(1)>0)).ne(1).data)
-        for k, (idx, term) in enumerate(zip(idxs, self.term_array)):
-            C[-K+k,idx] = C[idx,-K+k] = 1.0
+        for (idx, (k, term)) in enumerate(zip(idxs, self.terms.items())):
+            C[-K+idx,k] = C[k,-K+idx] = 1.0
 
         return C
 
