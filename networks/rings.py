@@ -4,11 +4,16 @@
 ## Imports ##
 #############
 
+## Other
+import numpy as np
+
 ## Relative
 from .network import Network
 from .directionalcouplers import DirectionalCouplerNetwork
 from ..components.waveguides import Waveguide
 from ..components.directionalcouplers import DirectionalCoupler
+from ..utils.autograd import block_diag
+from ..utils.tensor import where
 
 
 #####################
@@ -122,17 +127,17 @@ class RingNetwork(DirectionalCouplerNetwork):
 
     Network
     -------
-         1    2    3    4
+         1    2    3    5
         ..   ..   ..   ..
          1    1    1    1
-    0 : 0 2--2 0--0 2--2 0 : 5
+    0 : 0 2--2 0--0 2--2 0 : 4
          3    3    3    3
          |    |    |    |
          3    3    3    3
-    11: 0 2--2 0--0 2--2 0 : 6
+    6 : 0 2--2 0--0 2--2 0 :10
          1    1    1    1
         ..   ..   ..   ..
-        10    9    8    7
+         7    8    9   11
 
     Legend
     ------
@@ -147,6 +152,7 @@ class RingNetwork(DirectionalCouplerNetwork):
     Because of the connection order of the directional coupler (0<->1 and 2<->3), this
     network does contain loops and can thus be used as a reservoir.
     '''
+
     def _parse_connections(self):
         connections = []
         I,J = self.shape
