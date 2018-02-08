@@ -13,6 +13,7 @@ import numpy as np
 ## Relative
 from .component import Component
 from ..utils.constants import pi, c
+from ..utils.functions import inv_sigmoid
 
 
 ############
@@ -54,7 +55,8 @@ class Mirror(Component):
             self.R_max = R_bounds[1]
 
         if self.R_min != self.R_max:
-            self.W_R = self.new_parameter([-np.log(1/R-1)], dtype='float')
+            _R = (R-self.R_min)/(self.R_max-self.R_min)
+            self.W_R = self.new_parameter([inv_sigmoid(_R)], dtype='float')
 
     @property
     def R(self):
@@ -65,7 +67,8 @@ class Mirror(Component):
     @R.setter
     def R(self, value):
         ''' Set Reflectivity of the mirror manually (not recommended) '''
-        self.W_R = self.new_parameter([-np.log(1/value-1)], dtype='float')
+        _R = (value-self.R_min)/(self.R_max-self.R_min)
+        self.W_R = self.new_parameter([inv_sigmoid(_R)], dtype='float')
 
     @property
     def rS(self):
