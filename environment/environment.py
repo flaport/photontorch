@@ -104,8 +104,7 @@ class Environment(object):
     def copy(self, **kwargs):
         new = deepcopy(self)
         for kw, val in kwargs.items():
-            if hasattr(new, kw):
-                setattr(new, kw, val)
+            setattr(new, kw, val)
         if 'dt' in kwargs:
             new.dt = kwargs['dt']
         return new
