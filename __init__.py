@@ -49,4 +49,12 @@ from .environment.environment import Environment
 
 ## Useful utils
 
-from .utils import block_diag
+# autograd
+from .utils.autograd import block_diag
+
+# tensor
+from .utils.tensor import zeros
+from .utils.tensor import where
+
+# non-autograd functions
+from .utils.functions import inv_sigmoid
