@@ -1,4 +1,4 @@
-''' Torch autograd function extensions '''
+''' Torch.autograd extensions '''
 
 #############
 ## Imports ##
@@ -139,7 +139,7 @@ class BlockDiag(Function):
         # Get start and end indices of blocks in matrix
         ctx.idxs = list(zip(idxs[:-1], idxs[1:]))
         # Get type of new matrix and create empty new matrix with total_size as shape
-        M = zeros(total_size, total_size, type=inputs[0].type())
+        M = zeros((total_size, total_size), type=inputs[0].type())
         # Fill Blocks
         for (i, j), matrix in zip(ctx.idxs, inputs):
             M[i:j,i:j] = matrix

@@ -2,16 +2,16 @@
 
 
 ## custom torch differentiable functions
-
 from .autograd import block_diag
 
 
-## Custom Tensor Functions
+## custom neural network functions
+from .nn import Module
+from .nn import Parameter
+from .nn import BoundedParameter
 
+
+## Custom Tensor Functions
 from .tensor import zeros
 from .tensor import where
 
-
-## Other functions (not differentiable):
-
-from .functions import inv_sigmoid
