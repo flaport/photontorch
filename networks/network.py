@@ -7,7 +7,6 @@
 ## Torch
 import torch
 from torch.nn import Module
-from torch.nn import Parameter
 from torch.autograd import Variable
 
 ## Others
@@ -22,8 +21,8 @@ from ..components.component import Component
 from ..components.terms import Term
 from ..components.terms import Detector
 from ..utils.autograd import block_diag
-from ..utils.tensor import zeros
 from ..utils.tensor import where
+from ..utils.constants import pi, c
 
 
 #############
@@ -95,14 +94,14 @@ class Network(Component):
         ''' Transform Network to live on the GPU '''
         new = self.copy()
         new.components = tuple([comp.cuda() for comp in new.components])
-        new._cuda = True
+        new.is_cuda = True
         return new
 
     def cpu(self):
         ''' Transform Network to live on the CPU '''
         new = self.copy()
         new.components = tuple([comp.cpu() for comp in new.components])
-        new._cuda = False
+        new.is_cuda = False
         return new
 
     def initialize(self, env):
@@ -160,7 +159,7 @@ class Network(Component):
 
         # This extra step is necessary for CUDA.
         # CUDA does not allow matrix multiplication of ByteTensors.
-        if self._cuda:
+        if self.is_cuda:
             mc = mc.float()
             ml = ml.float()
 
@@ -172,7 +171,7 @@ class Network(Component):
 
         # This extra step is necessary for CUDA:
         # Indexing has to happen with ByteTensors.
-        if self._cuda:
+        if self.is_cuda:
             mc = mc.byte()
             ml = ml.byte()
             mcmc = mcmc.byte()
@@ -238,11 +237,11 @@ class Network(Component):
 
         ## locations and number of detectors
         self.num_detectors = int(torch.sum(detectors_at))
-        detectors_at = where(detectors_at[mc].data)#list(np.where(detectors_at[mc].data.cpu().numpy())[0])
+        detectors_at = where(detectors_at[mc].data)
 
         ## locations and number of sources
         self.num_sources = int(torch.sum(sources_at))
-        sources_at = where(sources_at[mc].data)#list(np.where(sources_at[mc].data.cpu().numpy())[0])
+        sources_at = where(sources_at[mc].data)
 
         ## Create and reorder reduced matrices.
         ## The reordering yields a small performance upgrade in the forward pass
@@ -254,15 +253,14 @@ class Network(Component):
         self._iC = iC[new_order][:,new_order] # imag part of reduced C-matrix
 
         # Create buffermask
-        type = 'torch.cuda.FloatTensor' if self._cuda else 'torch.FloatTensor'
-        buffermask = zeros(1, int(self._delays.max())+2, self.nmc, type=type)
+        buffermask = self.zeros((1, int(self._delays.max())+2, self.nmc))
         for i, d in enumerate(self._delays):
             buffermask[0, int(d), i] = 1.0
         self.buffermask = Variable(buffermask)
 
         self.initialized = True
 
-    def require_initializion(func):
+    def require_initialization(func):
         ''' Some functions require the Network to be initialized '''
         @functools.wraps(func)
         def wrapped(self, *args, **kwargs):
@@ -271,48 +269,89 @@ class Network(Component):
             return func(self, *args, **kwargs)
         return wrapped
 
-    @require_initializion
+    @require_initialization
     def new_buffer(self, num_batches=1):
         '''
         Create buffer to keep the hidden states of the Network (RNN)
         The buffer has shape (# batches, # time, # mc nodes)
         '''
-        type = 'torch.cuda.FloatTensor' if self._cuda else 'torch.FloatTensor'
-        buffer = zeros(num_batches, self.buffermask.size(1), self.buffermask.size(2), type=type)
+        buffer = self.zeros((num_batches, self.buffermask.size(1), self.buffermask.size(2)))
         rbuffer = Variable(buffer.clone())
         ibuffer = Variable(buffer)
         return rbuffer, ibuffer
 
-    @require_initializion
-    def handle_source(self, source):
+    @require_initialization
+    def new_source(self, source=None, add_phase=False):
         '''
-        Make a FloatTensor with size (# batches, # time, # sources)
+        Create a Source FloatTensor with size (# batches, # time, # sources, 2)
+
+        Parameters
+        ----------
+        source : source amplitude or time evolution of source. Accepted forms are:
+                 accepted:
+                   * None or (int/float) or (np.ndarray with ndim==1):
+                     A new FloatTensor with a single batch and the same input for all
+                     source locations will be created (None-> amplitude 1)
+                   * (np.ndarray with ndim==2):
+                     A new FloatTensor with multiple batches (first dimension) will be
+                     created. Same input for all source locations
+                   * (np.ndarray with ndim==3):
+                     A new FloatTensor with multiple batches and different inputs at each
+                     source location will be created.
+        add_phase = False : wether to add a phase that varies with time according to the
+                            frequency of the light. This is more realistic.
+        Note
+        ----
+        In the case an np.ndarray is provided, then then make sure the number of timesteps
+        correspond to the number of timesteps in the environment.
         '''
-        type = 'torch.cuda.FloatTensor' if self._cuda else 'torch.FloatTensor'
-        _rsource = self.new_variable(np.real(source))
-        _isource = self.new_variable(np.imag(source))
-        if _rsource.dim() == 1:
-            # batch with size 1:
-            _rsource = _rsource.unsqueeze(0)
-            _isource = _isource.unsqueeze(0)
-        if _rsource.dim() == 2:
-            # same input for all sources
-            _rsource = torch.cat([_rsource.unsqueeze(-1)]*self.num_sources, dim=-1)
-            _isource = torch.cat([_isource.unsqueeze(-1)]*self.num_sources, dim=-1)
 
-        source = Variable(zeros(_rsource.size(0), _rsource.size(1), self.nmc, 2, type=type))
-        source[:,:,:self.num_sources,0] = _rsource
-        source[:,:,:self.num_sources,1] = _isource
-        return source
+        if source is None: # We will make a source with amplitude 1
+            source = 1
+        if isinstance(source, int): # We will make a source with amplitude source
+            source = float(source)
+        if isinstance(source, float): # We will make a source with amplitude source
+            source = source*np.ones_like(self.env.t)
 
-    @require_initializion
+        # Create the FloatTensor
+        type = 'torch.cuda.FloatTensor' if self.is_cuda else 'torch.FloatTensor'
+        rsource = self.new_variable(np.real(source))
+        isource = self.new_variable(np.imag(source))
+
+        if rsource.dim() == 1:
+            # Only the time evolution of the source is given, we make a source with
+            # one single batch:
+            rsource.unsqueeze_(0)
+            isource.unsqueeze_(0)
+        if rsource.dim() == 2:
+            # No different input is given for the (different) source locations.
+            # We will use the same source amplitude at each source location.
+            rsource.unsqueeze_(-1)
+            isource.unsqueeze_(-1)
+            rsource = torch.cat([rsource]*self.num_sources, dim=-1)
+            isource = torch.cat([isource]*self.num_sources, dim=-1)
+        if add_phase:
+            # We add the phase introduced by the time evolution of the source:
+            rphase = self.new_variable(np.cos(2*pi*(c/self.env.wl)*self.env.t))
+            iphase = self.new_variable(np.sin(2*pi*(c/self.env.wl)*self.env.t))
+            rphase.unsqueeze_(0).unsqueeze_(-1)
+            iphase.unsqueeze_(0).unsqueeze_(-1)
+            rsource, isource = rphase*rsource - iphase*isource, rphase*isource + iphase*rsource
+
+        # Concatenate real and imaginary part and return the source:
+        return torch.cat((rsource.unsqueeze_(-1), isource.unsqueeze_(-1)), dim=-1)
+
+    @require_initialization
     def forward(self, source):
         '''
         Forward pass of the network.
         source should be a FloatTensor of size (# batches, # time, # sources).
         '''
+        type = 'torch.cuda.FloatTensor' if self.is_cuda else 'torch.FloatTensor'
+        _source = Variable(self.zeros((source.size(0), source.size(1), self.nmc, 2)))
+        _source[:,:,:self.num_sources] = source
 
-        detected = self.new_variable(np.zeros((source.size(0), self.env.num_timesteps, self.nmc)))
+        detected = self.new_variable(self.zeros((source.size(0), self.env.num_timesteps, self.nmc)))
 
         ## Get new buffer
         rbuffer, ibuffer = self.new_buffer(source.size(0))
@@ -320,9 +359,13 @@ class Network(Component):
         # solve
         for i in range(self.env.num_timesteps):
 
-            # get input state
-            rx = (torch.sum(self.buffermask*rbuffer, dim=1) + source[:,i,:,0]).t()
-            ix = (torch.sum(self.buffermask*ibuffer, dim=1) + source[:,i,:,1]).t()
+            # get state
+            rx = (torch.sum(self.buffermask*rbuffer, dim=1) + _source[:,i,:,0]).t()
+            ix = (torch.sum(self.buffermask*ibuffer, dim=1) + _source[:,i,:,1]).t()
+
+            # add source
+            #rx = rx + source[:,i,:,0].t()
+            #ix = rx + source[:,i,:,1].t()
 
             # connect memory-less components
             # rx and ix need to be calculated at the same time because of dependencies on each other

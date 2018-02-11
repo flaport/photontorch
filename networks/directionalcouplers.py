@@ -67,14 +67,14 @@ class DirectionalCouplerWithLength(Component):
         new = self.copy()
         new.dircoup = new.dircoup.cuda()
         new.wg = new.wg.cuda()
-        new._cuda = True
+        new.is_cuda = True
         return new
 
     def cpu(self):
         new = self.copy()
         new.dircoup = new.dircoup.cpu()
         new.wg = new.wg.cpu()
-        new._cuda = False
+        new.is_cuda = False
         return new
 
     @property
@@ -268,7 +268,7 @@ class DirectionalCouplerNetwork(Network, Component):
         for k, v in new.terms.items():
             terms[k] = v.cuda()
         new.terms = terms
-        new._cuda = True
+        new.is_cuda = True
         return new
 
     def cpu(self):
@@ -282,7 +282,7 @@ class DirectionalCouplerNetwork(Network, Component):
         for k, v in new.terms.items():
             terms[k] = v.cpu()
         new.terms = terms
-        new._cuda = False
+        new.is_cuda = False
         return new
 
     def copy(self, couplings = None):
