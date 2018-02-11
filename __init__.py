@@ -14,7 +14,6 @@ from .components.terms import Detector
 
 # Mirrors
 from .components.mirrors import Mirror
-from .components.mirrors import SlantedMirror
 
 # Waveguides
 from .components.waveguides import Waveguide
@@ -52,9 +51,11 @@ from .environment.environment import Environment
 # autograd
 from .utils.autograd import block_diag
 
+# neural networks
+from .utils.nn import Module
+from .utils.nn import Parameter
+from .utils.nn import BoundedParameter
+
 # tensor
 from .utils.tensor import zeros
 from .utils.tensor import where
-
-# non-autograd functions
-from .utils.functions import inv_sigmoid
