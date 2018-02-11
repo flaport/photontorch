@@ -12,7 +12,7 @@ import numpy as np
 
 ## Relative
 from .connection import Connection
-from ..utils.constants import pi, c
+from ..constants import pi, c
 
 ###############
 ## Waveguide ##

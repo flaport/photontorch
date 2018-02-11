@@ -9,10 +9,11 @@ deep learning framework PyTorch to view the photonic circuit as essentially a re
 neural network. This enables the use of native PyTorch optimizers to optimize the
 (physical) parameters of your circuit.
 ## Roadmap
-* Connection Matrix Network
 * Network visualizer
+* Connection Matrix Network
 * Batch Frequency Domain inversion (for faster frequency domain calculations)
-* Additional notebook figures
+* ~~Bounded Parameter~~
+* ~~Additional notebook figures~~
 * ~~Ring Networks~~
 * ~~Directional Coupler Networks~~
 * ~~Network termination~~

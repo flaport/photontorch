@@ -46,16 +46,16 @@ from .networks.directionalcouplers import DirectionalCouplerWithLength
 from .environment.environment import Environment
 
 
-## Useful utils
+## PyTorch extensions
 
 # autograd
-from .utils.autograd import block_diag
+from .torch_ext.autograd import block_diag
 
 # neural networks
-from .utils.nn import Module
-from .utils.nn import Parameter
-from .utils.nn import BoundedParameter
+from .torch_ext.nn import Module
+from .torch_ext.nn import Parameter
+from .torch_ext.nn import BoundedParameter
 
 # tensor
-from .utils.tensor import zeros
-from .utils.tensor import where
+from .torch_ext.tensor import zeros
+from .torch_ext.tensor import where

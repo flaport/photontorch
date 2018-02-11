@@ -12,8 +12,8 @@ from .network import Network
 from .directionalcouplers import DirectionalCouplerNetwork
 from ..components.waveguides import Waveguide
 from ..components.directionalcouplers import DirectionalCoupler
-from ..utils.autograd import block_diag
-from ..utils.tensor import where
+from ..torch_ext.autograd import block_diag
+from ..torch_ext.tensor import where
 
 
 #####################

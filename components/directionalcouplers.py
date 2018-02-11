@@ -13,7 +13,7 @@ import numpy as np
 ## Relative
 from .mirrors import Mirror
 from .component import Component
-from ..utils.constants import pi, c
+from ..constants import pi, c
 
 
 #########################
