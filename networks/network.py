@@ -20,9 +20,9 @@ from .connector import Connector
 from ..components.component import Component
 from ..components.terms import Term
 from ..components.terms import Detector
-from ..utils.autograd import block_diag
-from ..utils.tensor import where
-from ..utils.constants import pi, c
+from ..torch_ext.autograd import block_diag
+from ..torch_ext.tensor import where
+from ..constants import pi, c
 
 
 #############

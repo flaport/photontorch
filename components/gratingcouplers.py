@@ -12,7 +12,7 @@ import numpy as np
 
 ## Relative
 from .component import Component
-from ..utils.constants import pi, c, fwhm2sigma
+from ..constants import pi, c, fwhm2sigma
 
 
 #####################

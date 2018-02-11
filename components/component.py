@@ -12,8 +12,8 @@ import numpy as np
 from copy import deepcopy
 
 ## Relative
-from ..utils import where
-from ..utils.nn import Module
+from ..torch_ext import where
+from ..torch_ext.nn import Module
 from ..networks.connector import Connector
 from ..environment.environment import Environment
 

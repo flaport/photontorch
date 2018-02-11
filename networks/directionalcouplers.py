@@ -14,8 +14,8 @@ from .network import Network
 from ..components.terms import Source, Detector, Term
 from ..components.connection import Connection
 from ..components.component import Component
-from ..utils.autograd import block_diag
-from ..utils.tensor import where
+from ..torch_ext.autograd import block_diag
+from ..torch_ext.tensor import where
 
 #####################
 ## All Pass Filter ##
