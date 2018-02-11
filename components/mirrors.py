@@ -4,16 +4,8 @@
 ## Imports ##
 #############
 
-## Torch
-import torch
-
-## Other
-import numpy as np
-
 ## Relative
 from .component import Component
-from ..utils.constants import pi, c
-from ..utils.functions import inv_sigmoid
 
 
 ############
@@ -43,32 +35,23 @@ class Mirror(Component):
         Parameters
         ----------
         R : float. Reflectivity of the mirror (between 0 and 1)
-        R_bounds : tuple. Bounds in which to optimize R.
+        R_bounds : tuple of length 2: Bounds in which to optimize R.
                    If None, R will not be optimized.
         name : str. name of this specific mirror
         '''
         Component.__init__(self, name=name)
-        if R_bounds is None:
-            self.R_min = self.R_max = R
-        else:
-            self.R_min = R_bounds[0]
-            self.R_max = R_bounds[1]
 
-        if self.R_min != self.R_max:
-            _R = (R-self.R_min)/(self.R_max-self.R_min)
-            self.W_R = self.new_parameter([inv_sigmoid(_R)], dtype='float')
-
-    @property
-    def R(self):
-        ''' Reflectivity of the Mirror '''
-        if self.R_min == self.R_max:
-            return self.R_min
-        return (self.R_max-self.R_min)*torch.sigmoid(self.W_R) + self.R_min
-    @R.setter
-    def R(self, value):
-        ''' Set Reflectivity of the mirror manually (not recommended) '''
-        _R = (value-self.R_min)/(self.R_max-self.R_min)
-        self.W_R = self.new_parameter([inv_sigmoid(_R)], dtype='float')
+        if R_bounds is None: # Non trainable parameter
+            self.R = self.new_parameter(
+                data=self.new_tensor([R], dtype='float'),
+                requires_grad=False, # not trainable
+            )
+        else: # Parameter trainable betweeen bounds
+            self.R = self.new_bounded_parameter(
+                data=self.new_tensor([R], dtype='float'),
+                bounds=R_bounds,
+                requires_grad=True, # trainable between bounds
+            )
 
     @property
     def rS(self):
@@ -79,37 +62,3 @@ class Mirror(Component):
     def iS(self):
         t = (1-self.R)**0.5
         return self.new_variable([[0,1],[1,0]])*t
-
-
-####################
-## Slanted Mirror ##
-####################
-
-class SlantedMirror(Mirror):
-    '''
-    A slanted mirror is a memory-less component with 4 ports.
-
-    A slanted mirror has one trainable parameter: the reflectivity R.
-
-
-    Connections
-    -----------
-    slanted_mirror['ijkl']:
-           j
-           |/
-       i --/-- k
-          /|
-           l
-    '''
-
-    num_ports = 4
-
-    @property
-    def rS(self):
-        r = self.R**0.5
-        return self.new_variable([[0,1,0,0],[1,0,0,0],[0,0,0,1],[0,0,1,0]])*r
-
-    @property
-    def iS(self):
-        t = (1-self.R)**0.5
-        return self.new_variable([[0,0,1,0],[0,0,0,1],[1,0,0,0],[0,1,0,0]])*t

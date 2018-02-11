@@ -5,9 +5,6 @@
 #############
 
 ## Torch
-import torch
-from torch.nn import Module
-from torch.nn import Parameter
 from torch.autograd import Variable
 
 ## Other
@@ -16,6 +13,7 @@ from copy import deepcopy
 
 ## Relative
 from ..utils import where
+from ..utils.nn import Module
 from ..networks.connector import Connector
 from ..environment.environment import Environment
 
@@ -43,16 +41,16 @@ class Component(Module):
         if name is None:
             name = self.__class__.__name__.lower()
         self.name = name
-        self._cuda = False
+        self.is_cuda = False
         self._env = Environment() # Set default environment
 
     def initialize(self, env):
         ''' Initialize Component For a simulation by giving it the simulation environment '''
         self._env = env
         if env.cuda is not None:
-            if env.cuda and not self._cuda:
+            if env.cuda and not self.is_cuda:
                 self.cuda()
-            elif not env.cuda and self._cuda:
+            elif not env.cuda and self.is_cuda:
                 self.cpu()
         self.zero_grad()
         if (self.sources_at & self.detectors_at).any():
@@ -68,43 +66,6 @@ class Component(Module):
     @env.setter
     def env(self, value):
         self.initialize(value)
-
-    def cuda(self):
-        ''' Transform component to live on the GPU '''
-        new = super(Component, self).cuda()
-        new._cuda = True
-        return new
-
-    def cpu(self):
-        ''' Transform component to live on the CPU '''
-        new = super(Component, self).cpu()
-        new._cuda = False
-        return new
-
-    def new_tensor(self, numpy_array, dtype='float'):
-        '''
-        Tensor constructor.
-        '''
-        dtype = {'byte':'uint8','float':'float32','double':'float64'}.get(dtype, dtype)
-        tensor = torch.from_numpy(np.asarray(numpy_array, dtype=dtype))
-        if self._cuda:
-            return tensor.cuda()
-        return tensor
-
-
-    def new_parameter(self, numpy_array, dtype='float', requires_grad=True):
-        '''
-        Parameter constructor.
-        Parameters are trainable [requires_grad=True]
-        '''
-        return Parameter(self.new_tensor(numpy_array, dtype=dtype), requires_grad=requires_grad)
-
-    def new_variable(self, numpy_array, dtype='float', requires_grad=False):
-        '''
-        Variable constructor
-        Variables are not trainable [requires_grad=False]
-        '''
-        return Variable(self.new_tensor(numpy_array, dtype=dtype), requires_grad=requires_grad)
 
     @property
     def rS(self):
