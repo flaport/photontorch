@@ -4,15 +4,12 @@
 ## Imports ##
 #############
 
-## Torch
-import torch
-
 ## Other
 import numpy as np
 
 ## Relative
 from .component import Component
-from ..constants import pi, c, fwhm2sigma
+from ..constants import fwhm2sigma
 
 
 #####################
@@ -63,9 +60,13 @@ class GratingCoupler(Component):
         ''' Real part of S matrix '''
         sigma = fwhm2sigma*self.BW
         loss = np.sqrt(self.Tmax*np.exp(-(self.wl0-self.env.wl)**2/(2*sigma**2)))
-        return self.new_variable([[0,loss],[loss,0]])
+        S = self.new_variable([[0, loss],
+                               [loss, 0]])
+        return S
 
     @property
     def iS(self):
         ''' Imag part of S matrix '''
-        return self.new_variable([[self.R_in,0],[0,self.R]])
+        S = self.new_variable([[self.R_in, 0],
+                               [0, self.R]])
+        return S

@@ -43,7 +43,7 @@ class Environment(object):
         dt = kwargs.pop('dt', 1e-14)
         num_timesteps = kwargs.pop('num_timesteps', None)
         t_start = kwargs.pop('t_start', 0)
-        t_end = kwargs.pop('t_end',1e-12)
+        t_end = kwargs.pop('t_end', 1e-12)
 
         self._dt = dt # dt has to be stored seperatly for the extreme case of len(t) < 1
         t = kwargs.pop('t', None)
@@ -74,34 +74,43 @@ class Environment(object):
 
     @property
     def num_timesteps(self):
+        ''' Number of timesteps in the simulation '''
         return self.t.shape[0]
     @num_timesteps.setter
     def num_timesteps(self, value):
+        ''' Number of timesteps in the simulation '''
         self.t = np.arange(self.t_start, value*self.dt, self.dt)
 
     @property
     def dt(self):
+        ''' Timestep of the simulation '''
         return self._dt
     @dt.setter
     def dt(self, value):
+        ''' Timestep of the simulation '''
         self._dt = value
         self.t = np.arange(self.t_start, self.t_end, value)
 
     @property
     def t_start(self):
+        ''' Starting time of the simulation '''
         return self.t[0]
     @t_start.setter
     def t_start(self, value):
+        ''' Starting time of the simulation '''
         self.t = np.arange(value, self.t_end, self.dt)
 
     @property
     def t_end(self):
+        ''' End time of the simulation '''
         return self.t[-1] + self.dt
     @t_end.setter
     def t_end(self, value):
+        ''' End time of the simulation '''
         self.t = np.arange(self.t_start, value, self.dt)
 
     def copy(self, **kwargs):
+        ''' Create a (deep) copy of the environment object '''
         new = deepcopy(self)
         for kw, val in kwargs.items():
             setattr(new, kw, val)
@@ -111,5 +120,3 @@ class Environment(object):
 
     def __repr__(self):
         return self.name + '(wl=%.2e, dt=%.2e)'%(self.wl, self.dt)
-
-

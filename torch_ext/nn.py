@@ -78,17 +78,21 @@ class Module(_Module_):
         assert len(getattr(self, name+'_bounds')) == 2
         setattr(cls, name+'_min', property(lambda self: getattr(self, name+'_bounds')[0]))
         def set_min(self, value):
+            ''' Set minimum of bounded parameter '''
             setattr(self, name+'_bounds', (value, getattr(self, name+'_bounds')[1]))
         setattr(cls, name+'_min', getattr(cls, name+'_min').setter(set_min))
         setattr(cls, name+'_max', property(lambda self: getattr(self, name+'_bounds')[1]))
         def set_max(self, value):
+            ''' Set maximum of bounded parameter '''
             setattr(self, name+'_bounds', (getattr(self, name+'_bounds')[0], value))
         setattr(cls, name+'_max', getattr(cls, name+'_max').setter(set_max))
         def get(self):
+            ''' Get bounded parameter '''
             min = getattr(self, name+'_bounds')[0]
             max = getattr(self, name+'_bounds')[1]
             return (max-min)*torch.sigmoid(getattr(self, '_'+name)) + min
         def set(self, value):
+            ''' Set bounded parameter '''
             eps = 1e-8
             min = getattr(self, name+'_bounds')[0]
             max = getattr(self, name+'_bounds')[1]
@@ -98,7 +102,11 @@ class Module(_Module_):
                     value = value[None]
                 value = self.new_tensor(value)
             data = ((1-2*eps)*((value - min)/(max - min) + eps))
-            setattr(self, '_'+name, Parameter(-torch.log(1/data-1), requires_grad=bparam.requires_grad)) # inverse sigmoid
+            setattr(
+                self, '_'+name,
+                Parameter(-torch.log(1/data-1), # inverse sigmoid
+                          requires_grad=bparam.requires_grad),
+            )
         set(self, bparam.data)
         setattr(cls, name, property(get))
         setattr(cls, name, getattr(cls, name).setter(set))
@@ -109,16 +117,6 @@ class Module(_Module_):
             self.register_bounded_parameter(attr, value)
         else:
             super(Module, self).__setattr__(attr, value)
-
-    def new_tensor(self, data, dtype='float', cuda=None):
-        '''
-        Tensor constructor.
-        '''
-        dtype = NUMPY_TYPES.get(dtype, dtype)
-        tensor = torch.from_numpy(np.asarray(data, dtype=dtype))
-        if self.is_cuda and (cuda is None or cuda is True):
-            return tensor.cuda()
-        return tensor
 
     def zeros(self, shape, dtype='float', cuda=None):
         '''
@@ -135,6 +133,20 @@ class Module(_Module_):
             tensor = tensor.cuda()
         return tensor
 
+    def new_tensor(self, data, dtype='float', cuda=None):
+        '''
+        Tensor constructor.
+        '''
+        dtype = NUMPY_TYPES.get(dtype, dtype)
+        if not isinstance(data, torch.Tensor):
+            data = np.asarray(data, dtype=dtype)
+            if data.ndim == 0:
+                data = data[None]
+            data = torch.from_numpy(data)
+        if self.is_cuda and (cuda is None or cuda is True):
+            return data.cuda()
+        return data
+
     def new_parameter(self, data, dtype='float', cuda=None, requires_grad=True):
         '''
         Parameter constructor.
@@ -142,12 +154,20 @@ class Module(_Module_):
         '''
         return Parameter(self.new_tensor(data, dtype=dtype, cuda=cuda), requires_grad=requires_grad)
 
-    def new_bounded_parameter(self, data, bounds, dtype='float', cuda=None, requires_grad=True):
+    def new_bounded_parameter(self, data, bounds=None, dtype='float',
+                              cuda=None, requires_grad=True):
         '''
         Bounded Parameter Constructor
         Bounded Parameters are trainable [requires_grad=True]
         '''
-        return BoundedParameter(self.new_tensor(data, dtype=dtype, cuda=cuda), bounds=bounds, requires_grad=requires_grad)
+        if bounds is None:
+            return self.new_parameter(data, dtype=dtype, cuda=cuda, requires_grad=requires_grad)
+        bparam = BoundedParameter(
+            self.new_tensor(data, dtype=dtype, cuda=cuda),
+            bounds=bounds,
+            requires_grad=requires_grad
+        )
+        return bparam
 
     def new_variable(self, data, dtype='float', cuda=None, requires_grad=False):
         '''
@@ -156,9 +176,9 @@ class Module(_Module_):
         '''
         return Variable(self.new_tensor(data, dtype=dtype, cuda=cuda), requires_grad=requires_grad)
 
-    def cuda(self):
+    def cuda(self, device=None):
         ''' Transform component to live on the GPU '''
-        new = super(Module, self).cuda()
+        new = super(Module, self).cuda(device=device)
         new.is_cuda = True
         return new
 

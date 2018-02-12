@@ -30,6 +30,7 @@ from ..constants import pi, c
 #############
 
 class Network(Component):
+    ''' a Network (circuit) of Components '''
     def __init__(self, *args, **kwargs):
         '''
         Initialization of the network.
@@ -73,7 +74,7 @@ class Network(Component):
         given corresponds to the number of ports in the component.
         '''
 
-        Component.__init__(self, name=kwargs.pop('name','nw'))
+        Component.__init__(self, name=kwargs.pop('name', None))
         # parse arguments
         self.s, self.components = self._parse_args(args)
 
@@ -128,6 +129,7 @@ class Network(Component):
         fully_connected = ((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).all()
         if not fully_connected:
             def forward(*args, **kwargs):
+                ''' Forward function for not fully connected Nework '''
                 raise ValueError('Network not Fully Connected')
             self.forward = forward
             return # Stop initialization here.
@@ -139,7 +141,7 @@ class Network(Component):
         # resulting delays in terms of the simulation timestep:
         delays = (delays_in_seconds/self.env.dt + 0.5).int()
         # Check if simulation timestep is too big:
-        if (delays[delays_in_seconds>0] < 10).any(): # This bound is rather arbitrary...
+        if (delays[delays_in_seconds > 0] < 10).any(): # This bound is rather arbitrary...
             warnings.warn('Simulation timestep might be too large, resulting'
                           'in too short delays. Try using a smaller timestep')
 
@@ -183,23 +185,23 @@ class Network(Component):
         ## S-matrix subsets
 
         # subsets of scattering matrix:
-        rS,iS = self.rS, self.iS
-        rSmcmc = rS[mcmc].view(nmc,nmc)
-        rSmlml = rS[mlml].view(nml,nml)
-        iSmcmc = iS[mcmc].view(nmc,nmc)
-        iSmlml = iS[mlml].view(nml,nml)
+        rS, iS = self.rS, self.iS
+        rSmcmc = rS[mcmc].view(nmc, nmc)
+        rSmlml = rS[mlml].view(nml, nml)
+        iSmcmc = iS[mcmc].view(nmc, nmc)
+        iSmlml = iS[mlml].view(nml, nml)
 
         # subsets of connection matrix:
-        Cmcmc = C[mcmc].view(nmc,nmc)
-        Cmcml = C[mcml].view(nmc,nml)
-        Cmlmc = C[mlmc].view(nml,nmc)
-        Cmlml = C[mlml].view(nml,nml)
+        Cmcmc = C[mcmc].view(nmc, nmc)
+        Cmcml = C[mcml].view(nmc, nml)
+        Cmlmc = C[mlmc].view(nml, nmc)
+        Cmlml = C[mlml].view(nml, nml)
 
 
         if nml: # Only do the following steps if there is at least one ml node:
             ## helper matrices
             # P = I - Cmlml@Smlml
-            rP = self.new_variable(np.eye(nml),'float') - (Cmlml).mm(rSmlml)
+            rP = self.new_variable(np.eye(nml), 'float') - (Cmlml).mm(rSmlml)
             iP = -(Cmlml).mm(iSmlml)
 
             ## reduced connection matrix
@@ -247,10 +249,10 @@ class Network(Component):
         ## The reordering yields a small performance upgrade in the forward pass
         new_order = torch.cat((sources_at, others_at, detectors_at))
         self._delays = delays[mc][new_order] # Reduced delay vector
-        self._rS = rSmcmc[new_order][:,new_order] # real part of reduced S-matrix
-        self._iS = iSmcmc[new_order][:,new_order] # imag part of reduced S-matrix
-        self._rC = rC[new_order][:,new_order] # real part of reduced C-matrix
-        self._iC = iC[new_order][:,new_order] # imag part of reduced C-matrix
+        self._rS = rSmcmc[new_order][:, new_order] # real part of reduced S-matrix
+        self._iS = iSmcmc[new_order][:, new_order] # imag part of reduced S-matrix
+        self._rC = rC[new_order][:, new_order] # real part of reduced C-matrix
+        self._iC = iC[new_order][:, new_order] # imag part of reduced C-matrix
 
         # Create buffermask
         buffermask = self.zeros((1, int(self._delays.max())+2, self.nmc))
@@ -314,7 +316,6 @@ class Network(Component):
             source = source*np.ones_like(self.env.t)
 
         # Create the FloatTensor
-        type = 'torch.cuda.FloatTensor' if self.is_cuda else 'torch.FloatTensor'
         rsource = self.new_variable(np.real(source))
         isource = self.new_variable(np.imag(source))
 
@@ -347,9 +348,8 @@ class Network(Component):
         Forward pass of the network.
         source should be a FloatTensor of size (# batches, # time, # sources).
         '''
-        type = 'torch.cuda.FloatTensor' if self.is_cuda else 'torch.FloatTensor'
         _source = Variable(self.zeros((source.size(0), source.size(1), self.nmc, 2)))
-        _source[:,:,:self.num_sources] = source
+        _source[:, :, :self.num_sources] = source
 
         detected = self.new_variable(self.zeros((source.size(0), self.env.num_timesteps, self.nmc)))
 
@@ -360,8 +360,8 @@ class Network(Component):
         for i in range(self.env.num_timesteps):
 
             # get state
-            rx = (torch.sum(self.buffermask*rbuffer, dim=1) + _source[:,i,:,0]).t()
-            ix = (torch.sum(self.buffermask*ibuffer, dim=1) + _source[:,i,:,1]).t()
+            rx = (torch.sum(self.buffermask*rbuffer, dim=1) + _source[:, i, :, 0]).t()
+            ix = (torch.sum(self.buffermask*ibuffer, dim=1) + _source[:, i, :, 1]).t()
 
             # add source
             #rx = rx + source[:,i,:,0].t()
@@ -372,17 +372,17 @@ class Network(Component):
             rx, ix = (self._rC).mm(rx) - (self._iC).mm(ix), (self._rC).mm(ix) + (self._iC).mm(rx)
 
             # get output state
-            detected[:,i,:] = (torch.pow(rx,2) + torch.pow(ix,2)).t()
+            detected[:, i, :] = (torch.pow(rx, 2) + torch.pow(ix, 2)).t()
 
             # connect memory-containing components
             # rx and ix need to be calculated at the same time because of dependencies on each other
             rx, ix = (self._rS).mm(rx) - (self._iS).mm(ix), (self._rS).mm(ix) + (self._iS).mm(rx)
 
             # update buffer
-            rbuffer = torch.cat((rx.t().unsqueeze(1), rbuffer[:,0:-1,:]), dim=1)
-            ibuffer = torch.cat((ix.t().unsqueeze(1), ibuffer[:,0:-1,:]), dim=1)
+            rbuffer = torch.cat((rx.t().unsqueeze(1), rbuffer[:, 0:-1, :]), dim=1)
+            ibuffer = torch.cat((ix.t().unsqueeze(1), ibuffer[:, 0:-1, :]), dim=1)
 
-        return detected[:,:,-self.num_detectors:]
+        return detected[:, :, -self.num_detectors:]
 
 
     def parameters(self):
@@ -395,19 +395,21 @@ class Network(Component):
                 yield p
 
     def plot(self, x, detected, label='', type='time'):
+        ''' Plot detected power versus time or wavelength '''
         if isinstance(detected, Variable):
             detected = detected.data.cpu().numpy()
         if isinstance(detected, torch.Tensor):
             detected = detected.cpu().numpy()
         if len(detected.shape) == 1:
-            detected = detected[:,None]
+            detected = detected[:, None]
         f = (int(np.log10(max(x))+0.5)//3)*3-3
         x = x*10**-f # no inplace operation, since that would change the original x...
-        prefix = {12:'T',9:'G',6:'M',3:'k',0:'',-3:'m',-6:'$\mu$',-9:'n',-12:'p',-15:'f'}[f]
+        prefix = {12:'T', 9:'G', 6:'M', 3:'k', 0:'', -3:'m',
+                  -6:r'$\mu$', -9:'n', -12:'p', -15:'f'}[f]
         plots = plt.plot(x, detected)
-        if type=='time':
+        if type in ['time', 't']:
             plt.xlabel("time [%ss]"%prefix)
-        elif type in ['wl','wls','wavelength','wavelengths']:
+        elif type in ['wl', 'wls', 'wavelength', 'wavelengths']:
             plt.xlabel('wavelength [%sm]'%prefix)
         plt.ylabel("intensity [a.u.]")
         names = [comp.name for comp in self.components if isinstance(comp, Detector)]
@@ -453,7 +455,7 @@ class Network(Component):
             idxs = free_idxs[k]
             i = Ns[k] + idxs[j1]
             j = Ns[k] + idxs[j2]
-            C[i,j] = C[j,i] = 1.0
+            C[i, j] = C[j, i] = 1.0
 
         # add connections
         for i1, j1, i2, j2  in self._parse_connections():
@@ -461,7 +463,7 @@ class Network(Component):
             idxs2 = free_idxs[i2]
             i = Ns[i1] + idxs1[j1]
             j = Ns[i2] + idxs2[j2]
-            C[i,j] = C[j,i] = 1.0
+            C[i, j] = C[j, i] = 1.0
 
         return C
 
@@ -485,7 +487,7 @@ class Network(Component):
             for j1, c1 in enumerate(s[:-1]):
                 for j2, c2 in enumerate(s[j1+1:], start=j1+1):
                     if c1 == c2:
-                        loops += [(i,j1,j2)]
+                        loops += [(i, j1, j2)]
         return loops
 
     def _parse_connections(self):
@@ -495,6 +497,6 @@ class Network(Component):
             for i2, s2 in enumerate(S[i1+1:], start=i1+1):
                 for j1, c1 in enumerate(s1):
                     for j2, c2 in enumerate(s2):
-                        if c1==c2:
-                            connections += [(i1,j1,i2,j2)]
+                        if c1 == c2:
+                            connections += [(i1, j1, i2, j2)]
         return connections

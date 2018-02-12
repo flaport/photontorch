@@ -1,11 +1,12 @@
-''' Module with network terminations. Network terminations can be absorbing (Term), a source (Source) or absorbing and detecting (Detector) '''
+'''
+Module with network terminations.
+Network terminations can be absorbing (Term), injecting (Source) or absorbing and
+detecting (Detector)
+'''
 
 #############
 ## Imports ##
 #############
-
-## Other
-import numpy as np
 
 ## Relative
 from .component import Component

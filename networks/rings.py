@@ -10,10 +10,6 @@ import numpy as np
 ## Relative
 from .network import Network
 from .directionalcouplers import DirectionalCouplerNetwork
-from ..components.waveguides import Waveguide
-from ..components.directionalcouplers import DirectionalCoupler
-from ..torch_ext.autograd import block_diag
-from ..torch_ext.tensor import where
 
 
 #####################
@@ -21,7 +17,7 @@ from ..torch_ext.tensor import where
 #####################
 
 class AllPass(Network):
-    ''' All Pass Filter
+    r''' All Pass Filter
 
     An AllPass filter is a memory-containging component with one input and one output.
 
@@ -40,7 +36,7 @@ class AllPass(Network):
                  pass_wg=None,
                  in_term=None,
                  pass_term=None,
-                 name='allpass'):
+                 name=None):
         '''
         AllPass Filter Initialization
 
@@ -51,19 +47,19 @@ class AllPass(Network):
         '''
         connector = dircoup['ikjl']*ring_wg['jl']
 
-        i,j = connector.idxs
+        i, j = connector.idxs
         if in_wg is not None:
             connector = in_wg['a'+i]*connector
         if pass_wg is not None:
             connector = pass_wg['b'+j]*connector
 
-        i,j = connector.idxs
+        i, j = connector.idxs
         if in_term is not None:
             connector = in_term[i]*connector
         if pass_term is not None:
             connector = pass_term[j]*connector
 
-        Network.__init__(self, connector)
+        Network.__init__(self, connector, name=name)
 
 
 #####################
@@ -71,7 +67,7 @@ class AllPass(Network):
 #####################
 
 class AddDrop(Network):
-    ''' Add Drop Filter
+    r''' Add Drop Filter
 
     An AddDrop filter is a memory-containging component with one input and one output.
 
@@ -87,15 +83,15 @@ class AddDrop(Network):
                  dircoup1,
                  dircoup2,
                  half_ring_wg,
-                 in_wg = None,
-                 pass_wg = None,
-                 add_wg = None,
-                 drop_wg = None,
-                 in_term = None,
-                 pass_term = None,
-                 add_term = None,
-                 drop_term = None,
-                 name='adddrop'):
+                 in_wg=None,
+                 pass_wg=None,
+                 add_wg=None,
+                 drop_wg=None,
+                 in_term=None,
+                 pass_term=None,
+                 add_term=None,
+                 drop_term=None,
+                 name=None):
         '''
         AddDrop Filter Initialization
 
@@ -108,16 +104,16 @@ class AddDrop(Network):
         connector = dircoup1['abcd']*dircoup2['efgh']
         connector = half_ring_wg['ce']*half_ring_wg['df']*connector
 
-        for i,j, wg in zip('wxyz',connector.idxs,[in_wg, pass_wg, drop_wg, add_wg]):
+        for i, j, wg in zip('wxyz', connector.idxs, [in_wg, pass_wg, drop_wg, add_wg]):
             if wg is not None:
                 connector = wg[i+j]*connector
 
-        for i, term in zip(connector.idxs,[in_term, pass_term, drop_term, add_term]):
+        for i, term in zip(connector.idxs, [in_term, pass_term, drop_term, add_term]):
             if term is not None:
                 connector = term[i]*connector
         print(connector)
 
-        Network.__init__(self, connector)
+        Network.__init__(self, connector, name=name)
 
 
 class RingNetwork(DirectionalCouplerNetwork):
@@ -152,41 +148,41 @@ class RingNetwork(DirectionalCouplerNetwork):
     Because of the connection order of the directional coupler (0<->1 and 2<->3), this
     network does contain loops and can thus be used as a reservoir.
     '''
-    def __init__(self, couplings, dircoup, wg, terms={}, name='dircoupnw'):
+    def __init__(self, couplings, dircoup, wg, terms=None, name='dircoupnw'):
         DirectionalCouplerNetwork.__init__(self, couplings, dircoup, wg, terms=terms, name=name)
         # Change default term order to term order of ring network
-        I,J = self.shape
-        k0 = (I%2==0)&(J%2==1)
+        I, J = self.shape
+        k0 = (I%2 == 0) & (J%2 == 1)
         k1 = not k0
         self._order = np.hstack((
             np.arange(1, J, 1), # North row
-            [J,J+1] if J%2 else [J+1,J], #North East Corner
-            np.arange(J+3, 4+(J-2)+2*(J-2),2), # East column
+            [J, J+1] if J%2 else [J+1, J], #North East Corner
+            np.arange(J+3, 4+(J-2)+2*(J-2), 2), # East column
             [8+2*(I-2)+2*(J-2)-2+k0, 8+2*(I-2)+2*(J-2)-2+k1], # South-East Corner
-            np.arange(4+(J-2)+2*(I-2),8+2*(I-2)+2*(J-2)-2)[::-1], #South Row
-            np.arange(J+2, 4+(J-2)+2*(J-2),2)[::-1], # left column
+            np.arange(4+(J-2)+2*(I-2), 8+2*(I-2)+2*(J-2)-2, 1)[::-1], #South Row
+            np.arange(J+2, 4+(J-2)+2*(J-2), 2)[::-1], # left column
             [0], # half of north west corner
         ))
 
     def _parse_connections(self):
         connections = []
-        I,J = self.shape
+        I, J = self.shape
         for i in range(I):
             for j in range(J):
                 if i < I-1:
                     if i%2 == 0:
-                        top = (i*J+j,3)
-                        bottom = ((i+1)*J+j,3)
+                        top = (i*J+j, 3)
+                        bottom = ((i+1)*J+j, 3)
                     if i%2 == 1:
-                        top = (i*J+j,1)
-                        bottom = ((i+1)*J+j,1)
+                        top = (i*J+j, 1)
+                        bottom = ((i+1)*J+j, 1)
                     connections.append(top + bottom)
                 if j < J-1:
                     if j%2 == 0:
-                        left = (i*J+j,2)
-                        right = (i*J+j+1,2)
+                        left = (i*J+j, 2)
+                        right = (i*J+j+1, 2)
                     if j%2 == 1:
-                        left = (i*J+j,0)
-                        right = (i*J+j+1,0)
+                        left = (i*J+j, 0)
+                        right = (i*J+j+1, 0)
                     connections.append(left + right)
         return connections

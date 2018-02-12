@@ -28,7 +28,7 @@ class Mirror(Component):
 
     num_ports = 2
 
-    def __init__(self, R=0.5, R_bounds=(0,1), name=None):
+    def __init__(self, R=0.5, R_bounds=(0, 1), name=None):
         '''
         Mirror initialization
 
@@ -41,24 +41,22 @@ class Mirror(Component):
         '''
         Component.__init__(self, name=name)
 
-        if R_bounds is None: # Non trainable parameter
-            self.R = self.new_parameter(
-                data=self.new_tensor([R], dtype='float'),
-                requires_grad=False, # not trainable
-            )
-        else: # Parameter trainable betweeen bounds
-            self.R = self.new_bounded_parameter(
-                data=self.new_tensor([R], dtype='float'),
-                bounds=R_bounds,
-                requires_grad=True, # trainable between bounds
-            )
+        self.R = self.new_bounded_parameter(
+            data=R,
+            bounds=R_bounds,
+            requires_grad=True, # trainable between bounds
+        )
 
     @property
     def rS(self):
         r = self.R**0.5
-        return self.new_variable([[1,0],[0,1]])*r
+        S = self.new_variable([[1, 0],
+                               [0, 1]])
+        return r*S
 
     @property
     def iS(self):
         t = (1-self.R)**0.5
-        return self.new_variable([[0,1],[1,0]])*t
+        S = self.new_variable([[0, 1],
+                               [1, 0]])
+        return t*S
