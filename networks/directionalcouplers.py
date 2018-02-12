@@ -146,15 +146,29 @@ class DirectionalCouplerNetwork(Network, Component):
     Because of the connection order of the directional coupler (0<->1 and 2<->3), this
     network does not contain any loops and can thus be used as a weight matrix.
     '''
-    def __init__(self, couplings, dircoup, wg, terms=None, name='dircoupnw'):
+    def __init__(self,
+                 shape,
+                 dircoup,
+                 wg,
+                 couplings=None,
+                 lengths=None,
+                 terms=None,
+                 name='dircoupnw'):
         ''' DirectionalCouplerNetwork __init__
 
         Arguments
         ---------
-        couplings: (numpy ndarray) : Desired couplings for the grating couplers
+        shape : tuple : shape of the network.
         dircoup : DirectionalCoupler : zero length directional coupler.
         wg : Waveguide : a waveguide containing all the properties of a single directional
                          coupler arm, such as the length and the effective index.
+        couplings: (numpy ndarray) : Desired couplings for the grating couplers. This
+                                     array should have the same length as the shape of
+                                     the network. If None, all directional couplers
+                                     default to a coupling of 0.5.
+        lengths : (numpy ndarray) : optional. Lengths of de directional couplers. If None
+                                    all lengths will be equal to the length of the
+                                    specified directional coupler.
         terms : A dictionary with source and Detector locations in the form
                 terms = {3:Source(), 15:Detector(), ...}.
                 any other not specified terms will be terminated by terms['default'].
@@ -171,7 +185,7 @@ class DirectionalCouplerNetwork(Network, Component):
         Component.__init__(self, name=name)
 
         # Handle shape of network
-        I, J = couplings.shape
+        I, J = shape
         if I < 2 or J < 2:
             raise ValueError('2D Network is required.')
 
@@ -185,7 +199,10 @@ class DirectionalCouplerNetwork(Network, Component):
                 # Create copy of directional coupler:
                 dircoup_copy = self.dircoup.copy()
                 dircoup_copy.name = '+'
-                dircoup_copy.dircoup.kappa2 = couplings[i, j]
+                if couplings is not None:
+                    dircoup_copy.dircoup.kappa2 = couplings[i, j]
+                if lengths is not None:
+                    dircoup_copy.wg.length = lengths[i, j]
                 # Put copy in dircoup array
                 self.dircoup_array[i, j] = dircoup_copy
 
@@ -196,14 +213,14 @@ class DirectionalCouplerNetwork(Network, Component):
         self.terms = OrderedDict(terms)
 
         # save order of terms (to reorder in terms clockwise direction):
-        self._order = np.hstack((
+        self._order = torch.from_numpy(np.hstack((
             np.arange(1, J+2, 1), # North row
             np.arange(J+3, 4+(J-2)+2*(J-2), 2), # East column
             [8+2*(I-2)+2*(J-2)-2, 8+2*(I-2)+2*(J-2)-1], # South-East Corner
             np.arange(4+(J-2)+2*(I-2), 8+2*(I-2)+2*(J-2)-2, 1)[::-1], #South Row
             np.arange(J+2, 4+(J-2)+2*(J-2), 2)[::-1], # left column
             [0], # half of north west corner
-        ))
+        ))).long()
 
     def terminate(self, term=None):
         ''' Directional Coupler Networks are terminated by default '''
@@ -225,6 +242,32 @@ class DirectionalCouplerNetwork(Network, Component):
             for j in range(J):
                 couplings[i, j] = self.dircoup_array[i, j].dircoup.kappa2
         return couplings
+
+    @couplings.setter
+    def couplings(self, array):
+        ''' Set all couplings of the network '''
+        I, J = self.dircoup_array.shape
+        for i in range(I):
+            for j in range(J):
+                self.dircoup_array[i, j].dircoup.kappa2 = array[i,j]
+
+    @property
+    def lengths(self):
+        ''' Get array with couplings of the directional couplers '''
+        I, J = self.dircoup_array.shape
+        lengths = self.new_variable(np.zeros((I, J)))
+        for i in range(I):
+            for j in range(J):
+                lengths[i, j] = self.dircoup_array[i, j].wg.length
+        return lengths
+
+    @lengths.setter
+    def lengths(self, array):
+        ''' Set all lengths of the network '''
+        I, J = self.dircoup_array.shape
+        for i in range(I):
+            for j in range(J):
+                self.dircoup_array[i, j].wg.length = array[i,j]
 
     @property
     def C(self):
@@ -304,14 +347,18 @@ class DirectionalCouplerNetwork(Network, Component):
         new.is_cuda = False
         return new
 
-    def copy(self, couplings=None):
+    def copy(self, couplings=None, lengths=None):
         ''' Copy the directional coupler network '''
         if couplings is None:
             couplings = self.couplings.data.cpu().numpy()
+        if lengths is None:
+            lengths = self.lengths.data.cpu().numpy()
         new = self.__class__(
-            couplings=couplings,
+            shape=self.shape,
             dircoup=self.dircoup.dircoup,
             wg=self.dircoup.wg,
+            couplings=couplings,
+            lengths=lengths,
             name=self.name,
         )
         new.terms = self.terms

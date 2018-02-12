@@ -60,8 +60,8 @@ class Waveguide(Connection):
         # e = exp(2j*pi*neff*length/wl)
         re = 10**(-self.loss*self.length/10)*np.cos(2*pi*self.neff*self.length/self.env.wl)
         S = self.new_variable([[0, 1],
-                               [1, 0]])
-        return re*S
+                               [1, 0]], 'float')
+        return S*re
 
     @property
     def iS(self):
@@ -69,5 +69,5 @@ class Waveguide(Connection):
         # e = exp(2j*pi*neff*length/wl)
         ie = 10**(-self.loss*self.length/10)*np.sin(2*pi*self.neff*self.length/self.env.wl)
         S = self.new_variable([[0, 1],
-                               [1, 0]])
-        return ie*S
+                               [1, 0]], 'float')
+        return S*ie

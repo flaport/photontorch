@@ -4,6 +4,9 @@
 ## Imports ##
 #############
 
+## Torch
+import torch
+
 ## Other
 import numpy as np
 
@@ -148,13 +151,29 @@ class RingNetwork(DirectionalCouplerNetwork):
     Because of the connection order of the directional coupler (0<->1 and 2<->3), this
     network does contain loops and can thus be used as a reservoir.
     '''
-    def __init__(self, couplings, dircoup, wg, terms=None, name='dircoupnw'):
-        DirectionalCouplerNetwork.__init__(self, couplings, dircoup, wg, terms=terms, name=name)
+    def __init__(self,
+                 shape,
+                 dircoup,
+                 wg,
+                 couplings=None,
+                 lengths=None,
+                 terms=None,
+                 name='dircoupnw'):
+        DirectionalCouplerNetwork.__init__(
+            self,
+            shape,
+            dircoup,
+            wg,
+            couplings=couplings,
+            lengths=lengths,
+            terms=terms,
+            name=name,
+        )
         # Change default term order to term order of ring network
         I, J = self.shape
         k0 = (I%2 == 0) & (J%2 == 1)
         k1 = not k0
-        self._order = np.hstack((
+        self._order = torch.from_numpy(np.hstack((
             np.arange(1, J, 1), # North row
             [J, J+1] if J%2 else [J+1, J], #North East Corner
             np.arange(J+3, 4+(J-2)+2*(J-2), 2), # East column
@@ -162,7 +181,7 @@ class RingNetwork(DirectionalCouplerNetwork):
             np.arange(4+(J-2)+2*(I-2), 8+2*(I-2)+2*(J-2)-2, 1)[::-1], #South Row
             np.arange(J+2, 4+(J-2)+2*(J-2), 2)[::-1], # left column
             [0], # half of north west corner
-        ))
+        ))).long()
 
     def _parse_connections(self):
         connections = []
