@@ -4,7 +4,7 @@
 ## Constants ##
 ###############
 
-CHARS = ''.join([chr(i) for i in range(128)])
+CHARS = ''.join([chr(i) for i in range(256)]).replace(',','')
 
 ###############
 ## Connector ##
