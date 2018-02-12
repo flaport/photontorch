@@ -127,17 +127,17 @@ class RingNetwork(DirectionalCouplerNetwork):
 
     Network
     -------
-         1    2    3    5
+         0    1    2    3
         ..   ..   ..   ..
          1    1    1    1
-    0 : 0 2--2 0--0 2--2 0 : 4
+    11: 0 2--2 0--0 2--2 0 : 4
          3    3    3    3
          |    |    |    |
          3    3    3    3
-    6 : 0 2--2 0--0 2--2 0 :10
+    10: 0 2--2 0--0 2--2 0 : 5
          1    1    1    1
         ..   ..   ..   ..
-         7    8    9   11
+         9    8    7    6
 
     Legend
     ------
@@ -152,6 +152,21 @@ class RingNetwork(DirectionalCouplerNetwork):
     Because of the connection order of the directional coupler (0<->1 and 2<->3), this
     network does contain loops and can thus be used as a reservoir.
     '''
+    def __init__(self, couplings, dircoup, wg, terms={}, name='dircoupnw'):
+        DirectionalCouplerNetwork.__init__(self, couplings, dircoup, wg, terms=terms, name=name)
+        # Change default term order to term order of ring network
+        I,J = self.shape
+        k0 = (I%2==0)&(J%2==1)
+        k1 = not k0
+        self._order = np.hstack((
+            np.arange(1, J, 1), # North row
+            [J,J+1] if J%2 else [J+1,J], #North East Corner
+            np.arange(J+3, 4+(J-2)+2*(J-2),2), # East column
+            [8+2*(I-2)+2*(J-2)-2+k0, 8+2*(I-2)+2*(J-2)-2+k1], # South-East Corner
+            np.arange(4+(J-2)+2*(I-2),8+2*(I-2)+2*(J-2)-2)[::-1], #South Row
+            np.arange(J+2, 4+(J-2)+2*(J-2),2)[::-1], # left column
+            [0], # half of north west corner
+        ))
 
     def _parse_connections(self):
         connections = []

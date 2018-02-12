@@ -116,17 +116,17 @@ class DirectionalCouplerNetwork(Network, Component):
 
     Network
     -------
-         1    2    3    4
+         0    1    2    3
         ..   ..   ..   ..
          1    1    1    1
-    0 : 0 2--0 2--0 2--0 2 : 5
+    11: 0 2--0 2--0 2--0 2 : 4
          3    3    3    3
          |    |    |    |
          1    1    1    1
-    6 : 0 2--0 2--0 2--0 2 : 10
+    10: 0 2--0 2--0 2--0 2 : 5
          3    3    3    3
         ..   ..   ..   ..
-         7    8    9   11
+         9    8    7    6
 
     Legend
     ------
@@ -188,6 +188,16 @@ class DirectionalCouplerNetwork(Network, Component):
         self.num_terms = 8 + 2*(I-2) + 2*(J-2)
         self.terms = OrderedDict(terms)
 
+        # save order of terms (to reorder in terms clockwise direction):
+        self._order = np.hstack((
+            np.arange(1, J+2, 1), # North row
+            np.arange(J+3, 4+(J-2)+2*(J-2),2), # East column
+            [8+2*(I-2)+2*(J-2)-2, 8+2*(I-2)+2*(J-2)-1], # South-East Corner
+            np.arange(4+(J-2)+2*(I-2),8+2*(I-2)+2*(J-2)-2)[::-1], #South Row
+            np.arange(J+2, 4+(J-2)+2*(J-2),2)[::-1], # left column
+            [0], # half of north west corner
+        ))
+
     def terminate(self, term=None):
         ''' Directional Coupler Networks are terminated by default '''
         if term is None:
@@ -222,10 +232,10 @@ class DirectionalCouplerNetwork(Network, Component):
             j = Ns[i2] + idxs2[j2]
             C[i,j] = C[j,i] = 1.0
 
-        # find term connection locations
+        # find and reorder term connection locations
         I,J = self.shape
         K = self.num_terms
-        idxs = where(((C.sum(0)>0) | (C.sum(1)>0)).ne(1).data)[:K]
+        idxs = where(((C.sum(0)>0) | (C.sum(1)>0)).ne(1).data)[:K][self._order]
 
         # connect terms
         for k, i in enumerate(self.terms):
@@ -298,18 +308,12 @@ class DirectionalCouplerNetwork(Network, Component):
         new.terms = self.terms
         return new
 
-    @staticmethod
-    def _parse_string(s):
-        s.replace('+','d')
-        lines = [_s.strip() for _s in s.lower().splitlines()]
-        while lines[0] == '':
-            lines = lines[1:]
-        while lines[-1] == '':
-            lines = lines[:-1]
-        array = np.array([list(_s) for _s in lines], dtype=object)
-        return array
-
     def __getitem__(self, key):
+        '''
+        Special getitem.
+        A string will create a connector, while any other key will be passed to the
+        dircoup_array.
+        '''
         if isinstance(key, str):
             return Component.__getitem__(self, key)
         else:
