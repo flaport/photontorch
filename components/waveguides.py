@@ -4,9 +4,6 @@
 ## Imports ##
 #############
 
-## Torch
-import torch
-
 ## Other
 import numpy as np
 
@@ -53,18 +50,24 @@ class Waveguide(Connection):
     @property
     def delays(self):
         ''' The delay per node is given by the propagation time in the waveguide '''
-        return (self.neff*self.length/c)*self.new_variable([1,1],'float')
+        delay = self.neff*self.length/c
+        ones = self.new_variable([1, 1], 'float')
+        return delay*ones
 
     @property
     def rS(self):
         ''' real part of the scattering matrix '''
         # e = exp(2j*pi*neff*length/wl)
         re = 10**(-self.loss*self.length/10)*np.cos(2*pi*self.neff*self.length/self.env.wl)
-        return self.new_variable([[0,1],[1,0]])*re
+        S = self.new_variable([[0, 1],
+                               [1, 0]])
+        return re*S
 
     @property
     def iS(self):
         ''' imaginary part of the scattering matrix '''
         # e = exp(2j*pi*neff*length/wl)
         ie = 10**(-self.loss*self.length/10)*np.sin(2*pi*self.neff*self.length/self.env.wl)
-        return self.new_variable([[0,1],[1,0]])*ie
+        S = self.new_variable([[0, 1],
+                               [1, 0]])
+        return ie*S

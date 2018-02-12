@@ -1,3 +1,5 @@
+''' A helper class to connect Components together into a Network '''
+
 ###############
 ## Constants ##
 ###############
@@ -70,6 +72,7 @@ class Connector(object):
 
     @property
     def idxs(self):
+        ''' Get free indices of the connector object '''
         return self._idxs(self.s)
 
     @property
@@ -81,12 +84,12 @@ class Connector(object):
 
     def _idxs(self, s):
         if ',' in s:
-            return self._idxs(s.replace(',',''))
+            return self._idxs(s.replace(',', ''))
         for c in s:
             if s.count(c) > 2:
                 raise ValueError('Index %s occuring more than 2 times!'%c)
             if s.count(c) == 2:
-                return self._idxs(s.replace(c,''))
+                return self._idxs(s.replace(c, ''))
         return s
 
     def __mul__(self, other):
@@ -94,14 +97,14 @@ class Connector(object):
             s = ','.join(self.s.split(',')+other.s.split(','))
             return Connector(s, tuple(self.components)+tuple(other.components))
         else:
-            raise ValueError('Cannot connect %s and %s'(repr(self), repr(other)))
+            raise ValueError('Cannot connect %s and %s'%(repr(self), repr(other)))
 
     def __imul__(self, other):
         if isinstance(other, Connector):
             self.s = ','.join(self.s.split(',')+other.s.split(','))
             self.components += tuple(other.components)
         else:
-            raise ValueError('Cannot connect components %s and %s'(repr(self), repr(other)))
+            raise ValueError('Cannot connect components %s and %s'%(repr(self), repr(other)))
 
     def __repr__(self):
         ret = []

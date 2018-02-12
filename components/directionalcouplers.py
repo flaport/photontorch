@@ -4,24 +4,20 @@
 ## Imports ##
 #############
 
-## Torch
-import torch
-
 ## Other
 import numpy as np
 
 ## Relative
-from .mirrors import Mirror
 from .component import Component
-from ..constants import pi, c
+from ..constants import pi
 
 
 #########################
 ## Directional Coupler ##
 #########################
 
-class DirectionalCoupler(Mirror):
-    '''
+class DirectionalCoupler(Component):
+    r'''
     A directional coupler is a memory-less component with 4 ports.
 
     A directional coupler has one trainable parameter: the coupling R.
@@ -41,18 +37,45 @@ class DirectionalCoupler(Mirror):
 
     num_ports = 4
 
+    def __init__(self, kappa2=0.5, kappa2_bounds=(0, 1), name=None):
+        '''
+        Directional Coupler initialization
+
+        Parameters
+        ----------
+        kappa2 : float. squared coupling of the directional coupler (between 0 and 1)
+        kappa2_bounds : tuple of length 2: Bounds in which to optimize the squared coupling.
+                        If None, kappa2 will not be optimized.
+        name : str. name of this specific directional coupler
+        '''
+        Component.__init__(self, name=name)
+
+        self.kappa2 = self.new_bounded_parameter(
+            data=kappa2,
+            bounds=kappa2_bounds,
+            requires_grad=True, # trainable between bounds
+        )
+
     @property
     def rS(self):
-        t = (1-self.R)**0.5
-        return self.new_variable([[0,1,0,0],[1,0,0,0],[0,0,0,1],[0,0,1,0]])*t
+        t = (1-self.kappa2)**0.5
+        S = self.new_variable([[0, 1, 0, 0],
+                               [1, 0, 0, 0],
+                               [0, 0, 0, 1],
+                               [0, 0, 1, 0]])
+        return t*S
 
     @property
     def iS(self):
-        r = self.R**0.5
-        return self.new_variable([[0,0,1,0],[0,0,0,1],[1,0,0,0],[0,1,0,0]])*r
+        k = self.kappa2**0.5
+        S = self.new_variable([[0, 0, 1, 0],
+                               [0, 0, 0, 1],
+                               [1, 0, 0, 0],
+                               [0, 1, 0, 0]])
+        return k*S
 
 class RealisticDirectionalCoupler(Component):
-    '''
+    r'''
     A directional coupler is a memory-less component with 4 ports.
 
     The realistic directional coupler is based on the CapheModel of Umar Khan
@@ -74,7 +97,7 @@ class RealisticDirectionalCoupler(Component):
     num_ports = 4
 
     def __init__(self,
-                 length = 12.8e-6,
+                 length=12.8e-6,
                  k0=0.2332,
                  n0=0.0208,
                  de1_k0=1.2435,
@@ -92,6 +115,7 @@ class RealisticDirectionalCoupler(Component):
 
         Parameters
         ----------
+        length : length of the directional coupler
         k0 : bend coupling
         n0 : effective index difference between even and odd mode
         de1_k0 : first derivative of k0 w.r.t. wavelength
@@ -101,6 +125,7 @@ class RealisticDirectionalCoupler(Component):
         '''
 
         Component.__init__(name=name)
+        self.length = length
         self.k0 = k0
         self.de1_k0 = de1_k0
         self.de2_k0 = de2_k0
@@ -117,7 +142,11 @@ class RealisticDirectionalCoupler(Component):
         kappa0 = self.k0 + self.de1_k0*dwl + 0.5*self.de2_k0*dwl**2
         kappa1 = pi*dn/wl
         tau = np.cos(kappa0 + kappa1*self.length)
-        return self.new_variable([[0,1,0,0],[1,0,0,0],[0,0,0,1],[0,0,1,0]])*tau
+        S = self.new_variable([[0, 1, 0, 0],
+                               [1, 0, 0, 0],
+                               [0, 0, 0, 1],
+                               [0, 0, 1, 0]])
+        return tau*S
 
     @property
     def iS(self):
@@ -127,4 +156,8 @@ class RealisticDirectionalCoupler(Component):
         kappa0 = self.k0 + self.de1_k0*dwl + 0.5*self.de2_k0*dwl**2
         kappa1 = pi*dn/wl
         kappa = -np.sin(kappa0 + kappa1*self.length)
-        return self.new_variable([[0,0,0,1],[0,0,1,0],[0,1,0,0],[1,0,0,0]])*kappa
+        S = self.new_variable([[0, 0, 1, 0],
+                               [0, 0, 0, 1],
+                               [1, 0, 0, 0],
+                               [0, 1, 0, 0]])
+        return kappa*S

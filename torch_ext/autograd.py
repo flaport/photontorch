@@ -36,7 +36,7 @@ def pinv(input, rcond=1e-8):
     -------
     B : (N, M) FloatTensor. The pseudo-inverse of `input`.
     '''
-    return PseudoInverse().apply(input)
+    return PseudoInverse().apply(input, rcond=rcond)
 
 class PseudoInverse(Function):
     '''
@@ -59,13 +59,13 @@ class PseudoInverse(Function):
         # inverse = torch.from_numpy(np_inverse)
 
         # torch way
-        U,S,V = torch.svd(input)
+        U, S, V = torch.svd(input)
         selection = (torch.abs(S) <= cutoff)
         if selection.all():
             invS = torch.diag(torch.zeros_like(S))
         else:
             invS = torch.diag((1./S)*(~selection).type(input.type()))
-        inverse = V.mm(invS.mm(U.transpose(1,0)))
+        inverse = V.mm(invS.mm(U.t()))
 
         # save the inverse for the backward pass
         ctx.inverse = inverse
@@ -85,7 +85,7 @@ class PseudoInverse(Function):
         # some debugging with torch.autograd.gradcheck shows that we need
         # to transpose the inverse, for the desired backward pass to work.
         # So far, I have no idea why this is the case.
-        inverse = Variable(ctx.inverse, requires_grad=True).transpose(1,0) # we need a variable to work with
+        inverse = Variable(ctx.inverse, requires_grad=True).t() # we need a variable
 
         # return the gradient
         return -inverse.mm(grad_output.mm(inverse))
@@ -142,7 +142,7 @@ class BlockDiag(Function):
         M = zeros((total_size, total_size), type=inputs[0].type())
         # Fill Blocks
         for (i, j), matrix in zip(ctx.idxs, inputs):
-            M[i:j,i:j] = matrix
+            M[i:j, i:j] = matrix
         return M
 
     @staticmethod
@@ -151,7 +151,7 @@ class BlockDiag(Function):
         The backward pass selects the relevant submatrices of the gradient
         '''
         outputs = []
-        for i,j in ctx.idxs:
-            output = M[i:j,i:j]
+        for i, j in ctx.idxs:
+            output = M[i:j, i:j]
             outputs.append(output)
         return tuple(outputs)

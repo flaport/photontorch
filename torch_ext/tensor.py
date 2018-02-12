@@ -24,7 +24,7 @@ def zeros(shape, **kwargs):
     *shape : shape of the new tensor
     type = 'torch.FloatTensor' : type of the new tensor
     '''
-    type = kwargs.pop('type','torch.FloatTensor')
+    type = kwargs.pop('type', 'torch.FloatTensor')
     Tensor = TORCH_TYPES[type]
     tensor = Tensor(*shape).zero_()
     return tensor

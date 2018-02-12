@@ -28,8 +28,8 @@ class Connection(Component):
 
     @property
     def rS(self):
-        return self.new_variable([[0,1],[1,0]])
+        return self.new_variable([[0, 1], [1, 0]])
 
     @property
     def iS(self):
-        return self.new_variable([[0,0],[0,0]])
+        return self.new_variable([[0, 0], [0, 0]])

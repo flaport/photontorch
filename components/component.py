@@ -73,7 +73,8 @@ class Component(Module):
         Real Part of the Scattering matrix of the component.
         Should return a Variable containing a torch.FloatTensor.
         '''
-        raise NotImplementedError('The real part of the scattering matrix of %s does not exist'%self.name)
+        raise NotImplementedError('The real part of the scattering matrix '
+                                  'of %s does not exist'%self.name)
 
     @property
     def iS(self):
@@ -81,7 +82,8 @@ class Component(Module):
         Imaginary Part of the Scattering matrix of the component.
         Should return a Variable containing a torch.FloatTensor.
         '''
-        raise NotImplementedError('The imaginary part of the scattering matrix of %s does not exist'%self.name)
+        raise NotImplementedError('The imaginary part of the scattering matrix '
+                                  'of %s does not exist'%self.name)
 
     @property
     def C(self):
@@ -125,6 +127,7 @@ class Component(Module):
         return where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1).data)
 
     def copy(self):
+        ''' Make a (deep) copy of the component '''
         new = self.__class__.__new__(self.__class__)
         new.__dict__['env'] = None
         for k, v in self.__dict__.items():
