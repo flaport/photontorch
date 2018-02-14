@@ -211,7 +211,6 @@ class DirectionalCouplerNetwork(Network, Component):
             terms = {}
         self.num_terms = 8 + 2*(I-2) + 2*(J-2)
         self.terms = OrderedDict(terms)
-        print(self.terms)
 
         # save order of terms (to reorder in terms clockwise direction):
         self._order = torch.from_numpy(np.hstack((
