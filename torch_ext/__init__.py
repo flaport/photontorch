@@ -3,6 +3,7 @@
 
 ## custom torch differentiable functions
 from .autograd import block_diag
+from .autograd import batch_block_diag
 
 
 ## custom neural network functions
