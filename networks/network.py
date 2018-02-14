@@ -285,7 +285,7 @@ class Network(Component):
     @require_initialization
     def new_source(self, source=None, add_phase=False):
         '''
-        Create a Source FloatTensor with size (# time, # sources, # batches)
+        Create a Source FloatTensor with size (# time, # mc nodes, # batches)
 
         Parameters
         ----------
@@ -341,22 +341,26 @@ class Network(Component):
             iphase.unsqueeze_(-1).unsqueeze_(-1)
             rsource, isource = rphase*rsource - iphase*isource, rphase*isource + iphase*rsource
 
+        # create empty inputs:
+        _source = torch.cat((rsource.unsqueeze_(0), isource.unsqueeze_(0)), dim=0)
+        source = self.new_variable(np.zeros((2, self.env.num_timesteps, self.nmc, self.env.num_batches)))
+        source[:,:,:self.num_sources,:] = _source
+
         # Concatenate real and imaginary part and return the source:
-        return rsource, isource
+        return source
 
     @require_initialization
     def forward(self, source):
         '''
         Forward pass of the network.
-        source should be a tuple containing two FloatTensors of size (# batches, # time, # sources).
-        whereby each element corresponds to the real and imaginary part of the source respectively.
-        '''
-        rsource, isource = source
 
-        _rsource = Variable(self.zeros((self.env.num_timesteps, self.nmc, self.env.num_batches)))
-        _isource = _rsource.clone()
-        _rsource[:, :self.num_sources, :] = rsource
-        _isource[:, :self.num_sources, :] = isource
+        Arguments
+        ---------
+        source : should be a FloatTensors of size
+                 (#2 = (real|imag), # time, # mc nodes, # batches)
+              OR a Source object from photontorch.sources that returns a FloatTensor when
+                 indexed.
+        '''
 
         detected = self.new_variable(self.zeros((self.env.num_timesteps, self.nmc, self.env.num_batches)))
 
@@ -367,8 +371,8 @@ class Network(Component):
         for i in range(self.env.num_timesteps):
 
             # get state
-            rx = torch.sum(self.buffermask*rbuffer, dim=0) + _rsource[i]
-            ix = torch.sum(self.buffermask*ibuffer, dim=0) + _isource[i]
+            rx = torch.sum(self.buffermask*rbuffer, dim=0) + source[0,i]
+            ix = torch.sum(self.buffermask*ibuffer, dim=0) + source[1,i]
 
             # connect memory-less components
             # rx and ix need to be calculated at the same time because of dependencies on each other
