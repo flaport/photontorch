@@ -96,11 +96,10 @@ class Module(_Module_):
             eps = 1e-8
             min = getattr(self, name+'_bounds')[0]
             max = getattr(self, name+'_bounds')[1]
-            if not isinstance(value, torch.Tensor) or not isinstance(value, Variable):
-                value = np.array(value)
-                if value.ndim == 0:
-                    value = value[None]
-                value = self.new_tensor(value)
+
+            if isinstance(value, Variable):
+                value = value.data
+
             data = ((1-2*eps)*((value - min)/(max - min) + eps))
             setattr(
                 self, '_'+name,
