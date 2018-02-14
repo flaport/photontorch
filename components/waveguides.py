@@ -57,17 +57,16 @@ class Waveguide(Connection):
     @property
     def rS(self):
         ''' real part of the scattering matrix '''
-        # e = exp(2j*pi*neff*length/wl)
-        re = 10**(-self.loss*self.length/10)*np.cos(2*pi*self.neff*self.length/self.env.wl)
-        S = self.new_variable([[0, 1],
-                               [1, 0]], 'float')
-        return S*re
+        re = 10**(-self.loss*self.length/10)*np.cos(2*pi*self.neff*self.length/self.env.wls)
+        S = np.array([[[0, 1],
+                       [1, 0]]])
+        return self.new_variable(re[:,None,None]*S)
 
     @property
     def iS(self):
         ''' imaginary part of the scattering matrix '''
         # e = exp(2j*pi*neff*length/wl)
-        ie = 10**(-self.loss*self.length/10)*np.sin(2*pi*self.neff*self.length/self.env.wl)
-        S = self.new_variable([[0, 1],
-                               [1, 0]], 'float')
-        return S*ie
+        ie = 10**(-self.loss*self.length/10)*np.sin(2*pi*self.neff*self.length/self.env.wls)
+        S = np.array([[[0, 1],
+                       [1, 0]]])
+        return self.new_variable(ie[:,None,None]*S)

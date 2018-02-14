@@ -61,6 +61,7 @@ class DirectionalCouplerWithLength(Component):
         ''' Initialize Component '''
         self.wg.initialize(env)
         self.dircoup.initialize(env)
+        Component.initialize(self, env)
 
     @property
     def delays(self):
@@ -73,14 +74,14 @@ class DirectionalCouplerWithLength(Component):
         t = (1-self.dircoup.kappa2)**0.5 # Transmission
         rS_wg_t = self.wg.rS*t
         iS_wg_k = self.wg.iS*k
-        rS = self.new_variable([[0, 0, 0, 0],
-                                [0, 0, 0, 0],
-                                [0, 0, 0, 0],
-                                [0, 0, 0, 0]])
-        rS[:2, :2] = rS_wg_t # Transmission from i < - > j
-        rS[2:, 2:] = rS_wg_t # Transmission from k < - > l
-        rS[::2, ::2] = -iS_wg_k
-        rS[1::2, 1::2] = -iS_wg_k
+        rS = self.new_variable([[[0, 0, 0, 0],
+                                 [0, 0, 0, 0],
+                                 [0, 0, 0, 0],
+                                 [0, 0, 0, 0]]]*self.env.num_wl)
+        rS[:,:2, :2] = rS_wg_t # Transmission from i < - > j
+        rS[:,2:, 2:] = rS_wg_t # Transmission from k < - > l
+        rS[:,::2, ::2] = -iS_wg_k
+        rS[:,1::2, 1::2] = -iS_wg_k
         return rS
 
     @property
@@ -90,14 +91,14 @@ class DirectionalCouplerWithLength(Component):
         t = (1-self.dircoup.kappa2)**0.5 # Transmission
         iS_wg_t = self.wg.iS*t
         rS_wg_k = self.wg.rS*k
-        iS = self.new_variable([[0, 0, 0, 0],
-                                [0, 0, 0, 0],
-                                [0, 0, 0, 0],
-                                [0, 0, 0, 0]])
-        iS[:2, :2] = iS_wg_t # Transmission from i < - > j
-        iS[2:, 2:] = iS_wg_t # Transmission from k < - > l
-        iS[::2, ::2] = rS_wg_k
-        iS[1::2, 1::2] = rS_wg_k
+        iS = self.new_variable([[[0, 0, 0, 0],
+                                 [0, 0, 0, 0],
+                                 [0, 0, 0, 0],
+                                 [0, 0, 0, 0]]]*self.env.num_wl)
+        iS[:,:2, :2] = iS_wg_t # Transmission from i < - > j
+        iS[:,2:, 2:] = iS_wg_t # Transmission from k < - > l
+        iS[:,::2, ::2] = rS_wg_k
+        iS[:,1::2, 1::2] = rS_wg_k
         return iS
 
     def cuda(self):

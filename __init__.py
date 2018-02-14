@@ -55,6 +55,7 @@ from .environment.environment import Environment
 
 # autograd
 from .torch_ext.autograd import block_diag
+from .torch_ext.autograd import batch_block_diag
 
 # neural networks
 from .torch_ext.nn import Module

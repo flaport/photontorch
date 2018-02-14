@@ -4,6 +4,9 @@
 ## Imports ##
 #############
 
+## Torch
+import torch
+
 ## Relative
 from .component import Component
 
@@ -49,14 +52,22 @@ class Mirror(Component):
 
     @property
     def rS(self):
-        r = self.R**0.5
-        S = self.new_variable([[1, 0],
-                               [0, 1]])
+        '''
+        Real part of the scattering matrix
+        shape: (# num wavelengths, # num ports, # num ports)
+        '''
+        r = torch.cat([(self.R**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
+        S = self.new_variable([[[1, 0],
+                                [0, 1]]])
         return r*S
 
     @property
     def iS(self):
-        t = (1-self.R)**0.5
-        S = self.new_variable([[0, 1],
-                               [1, 0]])
+        '''
+        Imag part of the scattering matrix
+        shape: (# num wavelengths, # num ports, # num ports)
+        '''
+        t = torch.cat([((1-self.R)**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
+        S = self.new_variable([[[0, 1],
+                                [1, 0]]])
         return t*S

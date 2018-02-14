@@ -4,6 +4,9 @@
 ## Imports ##
 #############
 
+## Torch
+import torch
+
 ## Other
 import numpy as np
 
@@ -58,20 +61,28 @@ class DirectionalCoupler(Component):
 
     @property
     def rS(self):
-        t = (1-self.kappa2)**0.5
-        S = self.new_variable([[0, 1, 0, 0],
-                               [1, 0, 0, 0],
-                               [0, 0, 0, 1],
-                               [0, 0, 1, 0]])
+        '''
+        Real part of the scattering matrix
+        shape: (# num wavelengths, # num ports, # num ports)
+        '''
+        t = torch.cat([((1-self.kappa2)**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
+        S = self.new_variable([[[0, 1, 0, 0],
+                                [1, 0, 0, 0],
+                                [0, 0, 0, 1],
+                                [0, 0, 1, 0]]])
         return t*S
 
     @property
     def iS(self):
-        k = self.kappa2**0.5
-        S = self.new_variable([[0, 0, 1, 0],
-                               [0, 0, 0, 1],
-                               [1, 0, 0, 0],
-                               [0, 1, 0, 0]])
+        '''
+        Imag part of the scattering matrix
+        shape: (# num wavelengths, # num ports, # num ports)
+        '''
+        k = torch.cat([(self.kappa2**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
+        S = self.new_variable([[[0, 0, 1, 0],
+                                [0, 0, 0, 1],
+                                [1, 0, 0, 0],
+                                [0, 1, 0, 0]]])
         return k*S
 
 class RealisticDirectionalCoupler(Component):
@@ -136,28 +147,36 @@ class RealisticDirectionalCoupler(Component):
 
     @property
     def rS(self):
-        wl = self.env.wl
+        '''
+        Real part of the scattering matrix
+        shape: (# num wavelengths, # num ports, # num ports)
+        '''
+        wl = self.env.wls
         dwl = wl - self.wl0
         dn = self.n0 + self.de1_n0*dwl + 0.5*self.de2_n0*dwl**2
         kappa0 = self.k0 + self.de1_k0*dwl + 0.5*self.de2_k0*dwl**2
         kappa1 = pi*dn/wl
-        tau = np.cos(kappa0 + kappa1*self.length)
-        S = self.new_variable([[0, 1, 0, 0],
-                               [1, 0, 0, 0],
-                               [0, 0, 0, 1],
-                               [0, 0, 1, 0]])
+        tau = self.new_variable(np.cos(kappa0 + kappa1*self.length)).view(-1,1,1)
+        S = self.new_variable([[[0, 1, 0, 0],
+                                [1, 0, 0, 0],
+                                [0, 0, 0, 1],
+                                [0, 0, 1, 0]]])
         return tau*S
 
     @property
     def iS(self):
-        wl = self.env.wl
+        '''
+        Imag part of the scattering matrix
+        shape: (# num wavelengths, # num ports, # num ports)
+        '''
+        wl = self.env.wls
         dwl = wl - self.wl0
         dn = self.n0 + self.de1_n0*dwl + 0.5*self.de2_n0*dwl**2
         kappa0 = self.k0 + self.de1_k0*dwl + 0.5*self.de2_k0*dwl**2
         kappa1 = pi*dn/wl
-        kappa = -np.sin(kappa0 + kappa1*self.length)
-        S = self.new_variable([[0, 0, 1, 0],
-                               [0, 0, 0, 1],
-                               [1, 0, 0, 0],
-                               [0, 1, 0, 0]])
+        kappa = self.new_variable(-np.sin(kappa0 + kappa1*self.length)).view(-1,1,1)
+        S = self.new_variable([[[0, 0, 1, 0],
+                                [0, 0, 0, 1],
+                                [1, 0, 0, 0],
+                                [0, 1, 0, 0]]])
         return kappa*S
