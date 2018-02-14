@@ -200,9 +200,9 @@ class DirectionalCouplerNetwork(Network, Component):
                 dircoup_copy = self.dircoup.copy()
                 dircoup_copy.name = '+'
                 if couplings is not None:
-                    dircoup_copy.dircoup.kappa2 = couplings[i, j]
+                    dircoup_copy.dircoup.kappa2 = self.new_variable([float(couplings[i, j])])
                 if lengths is not None:
-                    dircoup_copy.wg.length = lengths[i, j]
+                    dircoup_copy.wg.length = float(lengths[i, j])
                 # Put copy in dircoup array
                 self.dircoup_array[i, j] = dircoup_copy
 
@@ -211,6 +211,7 @@ class DirectionalCouplerNetwork(Network, Component):
             terms = {}
         self.num_terms = 8 + 2*(I-2) + 2*(J-2)
         self.terms = OrderedDict(terms)
+        print(self.terms)
 
         # save order of terms (to reorder in terms clockwise direction):
         self._order = torch.from_numpy(np.hstack((
@@ -249,7 +250,7 @@ class DirectionalCouplerNetwork(Network, Component):
         I, J = self.dircoup_array.shape
         for i in range(I):
             for j in range(J):
-                self.dircoup_array[i, j].dircoup.kappa2 = array[i,j]
+                self.dircoup_array[i, j].dircoup.kappa2 = self.new_variable([float(array[i,j])])
 
     @property
     def lengths(self):
@@ -267,7 +268,7 @@ class DirectionalCouplerNetwork(Network, Component):
         I, J = self.dircoup_array.shape
         for i in range(I):
             for j in range(J):
-                self.dircoup_array[i, j].wg.length = array[i,j]
+                self.dircoup_array[i, j].wg.length = float(array[i,j])
 
     @property
     def C(self):
@@ -330,6 +331,8 @@ class DirectionalCouplerNetwork(Network, Component):
         for k, v in new.terms.items():
             terms[k] = v.cuda()
         new.terms = terms
+        new.dircoup = new.dircoup.cuda()
+        new._order = new._order.cuda()
         new.is_cuda = True
         return new
 
@@ -344,6 +347,7 @@ class DirectionalCouplerNetwork(Network, Component):
         for k, v in new.terms.items():
             terms[k] = v.cpu()
         new.terms = terms
+        new._order = new._order.cpu()
         new.is_cuda = False
         return new
 
