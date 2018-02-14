@@ -254,10 +254,10 @@ class Network(Component):
         self._rC = rC[new_order][:, new_order] # real part of reduced C-matrix
         self._iC = iC[new_order][:, new_order] # imag part of reduced C-matrix
 
-        # Create buffermask
-        buffermask = self.zeros((1, int(self._delays.max())+2, self.nmc))
+        # Create buffermask (# time, # mc nodes, # batches = 1)
+        buffermask = self.zeros((int(self._delays.max())+2, self.nmc, 1))
         for i, d in enumerate(self._delays):
-            buffermask[0, int(d), i] = 1.0
+            buffermask[int(d), i, 0] = 1.0
         self.buffermask = Variable(buffermask)
 
         self.initialized = True
@@ -272,12 +272,12 @@ class Network(Component):
         return wrapped
 
     @require_initialization
-    def new_buffer(self, num_batches=1):
+    def new_buffer(self):
         '''
         Create buffer to keep the hidden states of the Network (RNN)
-        The buffer has shape (# batches, # time, # mc nodes)
+        The buffer has shape (# time, # mc nodes, # batches)
         '''
-        buffer = self.zeros((num_batches, self.buffermask.size(1), self.buffermask.size(2)))
+        buffer = self.zeros((self.buffermask.size(0), self.nmc, self.env.num_batches))
         rbuffer = Variable(buffer.clone())
         ibuffer = Variable(buffer)
         return rbuffer, ibuffer
@@ -285,7 +285,7 @@ class Network(Component):
     @require_initialization
     def new_source(self, source=None, add_phase=False):
         '''
-        Create a Source FloatTensor with size (# batches, # time, # sources, 2)
+        Create a Source FloatTensor with size (# time, # sources, # batches)
 
         Parameters
         ----------
@@ -321,68 +321,71 @@ class Network(Component):
 
         if rsource.dim() == 1:
             # Only the time evolution of the source is given, we make a source with
-            # one single batch:
-            rsource.unsqueeze_(0)
-            isource.unsqueeze_(0)
+            # the number of batches specified in the environment.
+            rsource.unsqueeze_(-1)
+            isource.unsqueeze_(-1)
+            rsource = torch.cat([rsource]*self.env.num_batches, dim=-1)
+            isource = torch.cat([isource]*self.env.num_batches, dim=-1)
         if rsource.dim() == 2:
             # No different input is given for the (different) source locations.
             # We will use the same source amplitude at each source location.
-            rsource.unsqueeze_(-1)
-            isource.unsqueeze_(-1)
-            rsource = torch.cat([rsource]*self.num_sources, dim=-1)
-            isource = torch.cat([isource]*self.num_sources, dim=-1)
+            rsource.unsqueeze_(-2)
+            isource.unsqueeze_(-2)
+            rsource = torch.cat([rsource]*self.num_sources, dim=-2)
+            isource = torch.cat([isource]*self.num_sources, dim=-2)
         if add_phase:
             # We add the phase introduced by the time evolution of the source:
             rphase = self.new_variable(np.cos(2*pi*(c/self.env.wl)*self.env.t))
             iphase = self.new_variable(np.sin(2*pi*(c/self.env.wl)*self.env.t))
-            rphase.unsqueeze_(0).unsqueeze_(-1)
-            iphase.unsqueeze_(0).unsqueeze_(-1)
+            rphase.unsqueeze_(-1).unsqueeze_(-1)
+            iphase.unsqueeze_(-1).unsqueeze_(-1)
             rsource, isource = rphase*rsource - iphase*isource, rphase*isource + iphase*rsource
 
         # Concatenate real and imaginary part and return the source:
-        return torch.cat((rsource.unsqueeze_(-1), isource.unsqueeze_(-1)), dim=-1)
+        return rsource, isource
 
     @require_initialization
     def forward(self, source):
         '''
         Forward pass of the network.
-        source should be a FloatTensor of size (# batches, # time, # sources).
+        source should be a tuple containing two FloatTensors of size (# batches, # time, # sources).
+        whereby each element corresponds to the real and imaginary part of the source respectively.
         '''
-        _source = Variable(self.zeros((source.size(0), source.size(1), self.nmc, 2)))
-        _source[:, :, :self.num_sources] = source
+        rsource, isource = source
 
-        detected = self.new_variable(self.zeros((source.size(0), self.env.num_timesteps, self.nmc)))
+        _rsource = Variable(self.zeros((self.env.num_timesteps, self.nmc, self.env.num_batches)))
+        _isource = _rsource.clone()
+        _rsource[:, :self.num_sources, :] = rsource
+        _isource[:, :self.num_sources, :] = isource
+
+        detected = self.new_variable(self.zeros((self.env.num_timesteps, self.nmc, self.env.num_batches)))
 
         ## Get new buffer
-        rbuffer, ibuffer = self.new_buffer(source.size(0))
+        rbuffer, ibuffer = self.new_buffer()
 
         # solve
         for i in range(self.env.num_timesteps):
 
             # get state
-            rx = (torch.sum(self.buffermask*rbuffer, dim=1) + _source[:, i, :, 0]).t()
-            ix = (torch.sum(self.buffermask*ibuffer, dim=1) + _source[:, i, :, 1]).t()
-
-            # add source
-            #rx = rx + source[:,i,:,0].t()
-            #ix = rx + source[:,i,:,1].t()
+            rx = torch.sum(self.buffermask*rbuffer, dim=0) + _rsource[i]
+            ix = torch.sum(self.buffermask*ibuffer, dim=0) + _isource[i]
 
             # connect memory-less components
             # rx and ix need to be calculated at the same time because of dependencies on each other
             rx, ix = (self._rC).mm(rx) - (self._iC).mm(ix), (self._rC).mm(ix) + (self._iC).mm(rx)
 
             # get output state
-            detected[:, i, :] = (torch.pow(rx, 2) + torch.pow(ix, 2)).t()
+            detected[i] = torch.pow(rx, 2) + torch.pow(ix, 2)
 
             # connect memory-containing components
             # rx and ix need to be calculated at the same time because of dependencies on each other
             rx, ix = (self._rS).mm(rx) - (self._iS).mm(ix), (self._rS).mm(ix) + (self._iS).mm(rx)
 
             # update buffer
-            rbuffer = torch.cat((rx.t().unsqueeze(1), rbuffer[:, 0:-1, :]), dim=1)
-            ibuffer = torch.cat((ix.t().unsqueeze(1), ibuffer[:, 0:-1, :]), dim=1)
+            rbuffer = torch.cat((rx.unsqueeze(0), rbuffer[0:-1]), dim=0)
+            ibuffer = torch.cat((ix.unsqueeze(0), ibuffer[0:-1]), dim=0)
 
-        return detected[:, :, -self.num_detectors:]
+        return detected[:, -self.num_detectors:]
 
 
     def parameters(self):
@@ -400,7 +403,7 @@ class Network(Component):
             detected = detected.data.cpu().numpy()
         if isinstance(detected, torch.Tensor):
             detected = detected.cpu().numpy()
-        if len(detected.shape) == 1:
+        if detected.ndim == 1:
             detected = detected[:, None]
         f = (int(np.log10(max(x))+0.5)//3)*3-3
         x = x*10**-f # no inplace operation, since that would change the original x...
