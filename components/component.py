@@ -72,6 +72,7 @@ class Component(Module):
         '''
         Real Part of the Scattering matrix of the component.
         Should return a Variable containing a torch.FloatTensor.
+        shape: (# num wavelengths, # num ports, # num ports)
         '''
         raise NotImplementedError('The real part of the scattering matrix '
                                   'of %s does not exist'%self.name)
@@ -81,6 +82,7 @@ class Component(Module):
         '''
         Imaginary Part of the Scattering matrix of the component.
         Should return a Variable containing a torch.FloatTensor.
+        shape: (# num wavelengths, # num ports, # num ports)
         '''
         raise NotImplementedError('The imaginary part of the scattering matrix '
                                   'of %s does not exist'%self.name)
@@ -90,6 +92,7 @@ class Component(Module):
         '''
         Connection matrix of the component.
         Should return a Variable containing a torch.FloatTensor consisting of only ones and zeros.
+        shape: (# num ports, # num ports)
         '''
         return self.new_variable(np.zeros((self.num_ports, self.num_ports)), 'float')
 
@@ -99,6 +102,7 @@ class Component(Module):
         The delay introduced by the component.
         Should return a Variable containing a torch.FloatTensor
         containing the delays for each node in the component
+        shape: (# num ports, )
         '''
         return self.new_variable(np.zeros(self.num_ports), 'float')
 
@@ -108,6 +112,7 @@ class Component(Module):
         The locations of the sources in the component.
         Should return a Variable containing a torch.ByteTensor
         containing the locations of the sources in the component
+        shape: (# num ports, )
         '''
         return self.new_variable(np.zeros(self.num_ports), 'byte')
 
@@ -117,6 +122,7 @@ class Component(Module):
         The locations of the detectors in the component.
         Should return a Variable containing a torch.ByteTensor
         containing the locations of the detectors in the component
+        shape: (# num ports, )
         '''
         return self.new_variable(np.zeros(self.num_ports), 'byte')
 

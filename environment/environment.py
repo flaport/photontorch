@@ -25,7 +25,9 @@ class Environment(object):
         t_start (float) [s]: start time of the simulation
         t_end (float) [s]: end time of the simulation (not included)
         dt (float) [s]: timestep of the simulation
-        wl (float) [m]: wavelength of the simulation
+        wl (float) [m]: center wavelength of the simulation
+        wls (array) [m]: all wavelengths of the simulation
+        num_wl (int) : number of wavelengths in the simulation
         use_delays (bool) : if delays are necessary in the simulation.
                             You can set this to false in frequency domain simulations
                             with constant input source.
@@ -38,7 +40,10 @@ class Environment(object):
         '''
 
         # wavelength
+        wls = kwargs.pop('wls',None)
         self.wl = kwargs.pop('wl', 1.55e-6)
+        if wls is not None:
+            self.wls = wls
 
         # time data:
         dt = kwargs.pop('dt', 1e-14)
@@ -75,6 +80,17 @@ class Environment(object):
         # other keyword arguments are added to the attributes like so:
         for k, v in kwargs.items():
             self.__dict__[k] = v
+
+    @property
+    def wl(self):
+        return np.mean(self.wls)
+    @wl.setter
+    def wl(self, value):
+        self.wls = np.array([value])
+
+    @property
+    def num_wl(self):
+        return self.wls.shape[0]
 
     @property
     def num_timesteps(self):

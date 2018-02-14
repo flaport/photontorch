@@ -36,15 +36,18 @@ class ConstantSource(object):
 
         # shape of the virtual array returned by this source:
         self.source = nw.new_variable(nw.zeros((
+                nw.env.num_wl, # number of wavelengths in the simulation
                 nw.nmc, # number of memory containing nodes in the network
                 nw.env.num_batches, # number of parallel simulations
         ), cuda=nw.is_cuda))
 
-        self.source[:nw.num_sources] = 1
+        self.source[:, :nw.num_sources] = 1
 
         if isinstance(amplitude, np.ndarray):
             amplitude = nw.new_variable(torch.from_numpy(amplitude))
             if len(amplitude.size()) == 1:
+                amplitude.unsqueeze_(0)
+            if len(amplitude.size()) == 2:
                 amplitude.unsqueeze_(0)
 
         self.source *= amplitude

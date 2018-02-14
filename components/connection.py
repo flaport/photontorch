@@ -28,8 +28,16 @@ class Connection(Component):
 
     @property
     def rS(self):
-        return self.new_variable([[0, 1], [1, 0]])
+        '''
+        Real part of the scattering matrix
+        shape: (# num wavelengths, # num ports, # num ports)
+        '''
+        return self.new_variable([[[0, 1], [1, 0]]]*self.env.num_wl)
 
     @property
     def iS(self):
-        return self.new_variable([[0, 0], [0, 0]])
+        '''
+        Imag part of the scattering matrix
+        shape: (# num wavelengths, # num ports, # num ports)
+        '''
+        return self.new_variable([[[0, 0], [0, 0]]]*self.env.num_wl)

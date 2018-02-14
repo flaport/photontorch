@@ -4,6 +4,9 @@
 ## Imports ##
 #############
 
+## Torch
+import torch
+
 ## Other
 import numpy as np
 
@@ -57,16 +60,22 @@ class GratingCoupler(Component):
 
     @property
     def rS(self):
-        ''' Real part of S matrix '''
+        '''
+        Real part of the scattering matrix
+        shape: (# num wavelengths, # num ports, # num ports)
+        '''
         sigma = fwhm2sigma*self.BW
-        loss = np.sqrt(self.Tmax*np.exp(-(self.wl0-self.env.wl)**2/(2*sigma**2)))
-        S = self.new_variable([[0, loss],
-                               [loss, 0]])
-        return S
+        loss = np.sqrt(self.Tmax*np.exp(-(self.wl0-self.env.wls)**2/(2*sigma**2)))
+        S = np.array([[[0, 1],
+                       [1, 0]]])
+        return self.new_variable(loss[:,None,None]*S)
 
     @property
     def iS(self):
-        ''' Imag part of S matrix '''
-        S = self.new_variable([[self.R_in, 0],
-                               [0, self.R]])
-        return S
+        '''
+        Imag part of the scattering matrix
+        shape: (# num wavelengths, # num ports, # num ports)
+        '''
+        S = self.new_variable([[[self.R_in, 0],
+                                [0,    self.R]]])
+        return torch.cat([S]*self.env.num_wl, dim=0)

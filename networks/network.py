@@ -21,6 +21,7 @@ from ..components.component import Component
 from ..components.terms import Term
 from ..components.terms import Detector
 from ..torch_ext.autograd import block_diag
+from ..torch_ext.autograd import batch_block_diag
 from ..torch_ext.tensor import where
 from ..constants import pi, c
 
@@ -171,6 +172,11 @@ class Network(Component):
         mlmc = (ml.unsqueeze(1)).mm(mc.unsqueeze(0))
         mlml = (ml.unsqueeze(1)).mm(ml.unsqueeze(0))
 
+        bmcmc = torch.cat([mcmc.unsqueeze(0)]*self.env.num_wl, dim=0)
+        bmcml = torch.cat([mcml.unsqueeze(0)]*self.env.num_wl, dim=0)
+        bmlmc = torch.cat([mlmc.unsqueeze(0)]*self.env.num_wl, dim=0)
+        bmlml = torch.cat([mlml.unsqueeze(0)]*self.env.num_wl, dim=0)
+
         # This extra step is necessary for CUDA:
         # Indexing has to happen with ByteTensors.
         if self.is_cuda:
@@ -180,29 +186,42 @@ class Network(Component):
             mcml = mcml.byte()
             mlmc = mlmc.byte()
             mlml = mlml.byte()
+            bmcmc = bmcmc.byte()
+            bmcml = bmcml.byte()
+            bmlmc = bmlmc.byte()
+            bmlml = bmlml.byte()
 
 
         ## S-matrix subsets
 
-        # subsets of scattering matrix:
+        # MC subsets of scattering matrix:
         rS, iS = self.rS, self.iS
-        rSmcmc = rS[mcmc].view(nmc, nmc)
-        rSmlml = rS[mlml].view(nml, nml)
-        iSmcmc = iS[mcmc].view(nmc, nmc)
-        iSmlml = iS[mlml].view(nml, nml)
-
-        # subsets of connection matrix:
+        rSmcmc = rS[bmcmc].view(-1, nmc, nmc)
+        iSmcmc = iS[bmcmc].view(-1, nmc, nmc)
         Cmcmc = C[mcmc].view(nmc, nmc)
-        Cmcml = C[mcml].view(nmc, nml)
-        Cmlmc = C[mlmc].view(nml, nmc)
-        Cmlml = C[mlml].view(nml, nml)
+
 
 
         if nml: # Only do the following steps if there is at least one ml node:
+
+            # ML subsets of scattering matrix:
+            rSmlml = rS[bmlml].view(-1, nml, nml)
+            iSmlml = iS[bmlml].view(-1, nml, nml)
+
+            # subsets of connection matrix:
+            Cmcml = C[mcml].view(nmc, nml)
+            Cmlmc = C[mlmc].view(nml, nmc)
+            Cmlml = C[mlml].view(nml, nml)
+
             ## helper matrices
             # P = I - Cmlml@Smlml
-            rP = self.new_variable(np.eye(nml), 'float') - (Cmlml).mm(rSmlml)
-            iP = -(Cmlml).mm(iSmlml)
+            def cmm(C, S):
+                ''' Batch multiply with normal matrix '''
+                return torch.matmul(S.permute(0,2,1),C.t()).permute(0,2,1)
+
+            eye = torch.cat([self.new_variable(np.eye(nml), 'float').unsqueeze_(0)]*self.env.num_wl, dim=0)
+            rP = eye - cmm(Cmlml, rSmlml)
+            iP = -cmm(Cmlml, iSmlml)
 
             ## reduced connection matrix
 
@@ -214,25 +233,25 @@ class Network(Component):
             # the inverse is given by inv(P) = X + i*Y, with
             # X = inv(rP + iP@inv(rP)@iP)
             # Y = -X@iP@inv(rP)
-            inv_rP = torch.inverse(rP)
-            X = torch.inverse(rP + (iP).mm(inv_rP).mm(iP))
-            Y = -(X).mm(iP).mm(inv_rP)
+            inv_rP = torch.cat([torch.inverse(rp).unsqueeze(0) for rp in rP], dim=0)
+            X = torch.cat([torch.inverse(rp + (ip).mm(inv_rp).mm(ip)).unsqueeze(0) for rp, ip, inv_rp in zip(rP, iP, inv_rP)], dim=0)
+            Y = -(X).bmm(iP).bmm(inv_rP)
 
             # 2. x = Cmcml@Smlml
-            rx, ix = (Cmcml).mm(rSmlml), (Cmcml).mm(iSmlml)
+            rx, ix = cmm(Cmcml, rSmlml), cmm(Cmcml, iSmlml)
 
             # 3. x = x@invP [rx and ix calculated at the same time: they depend on each other]
-            rx, ix = (rx).mm(X) - (ix).mm(Y), (rx).mm(Y) + (ix).mm(X)
+            rx, ix = (rx).bmm(X) - (ix).bmm(Y), (rx).bmm(Y) + (ix).bmm(X)
 
             # 4. x = x@Cmlmc
-            rx, ix = (rx).mm(Cmlmc), (ix).mm(Cmlmc)
+            rx, ix = torch.matmul(rx, Cmlmc), torch.matmul(ix, Cmlmc)
 
             # 5. C = x + Cmcmc
-            rC = rx + Cmcmc
+            rC = rx + Cmcmc.unsqueeze(0)
             iC = ix
         else:
-            rC = Cmcmc
-            iC = torch.zeros_like(Cmcmc)
+            rC = torch.cat([Cmcmc.unsqueeze(0)]*self.env.num_wl, dim=0)
+            iC = torch.zeros_like(rC)
 
         ## other locations
         others_at = where((sources_at | detectors_at)[mc].ne(1).data)
@@ -249,15 +268,15 @@ class Network(Component):
         ## The reordering yields a small performance upgrade in the forward pass
         new_order = torch.cat((sources_at, others_at, detectors_at))
         self._delays = delays[mc][new_order] # Reduced delay vector
-        self._rS = rSmcmc[new_order][:, new_order] # real part of reduced S-matrix
-        self._iS = iSmcmc[new_order][:, new_order] # imag part of reduced S-matrix
-        self._rC = rC[new_order][:, new_order] # real part of reduced C-matrix
-        self._iC = iC[new_order][:, new_order] # imag part of reduced C-matrix
+        self._rS = rSmcmc[:, new_order, :][:, :, new_order] # real part of reduced S-matrix
+        self._iS = iSmcmc[:, new_order, :][:, :, new_order] # imag part of reduced S-matrix
+        self._rC = rC[:, new_order, :][:, :, new_order] # real part of reduced C-matrix
+        self._iC = iC[:, new_order, :][:, :, new_order] # imag part of reduced C-matrix
 
-        # Create buffermask (# time, # mc nodes, # batches = 1)
-        buffermask = self.zeros((int(self._delays.max())+2, self.nmc, 1))
+        # Create buffermask (# time, # wavelengths =1, # mc nodes, # batches = 1)
+        buffermask = self.zeros((int(self._delays.max())+2, 1, self.nmc, 1))
         for i, d in enumerate(self._delays):
-            buffermask[int(d), i, 0] = 1.0
+            buffermask[int(d), 0, i, 0] = 1.0
         self.buffermask = Variable(buffermask)
 
         self.initialized = True
@@ -275,79 +294,12 @@ class Network(Component):
     def new_buffer(self):
         '''
         Create buffer to keep the hidden states of the Network (RNN)
-        The buffer has shape (# time, # mc nodes, # batches)
+        The buffer has shape (# time, # wavelengths, # mc nodes, # batches)
         '''
-        buffer = self.zeros((self.buffermask.size(0), self.nmc, self.env.num_batches))
+        buffer = self.zeros((self.buffermask.size(0), self.env.num_wl, self.nmc, self.env.num_batches))
         rbuffer = Variable(buffer.clone())
         ibuffer = Variable(buffer)
         return rbuffer, ibuffer
-
-    @require_initialization
-    def new_source(self, source=None, add_phase=False):
-        '''
-        Create a Source FloatTensor with size (# time, # mc nodes, # batches)
-
-        Parameters
-        ----------
-        source : source amplitude or time evolution of source. Accepted forms are:
-                 accepted:
-                   * None or (int/float) or (np.ndarray with ndim==1):
-                     A new FloatTensor with a single batch and the same input for all
-                     source locations will be created (None-> amplitude 1)
-                   * (np.ndarray with ndim==2):
-                     A new FloatTensor with multiple batches (first dimension) will be
-                     created. Same input for all source locations
-                   * (np.ndarray with ndim==3):
-                     A new FloatTensor with multiple batches and different inputs at each
-                     source location will be created.
-        add_phase = False : wether to add a phase that varies with time according to the
-                            frequency of the light. This is more realistic.
-        Note
-        ----
-        In the case an np.ndarray is provided, then then make sure the number of timesteps
-        correspond to the number of timesteps in the environment.
-        '''
-
-        if source is None: # We will make a source with amplitude 1
-            source = 1
-        if isinstance(source, int): # We will make a source with amplitude source
-            source = float(source)
-        if isinstance(source, float): # We will make a source with amplitude source
-            source = source*np.ones_like(self.env.t)
-
-        # Create the FloatTensor
-        rsource = self.new_variable(np.real(source))
-        isource = self.new_variable(np.imag(source))
-
-        if rsource.dim() == 1:
-            # Only the time evolution of the source is given, we make a source with
-            # the number of batches specified in the environment.
-            rsource.unsqueeze_(-1)
-            isource.unsqueeze_(-1)
-            rsource = torch.cat([rsource]*self.env.num_batches, dim=-1)
-            isource = torch.cat([isource]*self.env.num_batches, dim=-1)
-        if rsource.dim() == 2:
-            # No different input is given for the (different) source locations.
-            # We will use the same source amplitude at each source location.
-            rsource.unsqueeze_(-2)
-            isource.unsqueeze_(-2)
-            rsource = torch.cat([rsource]*self.num_sources, dim=-2)
-            isource = torch.cat([isource]*self.num_sources, dim=-2)
-        if add_phase:
-            # We add the phase introduced by the time evolution of the source:
-            rphase = self.new_variable(np.cos(2*pi*(c/self.env.wl)*self.env.t))
-            iphase = self.new_variable(np.sin(2*pi*(c/self.env.wl)*self.env.t))
-            rphase.unsqueeze_(-1).unsqueeze_(-1)
-            iphase.unsqueeze_(-1).unsqueeze_(-1)
-            rsource, isource = rphase*rsource - iphase*isource, rphase*isource + iphase*rsource
-
-        # create empty inputs:
-        _source = torch.cat((rsource.unsqueeze_(0), isource.unsqueeze_(0)), dim=0)
-        source = self.new_variable(np.zeros((2, self.env.num_timesteps, self.nmc, self.env.num_batches)))
-        source[:,:,:self.num_sources,:] = _source
-
-        # Concatenate real and imaginary part and return the source:
-        return source
 
     @require_initialization
     def forward(self, source):
@@ -362,7 +314,7 @@ class Network(Component):
                  indexed.
         '''
 
-        detected = self.new_variable(self.zeros((self.env.num_timesteps, self.nmc, self.env.num_batches)))
+        detected = self.new_variable(self.zeros((self.env.num_timesteps, self.env.num_wl, self.nmc, self.env.num_batches)))
 
         ## Get new buffer
         rbuffer, ibuffer = self.new_buffer()
@@ -371,25 +323,26 @@ class Network(Component):
         for i in range(self.env.num_timesteps):
 
             # get state
-            rx = torch.sum(self.buffermask*rbuffer, dim=0) + source[0,i]
-            ix = torch.sum(self.buffermask*ibuffer, dim=0) + source[1,i]
+            rx = torch.sum(self.buffermask*rbuffer, dim=0) + source[0,i].clone()
+            ix = torch.sum(self.buffermask*ibuffer, dim=0) + source[1,i].clone()
+            self.rx = rx
 
             # connect memory-less components
             # rx and ix need to be calculated at the same time because of dependencies on each other
-            rx, ix = (self._rC).mm(rx) - (self._iC).mm(ix), (self._rC).mm(ix) + (self._iC).mm(rx)
+            rx, ix = (self._rC).bmm(rx) - (self._iC).bmm(ix), (self._rC).bmm(ix) + (self._iC).bmm(rx)
 
             # get output state
             detected[i] = torch.pow(rx, 2) + torch.pow(ix, 2)
 
             # connect memory-containing components
             # rx and ix need to be calculated at the same time because of dependencies on each other
-            rx, ix = (self._rS).mm(rx) - (self._iS).mm(ix), (self._rS).mm(ix) + (self._iS).mm(rx)
+            rx, ix = (self._rS).bmm(rx) - (self._iS).bmm(ix), (self._rS).bmm(ix) + (self._iS).bmm(rx)
 
             # update buffer
             rbuffer = torch.cat((rx.unsqueeze(0), rbuffer[0:-1]), dim=0)
             ibuffer = torch.cat((ix.unsqueeze(0), ibuffer[0:-1]), dim=0)
 
-        return detected[:, -self.num_detectors:]
+        return detected[:, :, -self.num_detectors:]
 
 
     def parameters(self):
@@ -443,12 +396,12 @@ class Network(Component):
     @property
     def rS(self):
         ''' Combined real part of the S-matrix of all the components in the network '''
-        return block_diag(*(comp.rS for comp in self.components))
+        return batch_block_diag(*(comp.rS for comp in self.components))
 
     @property
     def iS(self):
         ''' Combined imaginary part of the S-matrix of all the components in the network '''
-        return block_diag(*(comp.iS for comp in self.components))
+        return batch_block_diag(*(comp.iS for comp in self.components))
 
     @property
     def C(self):

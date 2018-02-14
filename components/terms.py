@@ -24,10 +24,10 @@ class Term(Component):
 
     @property
     def rS(self):
-        return self.new_variable([[0]], 'float')
+        return self.new_variable([[[0]]]*self.env.num_wl, 'float')
     @property
     def iS(self):
-        return self.new_variable([[0]], 'float')
+        return self.new_variable([[[0]]]*self.env.num_wl, 'float')
 
 ############
 ## Source ##
