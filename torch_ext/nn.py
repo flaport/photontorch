@@ -132,6 +132,17 @@ class Module(_Module_):
             tensor = tensor.cuda()
         return tensor
 
+    def ones(self, shape, dtype='float', cuda=None):
+        '''
+        Create an empty torch tensor with a certain type
+
+        Arguments
+        ---------
+        *shape : shape of the new tensor
+        type = 'torch.FloatTensor' : type of the new tensor
+        '''
+        return self.zeros(shape, dtype=dtype, cuda=cuda) + 1
+
     def new_tensor(self, data, dtype='float', cuda=None):
         '''
         Tensor constructor.
