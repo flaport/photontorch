@@ -41,6 +41,11 @@ from .networks.directionalcouplers import DirectionalCouplerNetwork
 from .networks.directionalcouplers import DirectionalCouplerWithLength
 
 
+## Sources
+
+from .sources.source import ConstantSource
+
+
 ## Environment
 
 from .environment.environment import Environment
