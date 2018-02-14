@@ -155,3 +155,71 @@ class BlockDiag(Function):
             output = M[i:j, i:j]
             outputs.append(output)
         return tuple(outputs)
+
+
+#################################
+## Batch Block Diagonal Matrix ##
+#################################
+
+def batch_block_diag(*inputs):
+    '''
+    Create a block diagonal matrix from provided arrays.
+
+    Given the inputs `A`, `B` and `C`, the output will have these
+    arrays arranged on the diagonal::
+
+        [[A, 0, 0],
+         [0, B, 0],
+         [0, 0, C]]
+
+    Parameters
+    ----------
+    A, B, C, ... : 2D square Torch FloatTensor Variables
+
+    Returns
+    -------
+    D : 2d square Torch FloatTensor Variable with A, B, C, ... on the diagonal
+    '''
+    return BatchBlockDiag().apply(*inputs)
+
+class BatchBlockDiag(Function):
+    '''
+    Construct a block diagonal matrix from a sequence of inputs
+
+    Note
+    ----
+    Do not use this torch Function directly.
+    Use `block_diag` instead.
+    '''
+    @staticmethod
+    def forward(ctx, *inputs):
+        '''
+        The forward method creates the block diagonal matrix and
+        saves the locations of the submatrices for the backward pass
+        '''
+        # we assume all inputs are square. and the same for each batch
+        # TODO: implement a check for this
+        # Get total size of block diagonal matrix
+        batch_size = inputs[0].size(0)
+        sizes = [m.size(1) for m in inputs]
+        idxs = list(np.cumsum([0]+sizes))
+        total_size = int(idxs[-1])
+        # Get start and end indices of blocks in matrix
+        ctx.idxs = list(zip(idxs[:-1], idxs[1:]))
+        # Get type of new matrix and create empty new matrix with total_size as shape
+        M = zeros((batch_size, total_size, total_size), type=inputs[0].type())
+        # Fill Blocks
+        for (i, j), matrix in zip(ctx.idxs, inputs):
+            M[:, i:j, i:j] = matrix
+        return M
+
+    @staticmethod
+    def backward(ctx, M):
+        '''
+        The backward pass selects the relevant submatrices of the gradient
+        '''
+        outputs = []
+        for i, j in ctx.idxs:
+            output = M[:, i:j, i:j]
+            outputs.append(output)
+        return tuple(outputs)
