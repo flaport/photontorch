@@ -79,8 +79,11 @@ class Network(Component):
         # parse arguments
         self.s, self.components = self._parse_args(args)
 
-        self.num_ports = np.sum(comp.num_ports for comp in self.components)
         self.initialized = False
+
+    @property
+    def num_ports(self):
+        return np.sum(comp.num_ports for comp in self.components)
 
     def terminate(self, term=None):
         ''' Add Terms to open connections '''
@@ -89,6 +92,8 @@ class Network(Component):
         connector = Connector(self.s, self.components)
         idxs = connector.idxs
         for i in idxs:
+            term = term.copy()
+            term.name = i
             connector = connector*term[i]
         return Network(connector, name=self.name)
 
@@ -142,7 +147,7 @@ class Network(Component):
         # resulting delays in terms of the simulation timestep:
         delays = (delays_in_seconds/self.env.dt + 0.5).int()
         # Check if simulation timestep is too big:
-        if (delays[delays_in_seconds > 0] < 10).any(): # This bound is rather arbitrary...
+        if (delays[delays_in_seconds.data > 0] < 10).any(): # This bound is rather arbitrary...
             warnings.warn('Simulation timestep might be too large, resulting'
                           'in too short delays. Try using a smaller timestep')
 
@@ -172,6 +177,7 @@ class Network(Component):
         mlmc = (ml.unsqueeze(1)).mm(mc.unsqueeze(0))
         mlml = (ml.unsqueeze(1)).mm(ml.unsqueeze(0))
 
+        # batched combined locations:
         bmcmc = torch.cat([mcmc.unsqueeze(0)]*self.env.num_wl, dim=0)
         bmcml = torch.cat([mcml.unsqueeze(0)]*self.env.num_wl, dim=0)
         bmlmc = torch.cat([mlmc.unsqueeze(0)]*self.env.num_wl, dim=0)
@@ -198,6 +204,8 @@ class Network(Component):
         rS, iS = self.rS, self.iS
         rSmcmc = rS[bmcmc].view(-1, nmc, nmc)
         iSmcmc = iS[bmcmc].view(-1, nmc, nmc)
+
+        # MC subset of Connection matrix
         Cmcmc = C[mcmc].view(nmc, nmc)
 
 
@@ -208,7 +216,7 @@ class Network(Component):
             rSmlml = rS[bmlml].view(-1, nml, nml)
             iSmlml = iS[bmlml].view(-1, nml, nml)
 
-            # subsets of connection matrix:
+            # ML subsets of connection matrix:
             Cmcml = C[mcml].view(nmc, nml)
             Cmlmc = C[mlmc].view(nml, nmc)
             Cmlml = C[mlml].view(nml, nml)
@@ -325,7 +333,6 @@ class Network(Component):
             # get state
             rx = torch.sum(self.buffermask*rbuffer, dim=0) + source[0,i].clone()
             ix = torch.sum(self.buffermask*ibuffer, dim=0) + source[1,i].clone()
-            self.rx = rx
 
             # connect memory-less components
             # rx and ix need to be calculated at the same time because of dependencies on each other
@@ -352,9 +359,10 @@ class Network(Component):
         '''
         for comp in self.components:
             for p in comp.parameters():
-                yield p
+                if p.requires_grad:
+                    yield p
 
-    def plot(self, x, detected, label='', type='time'):
+    def plot(self, type, detected, label=''):
         ''' Plot detected power versus time or wavelength '''
         if isinstance(detected, Variable):
             detected = detected.data.cpu().numpy()
@@ -362,6 +370,11 @@ class Network(Component):
             detected = detected.cpu().numpy()
         if detected.ndim == 1:
             detected = detected[:, None]
+        type = {'time':'t', 't':'t',
+                'wl':'wls', 'wls':'wls',
+                'f':'wls', 'freq':'wls','frequency':'wls'}[type]
+        x = (self.env.__dict__[type])[:detected.shape[0]]
+        detected = detected[:x.shape[0]]
         f = (int(np.log10(max(x))+0.5)//3)*3-3
         x = x*10**-f # no inplace operation, since that would change the original x...
         prefix = {12:'T', 9:'G', 6:'M', 3:'k', 0:'', -3:'m',

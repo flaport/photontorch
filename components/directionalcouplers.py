@@ -56,7 +56,7 @@ class DirectionalCoupler(Component):
         self.kappa2 = self.new_bounded_parameter(
             data=kappa2,
             bounds=kappa2_bounds,
-            requires_grad=True, # trainable between bounds
+            requires_grad=(kappa2_bounds is not None) and (kappa2_bounds[0]!=kappa2_bounds[1]),
         )
 
     @property
@@ -135,7 +135,7 @@ class RealisticDirectionalCoupler(Component):
         de2_n0 : second derivative of n0 w.r.t. wavelength
         '''
 
-        Component.__init__(name=name)
+        Component.__init__(self, name=name)
         self.length = length
         self.k0 = k0
         self.de1_k0 = de1_k0
