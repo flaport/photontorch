@@ -47,7 +47,7 @@ class Mirror(Component):
         self.R = self.new_bounded_parameter(
             data=R,
             bounds=R_bounds,
-            requires_grad=True, # trainable between bounds
+            requires_grad=(R_bounds is not None) and (R_bounds[0]!=R_bounds[1]),
         )
 
     @property

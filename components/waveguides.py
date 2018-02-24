@@ -4,6 +4,9 @@
 ## Imports ##
 #############
 
+## Torch
+import torch
+
 ## Other
 import numpy as np
 
@@ -30,7 +33,7 @@ class Waveguide(Connection):
 
     '''
 
-    def __init__(self, length=1e-6, neff=2.86, loss=0, name=None):
+    def __init__(self, length=1e-6, neff=2.86, loss=0, length_bounds=None, name=None):
         '''
         Waveguide Initialization
 
@@ -43,30 +46,41 @@ class Waveguide(Connection):
         '''
         Connection.__init__(self, name=name)
         # Handle inputs
-        self.length = float(length)
         self.neff = float(neff)
         self.loss = loss
+        # as the phase is very sensitive on the length, we need double precision to
+        # store the length of the waveguide:
+        self.length = self.new_bounded_parameter(
+            data=length,
+            bounds=length_bounds,
+            dtype='double',
+            requires_grad=(length_bounds is not None) and (length_bounds[0]!=length_bounds[1]),
+        )
 
     @property
     def delays(self):
         ''' The delay per node is given by the propagation time in the waveguide '''
         delay = self.neff*self.length/c
-        ones = self.new_variable([1, 1], 'float')
-        return delay*ones
+        return torch.cat([delay, delay]).float()
 
     @property
     def rS(self):
         ''' real part of the scattering matrix '''
-        re = 10**(-self.loss*self.length/10)*np.cos(2*pi*self.neff*self.length/self.env.wls)
-        S = np.array([[[0, 1],
-                       [1, 0]]])
-        return self.new_variable(re[:,None,None]*S)
+        wls = self.new_variable(self.env.wls, dtype='double')
+        re = 10**(-self.loss*self.length/10)*torch.cos(2*pi*self.neff*self.length/wls)
+        # we can safely convert back to single precision now:
+        re = re.float()
+        S = self.new_variable([[[0, 1],
+                                [1, 0]]])
+        return re.view(-1,1,1)*S
 
     @property
     def iS(self):
         ''' imaginary part of the scattering matrix '''
-        # e = exp(2j*pi*neff*length/wl)
-        ie = 10**(-self.loss*self.length/10)*np.sin(2*pi*self.neff*self.length/self.env.wls)
-        S = np.array([[[0, 1],
-                       [1, 0]]])
-        return self.new_variable(ie[:,None,None]*S)
+        wls = self.new_variable(self.env.wls, dtype='double')
+        ie = (10**(-self.loss*self.length/10)*torch.sin(2*pi*self.neff*self.length/wls))
+        # we can safely convert back to single precision now:
+        ie = ie.float()
+        S = self.new_variable([[[0, 1],
+                                [1, 0]]])
+        return ie.view(-1,1,1)*S

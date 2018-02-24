@@ -4,8 +4,11 @@
 ## Imports ##
 #############
 
-## Other
+# Torch
 import torch
+from torch.nn import Parameter
+
+## Other
 import numpy as np
 from collections import OrderedDict
 
@@ -53,7 +56,7 @@ class DirectionalCouplerWithLength(Component):
         dircoup : DirectionalCoupler instance without length
         wg : yields the full length and the resulting delays of the directional coupler
         '''
-        Component.__init__(self, name=None)
+        Component.__init__(self, name=name)
         self.wg = wg
         self.dircoup = dircoup
 
@@ -200,12 +203,16 @@ class DirectionalCouplerNetwork(Network, Component):
                 # Create copy of directional coupler:
                 dircoup_copy = self.dircoup.copy()
                 dircoup_copy.name = '+'
-                if couplings is not None:
-                    dircoup_copy.dircoup.kappa2 = self.new_variable([float(couplings[i, j])])
-                if lengths is not None:
-                    dircoup_copy.wg.length = float(lengths[i, j])
                 # Put copy in dircoup array
                 self.dircoup_array[i, j] = dircoup_copy
+
+        # Override couplings
+        if couplings is not None:
+            self.couplings = couplings
+
+        # Override lengths
+        if lengths is not None:
+            self.lengths = lengths
 
         # Create term dictionary
         if terms is None:
@@ -223,6 +230,9 @@ class DirectionalCouplerNetwork(Network, Component):
             [0], # half of north west corner
         ))).long()
 
+        # Other things to finish off:
+        self.initialized = False
+
     def terminate(self, term=None):
         ''' Directional Coupler Networks are terminated by default '''
         if term is None:
@@ -230,7 +240,7 @@ class DirectionalCouplerNetwork(Network, Component):
         for t in range(self.num_terms):
             if t not in self.terms:
                 term = term.copy()
-                term.name = 't'+str(t)
+                term.name = str(t)
                 self.terms[t] = term
         return self
 
@@ -250,7 +260,12 @@ class DirectionalCouplerNetwork(Network, Component):
         I, J = self.dircoup_array.shape
         for i in range(I):
             for j in range(J):
-                self.dircoup_array[i, j].dircoup.kappa2 = self.new_variable([float(array[i,j])])
+                new_variable = self.dircoup_array[i,j].dircoup.new_variable
+                if isinstance(self.dircoup_array[i,j].dircoup.kappa2, Parameter):
+                    # This happens when kappa2 is not trainable
+                    new_variable = self.dircoup_array[i,j].dircoup.new_parameter
+                    del self.dircoup_array[i,j].dircoup.kappa2
+                self.dircoup_array[i, j].dircoup.kappa2 = new_variable([float(array[i,j])])
 
     @property
     def lengths(self):
@@ -268,7 +283,16 @@ class DirectionalCouplerNetwork(Network, Component):
         I, J = self.dircoup_array.shape
         for i in range(I):
             for j in range(J):
-                self.dircoup_array[i, j].wg.length = float(array[i,j])
+                new_variable = self.dircoup_array[i,j].wg.new_variable
+                if isinstance(self.dircoup_array[i,j].wg.length, Parameter):
+                    # This happens when the length is not trainable
+                    new_variable = self.dircoup_array[i,j].wg.new_parameter
+                    del self.dircoup_array[i,j].wg.length
+                length = new_variable(
+                    data = [float(array[i, j])],
+                    dtype='double',
+                )
+                self.dircoup_array[i,j].wg.length = length
 
     @property
     def C(self):
@@ -290,8 +314,9 @@ class DirectionalCouplerNetwork(Network, Component):
 
         # connect terms
         for k, i in enumerate(self.terms):
-            idx = idxs[i]
-            C[-K+k, idx] = C[idx, -K+k] = 1.0
+            idx = idxs[i] # index of the dircoup free port
+            t_idx = Ns[-K+k-1] + free_idxs[-K+k][0] # index of the term (single) free port
+            C[t_idx, idx] = C[idx, t_idx] = 1.0
 
         return C
 

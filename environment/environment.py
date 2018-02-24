@@ -99,7 +99,7 @@ class Environment(object):
     @num_timesteps.setter
     def num_timesteps(self, value):
         ''' Number of timesteps in the simulation '''
-        self.t = np.arange(self.t_start, value*self.dt, self.dt)
+        self.t = np.arange(self.t_start, value*self.dt-0.5*self.dt, self.dt)
 
     @property
     def dt(self):
