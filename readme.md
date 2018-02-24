@@ -11,17 +11,26 @@ neural network. This enables the use of native PyTorch optimizers to optimize th
 ## Roadmap
 * Network visualizer
 * Connection Matrix Network
-* Batch Frequency Domain inversion (for faster frequency domain calculations)
-* ~~Bounded Parameter~~
-* ~~Additional notebook figures~~
 * ~~Ring Networks~~
-* ~~Directional Coupler Networks~~
-* ~~Network termination~~
+* ~~Trainable Delays~~
+* ~~Bounded Parameter~~
 * ~~Copying components~~
-* ~~Possibility to ignore delays (for faster frequency domain calculations)~~
-* ~~Batched Training~~
-* ~~CUDA~~
+* ~~Network termination~~
 * ~~Network of networks~~
+* ~~CUDA enabled simulations~~
+* ~~Possibility to ignore delays~~
+* ~~Directional Coupler Networks~~
+* ~~Batched simulations / training~~
+* ~~Multi-wavelength simulations / training~~
+
+## Dependencies
+#### Required
+* [`numpy`](http://www.numpy.org/)
+* [`pytorch`](http://pytorch.org/)
+
+#### Optional
+* [`tqdm`](https://pypi.python.org/pypi/tqdm) (for progress bars)
+* [`matplotlib`](https://matplotlib.org/) (for visualization)
 
 
 ## Copyright
