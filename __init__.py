@@ -43,6 +43,8 @@ from .networks.directionalcouplers import DirectionalCouplerWithLength
 
 ## Sources
 
+from .sources.source import BitSource
+from .sources.source import TimeSource
 from .sources.source import ConstantSource
 
 
@@ -65,3 +67,7 @@ from .torch_ext.nn import BoundedParameter
 # tensor
 from .torch_ext.tensor import zeros
 from .torch_ext.tensor import where
+
+
+## Tests
+from . import tests
