@@ -23,14 +23,14 @@ from ..components.terms import Detector
 from ..torch_ext.autograd import block_diag
 from ..torch_ext.autograd import batch_block_diag
 from ..torch_ext.tensor import where
-from ..constants import pi, c
+from ..sources.inject import SourceInjector
 
 
 #############
 ## Network ##
 #############
 
-class Network(Component):
+class Network(Component, SourceInjector):
     ''' a Network (circuit) of Components '''
     def __init__(self, *args, **kwargs):
         '''
@@ -76,10 +76,19 @@ class Network(Component):
         '''
 
         Component.__init__(self, name=kwargs.pop('name', None))
+
+        # Add all the possible sources to this network:
+        self.inject_sources()
+
         # parse arguments
         self.s, self.components = self._parse_args(args)
-
         self.initialized = False
+
+    def copy(self):
+        new = Component.copy(self)
+        # Add all the possible sources to the copy of this network:
+        new.inject_sources()
+        return new
 
     @property
     def num_ports(self):

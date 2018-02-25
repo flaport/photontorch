@@ -188,6 +188,9 @@ class DirectionalCouplerNetwork(Network, Component):
 
         Component.__init__(self, name=name)
 
+        # Add all the possible sources to this network:
+        self.inject_sources()
+
         # Handle shape of network
         I, J = shape
         if I < 2 or J < 2:
