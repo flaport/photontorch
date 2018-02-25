@@ -233,6 +233,16 @@ class DirectionalCouplerNetwork(Network, Component):
             [0], # half of north west corner
         ))).long()
 
+        # PyTorch requires submodules to be registered as attributes
+        # For the parameters to be found by autograd:
+        for comp in self.components:
+            i = 0
+            name = comp.name + ' '
+            while hasattr(self, name.strip()):
+                i += 1
+                name = name + str(i)
+            setattr(self, name.strip(), comp)
+
         # Other things to finish off:
         self.initialized = False
 

@@ -99,6 +99,8 @@ class ConstantSource(BaseSource):
         '''
         if key[0] == 0: # source has only a real part...
             return self.source
+        elif key[0] == 1:
+            return 0*self.source
 
 
 #################
