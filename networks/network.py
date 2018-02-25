@@ -80,8 +80,21 @@ class Network(Component, SourceInjector):
         # Add all the possible sources to this network:
         self.inject_sources()
 
+
         # parse arguments
         self.s, self.components = self._parse_args(args)
+
+        # PyTorch requires submodules to be registered as attributes
+        # For the parameters to be found by autograd:
+        for comp in self.components:
+            i = 0
+            name = comp.name + ' '
+            while hasattr(self, name.strip()):
+                i += 1
+                name = name + str(i)
+            setattr(self, name.strip(), comp)
+
+        # flag to see if the network is initialized with an environment.
         self.initialized = False
 
     def copy(self):
@@ -359,17 +372,6 @@ class Network(Component, SourceInjector):
             ibuffer = torch.cat((ix.unsqueeze(0), ibuffer[0:-1]), dim=0)
 
         return detected[:, :, -self.num_detectors:]
-
-
-    def parameters(self):
-        '''
-        Generator of the parameters of the network. Emulates the behavior of
-        a normal torch.nn.Module.parameters() call.
-        '''
-        for comp in self.components:
-            for p in comp.parameters():
-                if p.requires_grad:
-                    yield p
 
     def plot(self, type, detected, label=''):
         ''' Plot detected power versus time or wavelength '''
