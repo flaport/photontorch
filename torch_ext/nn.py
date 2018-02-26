@@ -70,6 +70,10 @@ class BoundedParameter(_Module_):
         else:
             scaled_data = (value - self.bounds[0])/(self.bounds[1]-self.bounds[0])
             self.weights.data = -torch.log(1/scaled_data-1)
+    def cos(self):
+        return self.datavar.cos()
+    def sin(self):
+        return self.datavar.sin()
     def __add__(self, other):
         return self.datavar + other
     def __radd__(self, other):
