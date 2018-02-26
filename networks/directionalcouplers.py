@@ -240,8 +240,10 @@ class DirectionalCouplerNetwork(Network, Component):
             name = comp.name + ' '
             while hasattr(self, name.strip()):
                 i += 1
-                name = name + str(i)
-            setattr(self, name.strip(), comp)
+                name = name[:-1] + str(i)
+            if i == 0:
+                name = name[:-1]
+            setattr(self, name, comp)
 
         # Other things to finish off:
         self.initialized = False
@@ -264,7 +266,7 @@ class DirectionalCouplerNetwork(Network, Component):
         couplings = self.new_variable(np.zeros((I, J)))
         for i in range(I):
             for j in range(J):
-                couplings[i, j] = self.dircoup_array[i, j].dircoup.kappa2
+                couplings.data[i, j] = self.dircoup_array[i, j].dircoup.kappa2.data[0]
         return couplings
 
     @couplings.setter
@@ -273,12 +275,7 @@ class DirectionalCouplerNetwork(Network, Component):
         I, J = self.dircoup_array.shape
         for i in range(I):
             for j in range(J):
-                new_variable = self.dircoup_array[i,j].dircoup.new_variable
-                if isinstance(self.dircoup_array[i,j].dircoup.kappa2, Parameter):
-                    # This happens when kappa2 is not trainable
-                    new_variable = self.dircoup_array[i,j].dircoup.new_parameter
-                    del self.dircoup_array[i,j].dircoup.kappa2
-                self.dircoup_array[i, j].dircoup.kappa2 = new_variable([float(array[i,j])])
+                self.dircoup_array[i,j].dircoup.kappa2.data = self.new_tensor([array[i,j]])
 
     @property
     def lengths(self):
@@ -287,7 +284,7 @@ class DirectionalCouplerNetwork(Network, Component):
         lengths = self.new_variable(np.zeros((I, J)))
         for i in range(I):
             for j in range(J):
-                lengths[i, j] = self.dircoup_array[i, j].wg.length
+                lengths.data[i, j] = self.dircoup_array[i, j].wg.length.data[0]
         return lengths
 
     @lengths.setter
@@ -296,16 +293,7 @@ class DirectionalCouplerNetwork(Network, Component):
         I, J = self.dircoup_array.shape
         for i in range(I):
             for j in range(J):
-                new_variable = self.dircoup_array[i,j].wg.new_variable
-                if isinstance(self.dircoup_array[i,j].wg.length, Parameter):
-                    # This happens when the length is not trainable
-                    new_variable = self.dircoup_array[i,j].wg.new_parameter
-                    del self.dircoup_array[i,j].wg.length
-                length = new_variable(
-                    data = [float(array[i, j])],
-                    dtype='double',
-                )
-                self.dircoup_array[i,j].wg.length = length
+                self.dircoup_array[i,j].wg.length.data = self.new_tensor([array[i,j]], dtype='double')
 
     @property
     def C(self):
@@ -404,6 +392,8 @@ class DirectionalCouplerNetwork(Network, Component):
             name=self.name,
         )
         new.terms = self.terms
+        if self.initialized:
+            new.initialize(self.env.copy())
         return new
 
     def __getitem__(self, key):
