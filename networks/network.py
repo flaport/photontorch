@@ -91,16 +91,19 @@ class Network(Component, SourceInjector):
             name = comp.name + ' '
             while hasattr(self, name.strip()):
                 i += 1
-                name = name + str(i)
-            setattr(self, name.strip(), comp)
+                name = name[:-1] + str(i)
+            if i == 0:
+                name = name[:-1]
+            setattr(self, name, comp)
 
         # flag to see if the network is initialized with an environment.
         self.initialized = False
 
     def copy(self):
-        new = Component.copy(self)
-        # Add all the possible sources to the copy of this network:
-        new.inject_sources()
+        components = [comp.copy() for comp in self.components]
+        new = self.__class__(self.s, *components)
+        if self.initialized:
+            new.initialize(self.env.copy())
         return new
 
     @property

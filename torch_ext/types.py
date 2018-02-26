@@ -79,3 +79,33 @@ NUMPY_TYPES = {
     torch.cuda.IntTensor:'int',
     torch.cuda.LongTensor:'long',
 }
+
+############
+## Simple ##
+############
+
+SIMPLE_TYPES = {
+    'byte':bool,
+    'float':float,
+    'double':float,
+    'torch.FloatTensor':float,
+    'torch.DoubleTensor':float,
+    'torch.ByteTensor':bool,
+    'torch.IntTensor':int,
+    'torch.LongTensor':int,
+    'torch.cuda.FloatTensor':int,
+    'torch.cuda.DoubleTensor':float,
+    'torch.cuda.ByteTensor':bool,
+    'torch.cuda.IntTensor':int,
+    'torch.cuda.LongTensor':int,
+    torch.FloatTensor:float,
+    torch.DoubleTensor:float,
+    torch.ByteTensor:bool,
+    torch.IntTensor:int,
+    torch.LongTensor:int,
+    torch.cuda.FloatTensor:float,
+    torch.cuda.DoubleTensor:float,
+    torch.cuda.ByteTensor:float,
+    torch.cuda.IntTensor:int,
+    torch.cuda.LongTensor:int,
+}
