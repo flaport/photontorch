@@ -80,6 +80,10 @@ class Environment(object):
         # other keyword arguments are added to the attributes like so:
         for k, v in kwargs.items():
             self.__dict__[k] = v
+    @property
+    def c(self):
+        ''' speed of light '''
+        return 299792458.0 #[m/s]
 
     @property
     def wl(self):
