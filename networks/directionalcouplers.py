@@ -156,6 +156,7 @@ class DirectionalCouplerNetwork(Network, Component):
                  wg,
                  couplings=None,
                  lengths=None,
+                 phases=None,
                  terms=None,
                  name='dircoupnw'):
         ''' DirectionalCouplerNetwork __init__
@@ -170,9 +171,11 @@ class DirectionalCouplerNetwork(Network, Component):
                                      array should have the same length as the shape of
                                      the network. If None, all directional couplers
                                      default to a coupling of 0.5.
-        lengths : (numpy ndarray) : optional. Lengths of de directional couplers. If None
+        lengths : (numpy ndarray) : optional. Lengths of the directional couplers. If None
                                     all lengths will be equal to the length of the
                                     specified directional coupler.
+        phases : (numpy ndarray) : optional. Phases introduced by the directional couplers. If None
+                                    all phases will be coupled to the length of the direcional coupler.
         terms : A dictionary with source and Detector locations in the form
                 terms = {3:Source(), 15:Detector(), ...}.
                 any other not specified terms will be terminated by terms['default'].
@@ -216,6 +219,10 @@ class DirectionalCouplerNetwork(Network, Component):
         # Override lengths
         if lengths is not None:
             self.lengths = lengths
+
+        # Override phases
+        if phases is not None:
+            self.phases = phases
 
         # Create term dictionary
         if terms is None:
@@ -294,6 +301,34 @@ class DirectionalCouplerNetwork(Network, Component):
         for i in range(I):
             for j in range(J):
                 self.dircoup_array[i,j].wg.length.data = self.new_tensor([array[i,j]], dtype='double')
+
+    @property
+    def phases(self):
+        ''' Get all the phases introduced by the waveguides
+            Note, this function returns None if the master waveguide hase phase==None.
+        '''
+        I, J = self.dircoup_array.shape
+        if self.dircoup.wg.phase is None:
+            return None
+        phases = self.new_variable(np.zeros((I, J)))
+        for i in range(I):
+            for j in range(J):
+                phases.data[i, j] = self.dircoup_array[i, j].wg.phase.data[0]
+        return phases
+
+    @phases.setter
+    def phases(self, array):
+        ''' Set the phases of the waveguides
+            Note: this only works if the master waveguide had phase!=None
+        '''
+        I, J = self.dircoup_array.shape
+        if self.dircoup.wg.phase is None:
+            raise AttributeError('Cannot set the phases of the waveguide manually, since '
+                                 'they are coupled to the length')
+        for i in range(I):
+            for j in range(J):
+                self.dircoup_array[i,j].wg.phase.data = self.new_tensor([array[i,j]])
+
 
     @property
     def C(self):

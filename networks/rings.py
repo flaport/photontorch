@@ -14,6 +14,12 @@ import numpy as np
 from .network import Network
 from .directionalcouplers import DirectionalCouplerNetwork
 
+from ..environment.environment import Environment
+from ..components.terms import Term, Detector, Source
+from ..components.waveguides import Waveguide
+from ..components.directionalcouplers import DirectionalCoupler
+from ..components.connection import Connection
+
 
 #####################
 ## All Pass Filter ##
@@ -157,6 +163,7 @@ class RingNetwork(DirectionalCouplerNetwork):
                  wg,
                  couplings=None,
                  lengths=None,
+                 phases=None,
                  terms=None,
                  name='dircoupnw'):
         DirectionalCouplerNetwork.__init__(
@@ -166,6 +173,7 @@ class RingNetwork(DirectionalCouplerNetwork):
             wg,
             couplings=couplings,
             lengths=lengths,
+            phases=phases,
             terms=terms,
             name=name,
         )
@@ -205,3 +213,92 @@ class RingNetwork(DirectionalCouplerNetwork):
                         right = (i*J+j+1, 0)
                     connections.append(left + right)
         return connections
+
+class RingNetworkExample(Network):
+    '''
+                   S  D
+                   |  |
+                0  1  2--3  4--5
+                |  |  |  |  |  |
+                0  1  2  3  4  5
+                |  |  |  |  |  |
+         n--23--+--+--+--+--+--+--6--6
+         |      |  |  |  |  |  |     |
+         m--22--+--+--+--+--+--+--7--7
+                |  |  |  |  |  |
+         l--21--+--+--+--+--+--+--8--8--T
+         |      |  |  |  |  |  |
+         k--20--+--+--+--+--+--+--9--9--D
+                |  |  |  |  |  |
+         j--19--+--+--+--+--+--+--10-a--T
+         |      |  |  |  |  |  |
+         i--18--+--+--+--+--+--+--11-b--D
+                |  |  |  |  |  |
+                17 16 15 14 13 12
+                h--g  f  e  d  c
+                      |  |  |  |
+                      D  T  D  T
+
+    0-23 : RingNetwork Output Nodes
+    0-a-n : Renamed Network Nodes
+    -- or | : connections / waveguides
+    + : directional coupler
+    S : Source
+    D : Detector
+    T : Termination
+
+    '''
+    def __init__(self, name=None):
+        # default environment
+        _env = Environment(
+            name = 'Default Environment', # name of the simulation environment
+            t_start = 0, #[s] Start time of the simulation
+            t_end = 1e-9, #[s] End time of the simulation
+            dt = 2e-12, #[s] Timestep of the simulation
+            wl = 1.55e-6, #[m] Wavelength of the simulation
+            neff = 2.86, # Effective index of the waveguides
+        )
+
+        # design parameters
+        r = np.random.RandomState(seed=0) # Random State for initializing the network lengths
+        min_length = 15*_env.dt*_env.c/_env.neff #[m] Minimum length of the waveguides
+        max_length = 0.010 #[m] Maximum length of the waveguides
+
+        ## Directional Coupler Network
+        dc_nw = RingNetwork(
+            shape=(6,6), # shape of the network
+            dircoup=DirectionalCoupler(0.5), # Base Directional Coupler
+            wg=Waveguide(length=min_length, neff=_env.neff, length_bounds=(min_length, max_length)), # Base Waveguide
+            lengths = min_length + r.rand(6,6)*(max_length-min_length), # override initial waveguide lengths
+            name='dcnw',
+        ).terminate(term=Connection()) # Terminate the network with a connection to the outside
+
+        # waveguide definition for the outside of the network:
+        def wg():
+            wg = Waveguide(
+                length=2*(min_length + r.rand()*(max_length-min_length)),
+                length_bounds = (2*min_length, 2*max_length),
+                neff=2.86,
+            )
+            return wg
+
+        Network.__init__(self,
+            (dc_nw, '0123456789abcdefghijklmn'),
+            (wg(), '23'),
+            (wg(), '45'),
+            (wg(), '67'),
+            (wg(), 'hg'),
+            (wg(), 'ji'),
+            (wg(), 'kl'),
+            (wg(), 'mn'),
+            (Detector(name='f'), 'f'),
+            (Detector(name='d'), 'd'),
+            (Detector(name='b'), 'b'),
+            (Detector(name='9'), '9'),
+            (Detector(name='1'), '1'),
+            (Source(), '0'),
+            name=name,
+        )
+
+        # initialize
+        self.initialize(_env)
