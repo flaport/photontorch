@@ -117,7 +117,32 @@ class TimeSource(ConstantSource):
         signal : the time signal of the source
         '''
         ConstantSource.__init__(self, 1)
-        self.signal = signal
+
+        self.store_signal(signal)
+
+    def store_signal(self, signal):
+        ''' Handle and store the time signal of the source '''
+        if isinstance(signal, np.ndarray):
+            real_signal = self.nw.new_variable(np.real(signal))
+            imag_signal = self.nw.new_variable(np.imag(signal))
+        elif torch.is_tensor(signal):
+            real_signal = self.nw.new_variable(signal)
+            imag_signal = torch.zeros_like(real_signal)
+        else:
+            real_signal = signal
+            imag_signal = torch.zeros_like(real_signal)
+        self.real_signal = real_signal
+        self.imag_signal = imag_signal
+        self.is_real = (self.imag_signal == 0).all()
+        # Store numpy version of the signal for fast acces:
+        self.signal = self.real_signal.data.cpu().numpy()
+        if not self.is_real:
+            self.signal = np.asarray(self.signal, dtype=complex)
+            self.signal += self.imag_signal.data.cpu().numpy()
+
+        if len(self.real_signal.size()) == 1:
+            self.real_signal.unsqueeze_(1)
+            self.imag_signal.unsqueeze_(1)
 
     def __getitem__(self, key):
         '''
@@ -126,12 +151,12 @@ class TimeSource(ConstantSource):
         while the second index should be the time index
         '''
         time_idx = key[1]
-        if time_idx >= self.signal.shape[0]:
+        if time_idx >= self.real_signal.shape[0]:
             return 0*self.source # no signal anymore
         elif key[0] == 0: # Real Part
-            return float(np.real(self.signal[time_idx]))*self.source
+            return self.real_signal[time_idx]*self.source
         elif key[0] == 1: # Imag Part
-            return float(np.imag(self.signal[time_idx]))*self.source
+            return self.imag_signal[time_idx]*self.source
 
 
 ################
@@ -153,6 +178,8 @@ class BitSource(TimeSource):
 
         # set variables
         self.bits = np.asarray(bits)
+        if self.bits.ndim == 1:
+            self.bits = self.bits[:,None]
         self.samplerate = 1/self.nw.env.dt
         self.rising_fraction = rising_fraction
 
@@ -170,7 +197,7 @@ class BitSource(TimeSource):
     def bitrate(self, value):
         ''' The exact bitrate is determined by the timestep of the simulation '''
         self.bitlength = int(self.samplerate/value + 0.5)
-        self.signal = self._signal(self.bits)
+        self.store_signal(self._signal(self.bits))
     @property
     def riselength(self):
         ''' The exact riselength is determined by the timestep of the simulation '''
@@ -178,12 +205,18 @@ class BitSource(TimeSource):
 
     def _signal(self, bits):
         ''' Calculation of the complete bitsignal '''
-        _bits = np.hstack(([bits[0]], bits))
-        bits_ = np.hstack((bits, [bits[-1]]))
-        signal = np.hstack([self._edge(b1, b2) for b1, b2 in zip(_bits,bits_)])
         crop_start = self.bitlength // 2
         crop_end = self.bitlength // 2 + self.bitlength % 2
-        signal = signal[crop_start:-crop_end]
+
+        signals = [None]*bits.shape[1]
+
+        for i, batch_bits in enumerate(bits.T):
+            _bits = np.hstack(([batch_bits[0]], batch_bits))
+            bits_ = np.hstack((batch_bits, [batch_bits[-1]]))
+            batch_signal = np.hstack([self._edge(b1, b2) for b1, b2 in zip(_bits,bits_)])
+            signals[i] = batch_signal[crop_start:-crop_end]
+
+        signal = np.stack(signals, -1)
         return signal
 
     def _edge(self, b1, b2):
