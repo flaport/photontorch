@@ -341,8 +341,8 @@ class Network(Component, SourceInjector):
 
         Arguments
         ---------
-        source : should be a FloatTensors of size
-                 (#2 = (real|imag), # time, # mc nodes, # batches)
+        source : should be a FloatTensor of size
+                 (#2 = (real|imag), # time, # wavelength, # mc nodes, # batches)
               OR a Source object from photontorch.sources that returns a FloatTensor when
                  indexed.
         '''
@@ -376,8 +376,9 @@ class Network(Component, SourceInjector):
 
         return detected[:, :, -self.num_detectors:]
 
-    def plot(self, type, detected, label=''):
+    def plot(self, type, detected, **kwargs):
         ''' Plot detected power versus time or wavelength '''
+        label = kwargs.pop('label','')
         if isinstance(detected, Variable):
             detected = detected.data.cpu().numpy()
         if isinstance(detected, torch.Tensor):
@@ -393,7 +394,7 @@ class Network(Component, SourceInjector):
         x = x*10**-f # no inplace operation, since that would change the original x...
         prefix = {12:'T', 9:'G', 6:'M', 3:'k', 0:'', -3:'m',
                   -6:r'$\mu$', -9:'n', -12:'p', -15:'f'}[f]
-        plots = plt.plot(x, detected)
+        plots = plt.plot(x, detected, **kwargs)
         if type in ['time', 't']:
             plt.xlabel("time [%ss]"%prefix)
         elif type in ['wl', 'wls', 'wavelength', 'wavelengths']:
