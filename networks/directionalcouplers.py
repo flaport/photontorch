@@ -16,6 +16,7 @@ from collections import OrderedDict
 from .network import Network
 from ..components.terms import Term
 from ..components.component import Component
+from ..torch_ext.nn import Buffer
 from ..torch_ext.autograd import block_diag
 from ..torch_ext.tensor import where
 
@@ -104,20 +105,6 @@ class DirectionalCouplerWithLength(Component):
         iS[:,1::2, 1::2] = rS_wg_k
         return iS
 
-    def cuda(self):
-        new = self.copy()
-        new.dircoup = new.dircoup.cuda()
-        new.wg = new.wg.cuda()
-        new.is_cuda = True
-        return new
-
-    def cpu(self):
-        new = self.copy()
-        new.dircoup = new.dircoup.cpu()
-        new.wg = new.wg.cpu()
-        new.is_cuda = False
-        return new
-
 class DirectionalCouplerNetwork(Network, Component):
     ''' A network of directional couplers.
     A directional coupler with normal port ordering is repeated periodically in a grid,
@@ -200,7 +187,15 @@ class DirectionalCouplerNetwork(Network, Component):
             raise ValueError('2D Network is required.')
 
         # Get directional coupler with length
-        self.dircoup = DirectionalCouplerWithLength(dircoup=dircoup, wg=wg)
+        master_wg = wg.copy()
+        master_wg.name = 'wg'
+        master_dc = dircoup.copy()
+        master_dc.name = 'dc'
+        self.dircoup = DirectionalCouplerWithLength(
+            dircoup=master_dc,
+            wg=master_wg,
+            name='dcwl',
+        )
 
         # Create directional coupler array
         self.dircoup_array = np.zeros((I, J), dtype=object)
@@ -208,7 +203,7 @@ class DirectionalCouplerNetwork(Network, Component):
             for j in range(J):
                 # Create copy of directional coupler:
                 dircoup_copy = self.dircoup.copy()
-                dircoup_copy.name = '+'
+                dircoup_copy.name = 'dc'
                 # Put copy in dircoup array
                 self.dircoup_array[i, j] = dircoup_copy
 
@@ -231,14 +226,14 @@ class DirectionalCouplerNetwork(Network, Component):
         self.terms = OrderedDict(terms)
 
         # save order of terms (to reorder in terms clockwise direction):
-        self._order = torch.from_numpy(np.hstack((
+        self._order = Buffer(torch.from_numpy(np.hstack((
             np.arange(1, J+2, 1), # North row
             np.arange(J+3, 4+(J-2)+2*(J-2), 2), # East column
             [8+2*(I-2)+2*(J-2)-2, 8+2*(I-2)+2*(J-2)-1], # South-East Corner
             np.arange(4+(J-2)+2*(I-2), 8+2*(I-2)+2*(J-2)-2, 1)[::-1], #South Row
             np.arange(J+2, 4+(J-2)+2*(J-2), 2)[::-1], # left column
             [0], # half of north west corner
-        ))).long()
+        ))).long())
 
         # PyTorch requires submodules to be registered as attributes
         # For the parameters to be found by autograd:
@@ -246,8 +241,9 @@ class DirectionalCouplerNetwork(Network, Component):
             i = 0
             name = comp.name + ' '
             while hasattr(self, name.strip()):
+                k = 1 if i == 0 else int(np.log10(float(i))) + 1
                 i += 1
-                name = name[:-1] + str(i)
+                name = name[:-k] + str(i)
             if i == 0:
                 name = name[:-1]
             setattr(self, name, comp)
@@ -259,11 +255,14 @@ class DirectionalCouplerNetwork(Network, Component):
         ''' Directional Coupler Networks are terminated by default '''
         if term is None:
             term = Term()
+        if self.is_cuda:
+            term = term.cuda()
         for t in range(self.num_terms):
             if t not in self.terms:
                 term = term.copy()
                 term.name = str(t)
                 self.terms[t] = term
+                setattr(self, term.name, term)
         return self
 
     @property
@@ -346,7 +345,7 @@ class DirectionalCouplerNetwork(Network, Component):
 
         # find and reorder term connection locations
         K = self.num_terms
-        idxs = where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1).data)[:K][self._order]
+        idxs = where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1).data)[:K][self._order.data]
 
         # connect terms
         for k, i in enumerate(self.terms):
@@ -380,37 +379,6 @@ class DirectionalCouplerNetwork(Network, Component):
     def components(self):
         ''' Get all components of the directional coupler network as a list '''
         return tuple(self.dircoup_array.ravel()) + tuple(self.terms.values())
-
-    def cuda(self):
-        ''' Transform Network to live on the GPU '''
-        new = self.copy()
-        I, J = self.shape
-        for i in range(I):
-            for j in range(J):
-                new.dircoup_array[i, j] = new.dircoup_array[i, j].cuda()
-        terms = OrderedDict()
-        for k, v in new.terms.items():
-            terms[k] = v.cuda()
-        new.terms = terms
-        new.dircoup = new.dircoup.cuda()
-        new._order = new._order.cuda()
-        new.is_cuda = True
-        return new
-
-    def cpu(self):
-        ''' Transform Network to live on the CPU '''
-        new = self.copy()
-        I, J = self.shape
-        for i in range(I):
-            for j in range(J):
-                new.dircoup_array[i, j] = new.dircoup_array[i, j].cpu()
-        terms = OrderedDict()
-        for k, v in new.terms.items():
-            terms[k] = v.cpu()
-        new.terms = terms
-        new._order = new._order.cpu()
-        new.is_cuda = False
-        return new
 
     def copy(self, couplings=None, lengths=None):
         ''' Copy the directional coupler network '''

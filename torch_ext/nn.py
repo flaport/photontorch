@@ -52,6 +52,24 @@ class BoundedParameter(_Module_):
         else:
             name = 'BoundedParameter with no bounds:'
         return name + self.data.__repr__()
+    def copy(self):
+        new = self.__class__(
+            data = self.data.clone(),
+            bounds = (self.bounds[0], self.bounds[1]),
+            requires_grad = self.requires_grad,
+        )
+        return new
+    def cuda(self, device=None):
+        ''' Transform component to live on the GPU '''
+        new = super(BoundedParameter, self).cuda(device=device)
+        new.is_cuda = True
+        return new
+
+    def cpu(self):
+        ''' Transform component to live on the CPU '''
+        new = super(BoundedParameter, self).cpu()
+        new.is_cuda = False
+        return new
     @property
     def datavar(self):
         if self._datavar is not None:
@@ -105,6 +123,14 @@ class Buffer(Variable):
     ''' A variable of a module that is registered in _buffers '''
     def __repr__(self):
         return 'Buffer containing:' + self.data.__repr__()
+    def cuda(self, device=None):
+        ''' Transform component to live on the GPU '''
+        new = super(Buffer, self).cuda(device=device)
+        return self.__class__(new.data, requires_grad=self.requires_grad)
+    def cpu(self):
+        ''' Transform component to live on the CPU '''
+        new = super(Buffer, self).cpu()
+        return self.__class__(new.data, requires_grad=self.requires_grad)
 
 
 ######################
@@ -113,20 +139,10 @@ class Buffer(Variable):
 
 class Module(_Module_):
     ''' Torch.nn Module extension for bounded parameters '''
-    def zero_grad(self):
-        """Sets gradients of all model parameters to zero."""
-        # normal zero grad
-        for p in self.parameters():
-            if p.grad is not None:
-                if p.grad.volatile:
-                    p.grad.data.zero_()
-                else:
-                    data = p.grad.data
-                    p.grad = Variable(data.new().resize_as_(data).zero_())
-            # if in the training cycle, the some parameters were out of bounds:
-            if hasattr(p, 'bounds') and p.bounds is not None:
-                p.data[p.data<p.bounds[0]] = p.bounds[0]
-                p.data[p.data>p.bounds[1]] = p.bounds[1]
+
+    def __init__(self):
+        super(Module, self).__init__()
+        self.is_cuda = False
 
     def __setattr__(self, attr, value):
         if isinstance(value, Buffer):
@@ -209,11 +225,23 @@ class Module(_Module_):
     def cuda(self, device=None):
         ''' Transform component to live on the GPU '''
         new = super(Module, self).cuda(device=device)
+        for k, v in self._parameters.items():
+            self._parameters[k] = v.cuda(device=device)
+        for k, v in self._buffers.items():
+            self._buffers[k] = v.cuda(device=device)
+        for k, v in self._modules.items():
+            self._modules[k] = v.cuda(device=device)
         new.is_cuda = True
         return new
 
     def cpu(self):
         ''' Transform component to live on the CPU '''
         new = super(Module, self).cpu()
+        for k, v in self._parameters.items():
+            self._parameters[k] = v.cpu()
+        for k, v in self._buffers.items():
+            self._buffers[k] = v.cpu()
+        for k, v in self._modules.items():
+            self._modules[k] = v.cpu()
         new.is_cuda = False
         return new
