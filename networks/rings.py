@@ -20,6 +20,8 @@ from ..components.waveguides import Waveguide
 from ..components.directionalcouplers import DirectionalCoupler
 from ..components.connection import Connection
 
+from ..torch_ext.nn import Buffer
+
 
 #####################
 ## All Pass Filter ##
@@ -120,7 +122,6 @@ class AddDrop(Network):
         for i, term in zip(connector.idxs, [in_term, pass_term, drop_term, add_term]):
             if term is not None:
                 connector = term[i]*connector
-        print(connector)
 
         Network.__init__(self, connector, name=name)
 
@@ -181,7 +182,7 @@ class RingNetwork(DirectionalCouplerNetwork):
         I, J = self.shape
         k0 = (I%2 == 0) & (J%2 == 1)
         k1 = not k0
-        self._order = torch.from_numpy(np.hstack((
+        self._order = Buffer(torch.from_numpy(np.hstack((
             np.arange(1, J, 1), # North row
             [J, J+1] if J%2 else [J+1, J], #North East Corner
             np.arange(J+3, 4+(J-2)+2*(J-2), 2), # East column
@@ -189,7 +190,7 @@ class RingNetwork(DirectionalCouplerNetwork):
             np.arange(4+(J-2)+2*(I-2), 8+2*(I-2)+2*(J-2)-2, 1)[::-1], #South Row
             np.arange(J+2, 4+(J-2)+2*(J-2), 2)[::-1], # left column
             [0], # half of north west corner
-        ))).long()
+        ))).long())
 
     def _parse_connections(self):
         connections = []

@@ -14,6 +14,7 @@ from copy import deepcopy
 ## Relative
 from ..torch_ext import where
 from ..torch_ext.nn import Module
+from ..torch_ext.nn import BoundedParameter
 from ..networks.connector import Connector
 from ..environment.environment import Environment
 
@@ -41,7 +42,6 @@ class Component(Module):
         if name is None:
             name = self.__class__.__name__.lower()
         self.name = name
-        self.is_cuda = False
         self._env = Environment() # Set default environment
 
     def initialize(self, env):
@@ -138,18 +138,24 @@ class Component(Module):
         new.__dict__['env'] = None
         for k, v in self.__dict__.items():
             if k == 'components': # special way of copying subcomponent of a network
-                new.__dict__[k] = tuple([comp.copy() for comp in v])
+                setattr(new, k, tuple([comp.copy() for comp in v]))
             elif isinstance(v, Component):
-                new.__dict__[k] = v.copy()
+                setattr(new, k, v.copy())
+            elif isinstance(v, BoundedParameter):
+                setattr(new, k, v.copy())
+            elif k == 'env':
+                pass
+            elif k == '_env':
+                pass
             elif isinstance(v, Variable):
                 # Do nothing to variables that are not parameters or leafs
                 # NOTE: parameters are in the ordered_dict _parameters and will
                 # be copied by the deepcopy below.
                 pass
             else:
-                new.__dict__[k] = deepcopy(v)
-        if new.__dict__['env'] is not None:
-            new.initialize(new.env)
+                setattr(new, k, deepcopy(v))
+        if new.__dict__.get('_env') is not None:
+            new.initialize(new._env)
         return new
 
     def __repr__(self):

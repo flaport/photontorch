@@ -90,8 +90,9 @@ class Network(Component, SourceInjector):
             i = 0
             name = comp.name + ' '
             while hasattr(self, name.strip()):
+                k = 1 if i == 0 else int(np.log10(float(i))) + 1
                 i += 1
-                name = name[:-1] + str(i)
+                name = name[:-k] + str(i)
             if i == 0:
                 name = name[:-1]
             setattr(self, name, comp)
@@ -114,6 +115,8 @@ class Network(Component, SourceInjector):
         ''' Add Terms to open connections '''
         if term is None:
             term = Term()
+        if self.is_cuda:
+            term = term.cuda()
         connector = Connector(self.s, self.components)
         idxs = connector.idxs
         for i in idxs:
@@ -121,20 +124,6 @@ class Network(Component, SourceInjector):
             term.name = i
             connector = connector*term[i]
         return Network(connector, name=self.name)
-
-    def cuda(self):
-        ''' Transform Network to live on the GPU '''
-        new = self.copy()
-        new.components = tuple([comp.cuda() for comp in new.components])
-        new.is_cuda = True
-        return new
-
-    def cpu(self):
-        ''' Transform Network to live on the CPU '''
-        new = self.copy()
-        new.components = tuple([comp.cpu() for comp in new.components])
-        new.is_cuda = False
-        return new
 
     def initialize(self, env):
         '''
@@ -187,8 +176,8 @@ class Network(Component, SourceInjector):
 
         mc = (sources_at | detectors_at | (delays > 0)) # memory-containing nodes:
         ml = mc.ne(1) # negation of mc: memory-less nodes
-        self.nmc = nmc = int(mc.sum()) # number of memory-containing nodes:
-        nml = int(ml.sum()) # number of memory-less nodes:
+        self.nmc = nmc = int(mc.int().sum()) # number of memory-containing nodes:
+        nml = int(ml.int().sum()) # number of memory-less nodes:
 
         # This extra step is necessary for CUDA.
         # CUDA does not allow matrix multiplication of ByteTensors.
