@@ -1,4 +1,9 @@
-''' Directional Couplers Module '''
+'''
+# Directional Couplers
+
+Directional Couplers are 4-port components coupling two waveguides together.
+
+'''
 
 #############
 ## Imports ##
@@ -20,22 +25,19 @@ from ..constants import pi
 #########################
 
 class DirectionalCoupler(Component):
-    r'''
-    A directional coupler is a memory-less component with 4 ports.
+    r''' A directional coupler is a memory-less component with 4 ports.
 
-    A directional coupler has one trainable parameter: the coupling R.
+    A directional coupler has one trainable parameter: the squared coupling kappa2.
 
     Connections
-    ------------
-    dircoup['ijkl']:
-     k        l
-      \______/
-      /------\
-     i        j
+        dc['ijkl']:
+        k        l
+        \______/
+        /------\
+        i        j
 
-    Note
-    ----
-     - This directional coupler introduces no delays (for now)
+    Note:
+        This directional coupler introduces no delays (for now)
     '''
 
     num_ports = 4
@@ -44,12 +46,11 @@ class DirectionalCoupler(Component):
         '''
         Directional Coupler initialization
 
-        Parameters
-        ----------
-        kappa2 : float. squared coupling of the directional coupler (between 0 and 1)
-        kappa2_bounds : tuple of length 2: Bounds in which to optimize the squared coupling.
-                        If None, kappa2 will not be optimized.
-        name : str. name of this specific directional coupler
+        Args:
+            kappa2 (float): squared coupling of the directional coupler (between 0 and 1)
+            kappa2_bounds (tuple): Bounds in which to optimize the squared coupling.
+                If None, kappa2 will not be optimized.
+            name (str). name of this specific directional coupler
         '''
         Component.__init__(self, name=name)
 
@@ -61,10 +62,7 @@ class DirectionalCoupler(Component):
 
     @property
     def rS(self):
-        '''
-        Real part of the scattering matrix
-        shape: (# num wavelengths, # num ports, # num ports)
-        '''
+        ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         t = torch.cat([((1-self.kappa2)**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
         S = self.new_variable([[[0, 1, 0, 0],
                                 [1, 0, 0, 0],
@@ -85,22 +83,99 @@ class DirectionalCoupler(Component):
                                 [0, 1, 0, 0]]])
         return k*S
 
+
+#####################################
+## Directional Coupler with length ##
+#####################################
+class DirectionalCouplerWithLength(Component):
+    r''' A directional coupler with length is a memory-containing component with 4 ports.
+
+    It is merely a holder of a directional coupler and a waveguide, and combines both
+    in a 4-port component.
+
+    Connections:
+        dc['ijkl']:
+        k        l
+        \______/
+        /------\
+        i        j
+
+    Note:
+        This version of a directional coupler is prefered over a wg-wg-wg-wg-dc network
+        becuase it only has 4 ports in stead of 12.
+    '''
+
+    num_ports = 4
+
+    def __init__(self, dc, wg, name=None):
+        ''' Directional Coupler
+
+        Args:
+            dc : DirectionalCoupler instance without length
+            wg : yields the full length and the resulting delays of the directional coupler
+        '''
+        Component.__init__(self, name=name)
+        self.wg = wg
+        self.dc = dc
+
+    def initialize(self, env):
+        self.wg.initialize(env)
+        self.dc.initialize(env)
+        Component.initialize(self, env)
+
+    @property
+    def delays(self):
+        ''' Delays of the directional coupler '''
+        return torch.cat((self.wg.delays, self.wg.delays))
+
+    @property
+    def rS(self):
+        ''' real part of the scattering matrix '''
+        k = self.dc.kappa2**0.5 # coupling
+        t = (1-self.dc.kappa2)**0.5 # Transmission
+        rS_wg_t = self.wg.rS*t
+        iS_wg_k = self.wg.iS*k
+        rS = self.new_variable([[[0, 0, 0, 0],
+                                 [0, 0, 0, 0],
+                                 [0, 0, 0, 0],
+                                 [0, 0, 0, 0]]]*self.env.num_wl)
+        rS[:,:2, :2] = rS_wg_t # Transmission from i < - > j
+        rS[:,2:, 2:] = rS_wg_t # Transmission from k < - > l
+        rS[:,::2, ::2] = -iS_wg_k
+        rS[:,1::2, 1::2] = -iS_wg_k
+        return rS
+
+    @property
+    def iS(self):
+        ''' imag part of the scattering matrix '''
+        k = self.dc.kappa2**0.5 # coupling
+        t = (1-self.dc.kappa2)**0.5 # Transmission
+        iS_wg_t = self.wg.iS*t
+        rS_wg_k = self.wg.rS*k
+        iS = self.new_variable([[[0, 0, 0, 0],
+                                 [0, 0, 0, 0],
+                                 [0, 0, 0, 0],
+                                 [0, 0, 0, 0]]]*self.env.num_wl)
+        iS[:,:2, :2] = iS_wg_t # Transmission from i < - > j
+        iS[:,2:, 2:] = iS_wg_t # Transmission from k < - > l
+        iS[:,::2, ::2] = rS_wg_k
+        iS[:,1::2, 1::2] = rS_wg_k
+        return iS
+
+
 class RealisticDirectionalCoupler(Component):
-    r'''
-    A directional coupler is a memory-less component with 4 ports.
+    r''' A directional coupler is a memory-less component with 4 ports.
 
     The realistic directional coupler is based on the CapheModel of Umar Khan
 
-    Connections
-    ------------
-    dircoup['ijkl']:
-     k        l
-      \______/
-      /------\
-     i        j
+    Connections:
+        dc['ijkl']:
+        k        l
+        \______/
+        /------\
+        i        j
 
-    Notes
-    -----
+    Notes:
      - This directional coupler introduces no delays (for now)
      - This directional coupler is not trainable (for now)
     '''
@@ -124,15 +199,14 @@ class RealisticDirectionalCoupler(Component):
            - adiabatic angle : 10 degrees
            - gap distance : 250 nm
 
-        Parameters
-        ----------
-        length : length of the directional coupler
-        k0 : bend coupling
-        n0 : effective index difference between even and odd mode
-        de1_k0 : first derivative of k0 w.r.t. wavelength
-        de1_n0 : first derivative of n0 w.r.t. wavelength
-        de2_k0 : second derivative of k0 w.r.t. wavelength
-        de2_n0 : second derivative of n0 w.r.t. wavelength
+        Args:
+            length : length of the directional coupler
+            k0 : bend coupling
+            n0 : effective index difference between even and odd mode
+            de1_k0 : first derivative of k0 w.r.t. wavelength
+            de1_n0 : first derivative of n0 w.r.t. wavelength
+            de2_k0 : second derivative of k0 w.r.t. wavelength
+            de2_n0 : second derivative of n0 w.r.t. wavelength
         '''
 
         Component.__init__(self, name=name)
@@ -147,10 +221,7 @@ class RealisticDirectionalCoupler(Component):
 
     @property
     def rS(self):
-        '''
-        Real part of the scattering matrix
-        shape: (# num wavelengths, # num ports, # num ports)
-        '''
+        ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         wl = self.env.wls
         dwl = wl - self.wl0
         dn = self.n0 + self.de1_n0*dwl + 0.5*self.de2_n0*dwl**2
@@ -165,10 +236,7 @@ class RealisticDirectionalCoupler(Component):
 
     @property
     def iS(self):
-        '''
-        Imag part of the scattering matrix
-        shape: (# num wavelengths, # num ports, # num ports)
-        '''
+        ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         wl = self.env.wls
         dwl = wl - self.wl0
         dn = self.n0 + self.de1_n0*dwl + 0.5*self.de2_n0*dwl**2

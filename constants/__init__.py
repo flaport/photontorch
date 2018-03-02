@@ -1,3 +1,7 @@
-''' Useful constants for photonic simulations '''
+'''
+# Constants
+Useful constants for photonic simulations
+
+'''
 
 from .constants import *

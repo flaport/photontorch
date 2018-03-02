@@ -32,16 +32,15 @@ class AllPass(Network):
 
     An AllPass filter is a memory-containging component with one input and one output.
 
-    Connections
-    -----------
-    allpass['ij']
-         ___
-        /   \
-        \___/
-    i-----------j
+    Connections:
+        allpass['ij']
+            ___
+            /   \
+            \___/
+        i-----------j
     '''
     def __init__(self,
-                 dircoup,
+                 dc,
                  ring_wg,
                  in_wg=None,
                  pass_wg=None,
@@ -51,12 +50,11 @@ class AllPass(Network):
         '''
         AllPass Filter Initialization
 
-        Parameters
-        ----------
-        ring_wg : waveguide for the ring
-        dircoup : directional coupler for the connection to the ring
+        Args:
+            ring_wg : waveguide for the ring
+            dc : directional coupler for the connection to the ring
         '''
-        connector = dircoup['ikjl']*ring_wg['jl']
+        connector = dc['ikjl']*ring_wg['jl']
 
         i, j = connector.idxs
         if in_wg is not None:
@@ -82,17 +80,16 @@ class AddDrop(Network):
 
     An AddDrop filter is a memory-containging component with one input and one output.
 
-    Connections
-    -----------
-    adddrop['ijkl']
-    j----===----l
-        /   \
-        \___/
-    i-----------k
+    Connections:
+        adddrop['ijkl']
+        j----===----l
+            /   \
+            \___/
+        i-----------k
     '''
     def __init__(self,
-                 dircoup1,
-                 dircoup2,
+                 dc1,
+                 dc2,
                  half_ring_wg,
                  in_wg=None,
                  pass_wg=None,
@@ -109,10 +106,10 @@ class AddDrop(Network):
         Parameters
         ----------
         half_ring_wg : waveguide for a half ring (will be used twice to make the network)
-        dircoup1 : bottom directional coupler for the connection to the ring
-        dircoup2 : top directional coupler for the connection to the ring
+        dc1 : bottom directional coupler for the connection to the ring
+        dc2 : top directional coupler for the connection to the ring
         '''
-        connector = dircoup1['abcd']*dircoup2['efgh']
+        connector = dc1['abcd']*dc2['efgh']
         connector = half_ring_wg['ce']*half_ring_wg['df']*connector
 
         for i, j, wg in zip('wxyz', connector.idxs, [in_wg, pass_wg, drop_wg, add_wg]):
@@ -131,8 +128,7 @@ class RingNetwork(DirectionalCouplerNetwork):
     A directional coupler is repeated periodically in a grid, with the ports flipped
     in odd locations to make rings in the network. The ports are connected by waveguides
 
-    Network
-    -------
+    Network:
          0    1    2    3
         ..   ..   ..   ..
          1    1    1    1
@@ -145,32 +141,30 @@ class RingNetwork(DirectionalCouplerNetwork):
         ..   ..   ..   ..
          9    8    7    6
 
-    Legend
-    ------
+    Legend:
         0: -> term locations
         1
        0 2 -> directional coupler
         3
        -- or | -> waveguides
 
-    Note
-    ----
-    Because of the connection order of the directional coupler (0<->1 and 2<->3), this
-    network does contain loops and can thus be used as a reservoir.
+    Note:
+        Because of the connection order of the directional coupler (0<->1 and 2<->3), this
+        network does contain loops and can thus be used as a reservoir.
     '''
     def __init__(self,
                  shape,
-                 dircoup,
+                 dc,
                  wg,
                  couplings=None,
                  lengths=None,
                  phases=None,
                  terms=None,
-                 name='dircoupnw'):
+                 name='dcnw'):
         DirectionalCouplerNetwork.__init__(
             self,
             shape,
-            dircoup,
+            dc,
             wg,
             couplings=couplings,
             lengths=lengths,
@@ -216,7 +210,7 @@ class RingNetwork(DirectionalCouplerNetwork):
         return connections
 
 class RingNetworkExample(Network):
-    '''
+    r'''
                    S  D
                    |  |
                 0  1  2--3  4--5
@@ -268,7 +262,7 @@ class RingNetworkExample(Network):
         ## Directional Coupler Network
         dc_nw = RingNetwork(
             shape=(6,6), # shape of the network
-            dircoup=DirectionalCoupler(0.5), # Base Directional Coupler
+            dc=DirectionalCoupler(0.5), # Base Directional Coupler
             wg=Waveguide(length=min_length, neff=_env.neff, length_bounds=(min_length, max_length)), # Base Waveguide
             lengths = min_length + r.rand(6,6)*(max_length-min_length), # override initial waveguide lengths
             name='dcnw',

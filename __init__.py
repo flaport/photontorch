@@ -1,8 +1,50 @@
-''' A package using the machine-learning module PyTorch to easily optimize Photonic Circuits '''
+'''
+# Photontorch
+
+
+## Introduction
+
+PhotonTorch is a photonic simulation framework based on the deep learning framework PyTorch.
+
+
+## Features
+
+PhotonTorch features CUDA enabled optimization of photonic circuits. It leverages the
+deep learning framework PyTorch to view the photonic circuit as essentially a recurrent
+neural network. This enables the use of native PyTorch optimizers to optimize the
+(physical) parameters of your circuit.
+
+
+## Dependencies
+
+#### Required
+* [`numpy`](http://www.numpy.org/)
+* [`pytorch`](http://pytorch.org/)
+
+#### Optional
+* [`tqdm`](https://pypi.python.org/pypi/tqdm) (for progress bars)
+* [`matplotlib`](https://matplotlib.org/) (for visualization)
+
+
+## Copyright
+
+(c) Floris Laporte
+
+'''
 
 # Useful while in development...
 import sys
 sys.dont_write_bytecode = True
+
+
+## Submodules
+from . import components
+from . import constants
+from . import environment
+from . import networks
+from . import sources
+from . import torch_ext
+from . import tests
 
 
 ## Components
@@ -24,6 +66,8 @@ from .components.gratingcouplers import GratingCoupler
 
 # Directional couplers
 from .components.directionalcouplers import DirectionalCoupler
+from .components.directionalcouplers import RealisticDirectionalCoupler
+from .components.directionalcouplers import DirectionalCouplerWithLength
 
 
 ## Networks
@@ -38,14 +82,6 @@ from .networks.rings import RingNetwork
 
 # Directional Coupler Networks
 from .networks.directionalcouplers import DirectionalCouplerNetwork
-from .networks.directionalcouplers import DirectionalCouplerWithLength
-
-
-## Sources
-
-from .sources.source import BitSource
-from .sources.source import TimeSource
-from .sources.source import ConstantSource
 
 
 ## Environment
@@ -67,7 +103,4 @@ from .torch_ext.nn import BoundedParameter
 # tensor
 from .torch_ext.tensor import zeros
 from .torch_ext.tensor import where
-
-
-## Tests
-from . import tests
+from .torch_ext.tensor import is_variable
