@@ -1,7 +1,7 @@
 # PhotonTorch
 
 ## Introduction
-PhotonTorch is a photonic simulation engine based on the deep learning framework PyTorch.
+PhotonTorch is a photonic simulation framework based on the deep learning framework PyTorch.
 
 ## Features
 PhotonTorch features CUDA enabled optimization of photonic circuits. It leverages the
@@ -31,6 +31,17 @@ neural network. This enables the use of native PyTorch optimizers to optimize th
 #### Optional
 * [`tqdm`](https://pypi.python.org/pypi/tqdm) (for progress bars)
 * [`matplotlib`](https://matplotlib.org/) (for visualization)
+
+## Documentation
+You can generate the documentation by typing [only with python 3]
+```
+python -m photontorch.documentation.generate
+```
+in the folder that contains photontorch.
+
+
+## Where to start
+If you don't know where to start, start going through the notebooks in the examples folder.
 
 
 ## Copyright
