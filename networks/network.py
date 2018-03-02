@@ -1,17 +1,88 @@
-''' Network Module '''
+r'''
+# PhotonTorch Network
+
+The Network is the core of Photontorch. This is where everything comes together.
+The Network is a special kind of torch.nn.Module, where all subcomponents are
+automatically initialized and connected in the right way.
+
+## A note on the S- and C-matrix reduction performed during Network.initialize:
+Each component can be described in terms of it's S matrix. For such a component,
+we have that the output fields \(\bf x_{\rm out}\) are connected to the input fields
+\(x_{\rm in}\) through a scattering matrix:
+```math
+x_{\rm out} = S \cdot x_{\rm in}
+```
+For a network of components, the field vectors \(x\) will just be stacked on top of each other,
+and the S-matrix will just be the block-diagonal matrix of the S-matrices of the
+individual components. However, to connect the output fields to each other, we need
+a connection matrix, which connects the output fields of the individual components
+to input fields of other components in the fields vector \(x\):
+```math
+x_{\rm in} = C \cdot x_{\rm out}
+```
+a simulation (without delays) can thus simply be described by:
+```math
+x(t+1) = C\cdot S\cdot x(t)
+```
+However, when delays come in the picture, the situation is a bit more complex. We then
+split the fields vector \(x\) in a memory_containing part (mc) and a memory-less part (ml):
+```math
+\begin{pmatrix}x^{\rm mc} \\x^{\rm ml} \end{pmatrix}(t+1) =
+\begin{pmatrix} C^{\rm mcmc} & C^{\rm mcml} \\ C^{\rm mlmc} & C^{\rm mlml} \end{pmatrix}
+\begin{pmatrix} S^{\rm mcmc} & S^{\rm mcml} \\ S^{\rm mlmc} & S^{\rm mlml} \end{pmatrix}
+\cdot\begin{pmatrix}x^{\rm mc} \\x^{\rm ml} \end{pmatrix}(t)
+```
+Usually, we are only interested in the memory-containing nodes, as memory-less nodes
+should be connected together and act all at once. After some matrix algebra we arrive at
+```math
+\begin{align}
+x^{\rm mc}(t+1) &= \left( C^{\rm mcmc} + C^{\rm mcml}\cdot S^{\rm mlml}\cdot
+\left(1-C^{\rm mlml}S^{\rm mlml}\right)^{-1} C^{\rm mlmc}\right)S^{\rm mcmc} x^{\rm mc}(t) \\
+&= C^{\rm red} x^{\rm mc}(t),
+\end{align}
+```
+Which defines the reduced connection matrix used in the simulations.
+
+## A note on complex matrix inverse
+
+PyTorch still does not allow complex valued Tensors. Therefore, the above equation was
+completely rewritten with matrices containing the real and imaginary parts.
+This would be fairly straightforward if it were not for the matrix inverse in the
+reduced connection matrix:
+```math
+P^{-1} = \left(1-C^{\rm mlml}S^{\rm mlml}\right)^{-1}
+```
+
+unfortunately for complex matrices \(P^{-1} \neq {\rm real}(P)^{-1} + i{\rm imag}(P)^{-1}\),
+the actual case is a bit more complicated.
+
+It is however, pretty clear from the equations that the \({\rm real}(P)^{-1}\) will always
+exist, and thus we can write for the real and imaginary part of \(P^{-1}\):
+
+
+```math
+\begin{align}
+{\rm real}(P^{-1}) &= \left({\rm real}(P) + {\rm imag}(P)\cdot {\rm real}(P)^{-1} \cdot {\rm imag}(P)\right)^{-1}\\
+{\rm real}(P^{-1}) &= -{\rm real}(P^{-1})\cdot {\rm imag}(P) \cdot {\rm real}(P)^{-1}
+\end{align}
+```
+This equation is valid, even if \({\rm imag}(P)^{-1}\) does not exist.
+
+'''
 
 #############
 ## Imports ##
 #############
 
+# Standard library
+import warnings
+import functools
+
 ## Torch
 import torch
-from torch.nn import Module
 from torch.autograd import Variable
 
 ## Others
-import warnings
-import functools
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -31,59 +102,81 @@ from ..sources.inject import SourceInjector
 #############
 
 class Network(Component, SourceInjector):
-    ''' a Network (circuit) of Components '''
+    ''' a Network (circuit) of Components
+
+    The Network is the core of Photontorch. This is where everything comes together.
+    The Network is a special kind of torch.nn.Module, where all subcomponents are
+    automatically initialized and connected in the right way.
+
+    It's two core method's are `initialize` and `forward`.
+
+    '''
     def __init__(self, *args, **kwargs):
         '''
         Initialization of the network.
 
-        Parameters
-        ----------
-        There are three accepted forms for the arguments of a new network:
+        Args:
+            There are three accepted forms for the arguments of a new network:
 
-        1. First option:
-        s = args[0] of type str
-        components = args[1:] of type component
+            1. First option:
+            s = args[0] of type str
+            components = args[1:] of type component
 
-        s is a string specifying how the components are connected. It follows
-        the einstein summation convention.
-        e.g.
-        nw = Network('ij,jklm,mn', wg1, dircoup, wg2)
-        makes a connection between two waveguides and a directional coupler.
-        The connection is made where equal indices occur:
-            last port of wg1 is connected to first port of dircoup
-            last port of dircoup is connected to first port of wg2.
+            s is a string specifying how the components are connected. It follows
+            the einstein summation convention.
+            e.g.
+            nw = Network('ij,jklm,mn', wg1, dc, wg2)
+            makes a connection between two waveguides and a directional coupler.
+            The connection is made where equal indices occur:
+                last port of wg1 is connected to first port of dc
+                last port of dc is connected to first port of wg2.
 
-        2. Second option:
-        args is a list of list with args[i][0] of type component and args[i][1] of type
-        str. Also follows the einstein summation convention.
-        e.g.
-        nw = Network(
-            (wg1, 'ij'),
-            (dircoup, 'jklm'),
-            (wg3, 'mn')
-        )
+            2. Second option:
+            args is a list of list with args[i][0] of type component and args[i][1] of type
+            str. Also follows the einstein summation convention.
+            e.g.
+            nw = Network(
+                (wg1, 'ij'),
+                (dc, 'jklm'),
+                (wg3, 'mn')
+            )
 
-        3. Third option:
-        args[0] is a Connector object that resulted from multiplication (connecting) of
-        indexed components:
-        e.g.
-        nw = Network(wg1['ij']*dircoup['jklm']*wg2['mn'])
+            3. Third option:
+            args[0] is a Connector object that resulted from multiplication (connecting) of
+            indexed components:
+            e.g.
+            nw = Network(wg1['ij']*dc['jklm']*wg2['mn'])
 
-        Note
-        ----
-        The initializer of the network does not check if the number of indices
-        given corresponds to the number of ports in the component.
+        Note:
+            The initializer of the network does not check if the number of indices
+            given corresponds to the number of ports in the component.
         '''
 
         Component.__init__(self, name=kwargs.pop('name', None))
-
-        # Add all the possible sources to this network:
-        self.inject_sources()
 
 
         # parse arguments
         self.s, self.components = self._parse_args(args)
 
+        # Add all the possible sources to this network:
+        self._inject_sources()
+
+        # register components as attributes:
+        self._register_components()
+
+        # flag to see if the network is initialized with an environment.
+        self.initialized = False
+
+    def _register_components(self):
+        ''' Register Components as submodules of the network
+
+        Pytorch requires submodules to be registered as attributes of a module.
+        This tries to registers all components in self.components under the component's
+        name. If the attribute name is already taken, an integer suffix is added.
+
+        Note:
+            This Method should only be called one single in the __init__.
+        '''
         # PyTorch requires submodules to be registered as attributes
         # For the parameters to be found by autograd:
         for comp in self.components:
@@ -97,10 +190,8 @@ class Network(Component, SourceInjector):
                 name = name[:-1]
             setattr(self, name, comp)
 
-        # flag to see if the network is initialized with an environment.
-        self.initialized = False
-
     def copy(self):
+        ''' create a (deep) copy of the network '''
         components = [comp.copy() for comp in self.components]
         new = self.__class__(self.s, *components)
         if self.initialized:
@@ -109,10 +200,15 @@ class Network(Component, SourceInjector):
 
     @property
     def num_ports(self):
+        ''' Get the number of ports in the network '''
         return np.sum(comp.num_ports for comp in self.components)
 
     def terminate(self, term=None):
-        ''' Add Terms to open connections '''
+        '''
+        Terminate open conections with the term of your choice
+
+        Args (Term): Which term to use. Defaults to Term.
+        '''
         if term is None:
             term = Term()
         if self.is_cuda:
@@ -126,13 +222,41 @@ class Network(Component, SourceInjector):
         return Network(connector, name=self.name)
 
     def initialize(self, env):
-        '''
+        r''' Initialize
         Initializer of the network. The initializer should be called before
-        doing the forward pass through the network. It creates all the internal variables
-        necessary.
+        doing any simulation (forward pass through the network). It creates all the
+        internal variables necessary.
+
+        Args:
+            env (Environment): Simulation environment.
 
         The Initializer should in principle also be called after every training Epoch to
         update the parameters of the network.
+
+        The goal of this initialization is to split the network into memory-containing nodes
+        (nodes that introduce delay, sources, detectors, ...) and memory-less nodes.
+        A matrix reduction method is then applied to remove the memory-less nodes from the
+        S-matrix and C-matrix. It is with these reduced matrices that the simulation will
+        then be performed.
+
+        The resulting reduced matrices will also be reordered, such that source nodes
+        will be the first nodes and detector nodes will be the last nodes. This is done
+        purely for ease of access afterwards.
+
+        Note:
+            during initialization, the reduced connection matrix is calculated for all
+            batches and for all wavelengths. This is a quite lengthy calculation, because
+            the matrices need to be (batch) multiplied in the right way. Below, you can find
+            the equation for the reduced connection matrix if you get lost:
+            ```math
+            C^{\rm red} = \left(1-C^{\rm mlml}S^{\rm mlml}\right)^{-1} C^{\rm mlmc}
+            ```
+
+        Note:
+            During initialization, it will be checked if the network is fully connected,
+            i.e. self.C.sum(0) > 0 everywhere and self.C.sum(1) > 0 everywhere. If the
+            network is not fully connected, the initialization will not be finalized.
+            (and the self.initialized flag will remain False)
         '''
         ## begin initialization:
         self.initialized = False
@@ -222,8 +346,6 @@ class Network(Component, SourceInjector):
         # MC subset of Connection matrix
         Cmcmc = C[mcmc].view(nmc, nmc)
 
-
-
         if nml: # Only do the following steps if there is at least one ml node:
 
             # ML subsets of scattering matrix:
@@ -304,7 +426,9 @@ class Network(Component, SourceInjector):
         self.initialized = True
 
     def require_initialization(func):
-        ''' Some functions require the Network to be initialized '''
+        '''Decorator.
+        Some functions require the Network to be initialized.
+        '''
         @functools.wraps(func)
         def wrapped(self, *args, **kwargs):
             if not self.initialized:
@@ -314,9 +438,11 @@ class Network(Component, SourceInjector):
 
     @require_initialization
     def new_buffer(self):
-        '''
-        Create buffer to keep the hidden states of the Network (RNN)
+        ''' Create buffer to keep the hidden states of the Network (RNN)
         The buffer has shape (# time, # wavelengths, # mc nodes, # batches)
+
+        Note:
+            obviously, this is a different buffer than Model buffers
         '''
         buffer = self.zeros((self.buffermask.size(0), self.env.num_wl, self.nmc, self.env.num_batches))
         rbuffer = Variable(buffer.clone())
@@ -328,12 +454,14 @@ class Network(Component, SourceInjector):
         '''
         Forward pass of the network.
 
-        Arguments
-        ---------
-        source : should be a FloatTensor of size
-                 (#2 = (real|imag), # time, # wavelength, # mc nodes, # batches)
-              OR a Source object from photontorch.sources that returns a FloatTensor when
-                 indexed.
+        Args:
+            source : should be a FloatTensor of size
+                    (2 = (real|imag), # time, # wavelength, # mc nodes, # batches)
+             OR     a Source object from photontorch.sources that returns a FloatTensor when
+                     indexed.
+
+        Returns:
+            detected (torch.Floattensor): a tensor with shape (# time, # wavelengths, # detectors, # batches)
         '''
 
         detected = self.new_variable(self.zeros((self.env.num_timesteps, self.env.num_wl, self.nmc, self.env.num_batches)))
@@ -366,7 +494,13 @@ class Network(Component, SourceInjector):
         return detected[:, :, -self.num_detectors:]
 
     def plot(self, type, detected, **kwargs):
-        ''' Plot detected power versus time or wavelength '''
+        ''' Plot detected power versus time or wavelength
+
+        Args:
+            type ('t' or 'wl'): type of the plot.
+            detected (np.ndarray | torch.Tensor): Detected signal
+            **kwargs: matplotlib plot keyword arguments.
+        '''
         label = kwargs.pop('label','')
         if isinstance(detected, Variable):
             detected = detected.data.cpu().numpy()
@@ -390,6 +524,8 @@ class Network(Component, SourceInjector):
             plt.xlabel('wavelength [%sm]'%prefix)
         plt.ylabel("intensity [a.u.]")
         names = [comp.name for comp in self.components if isinstance(comp, Detector)]
+        if len(names) == 1 and len(plots) > 1:
+            names = [names[0] + str(i) for i, _ in enumerate(plots)]
         for i, (name, plot) in enumerate(zip(names, plots)):
             if name == '' or name is None:
                 name = str(i)
@@ -422,6 +558,14 @@ class Network(Component, SourceInjector):
 
     @property
     def C(self):
+        ''' Combined Connection matrix of all the components in the network
+
+        Returns:
+            torch.FloatTensors with only 1's and 0's.
+
+        Note:
+            To create the connection matrix, the connection string is parsed.
+        '''
         Ns = np.cumsum([0]+[comp.num_ports for comp in self.components])
         free_idxs = [comp.free_idxs for comp in self.components]
 

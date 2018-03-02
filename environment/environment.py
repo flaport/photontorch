@@ -1,13 +1,25 @@
-''' Simulation Environment Module '''
+'''
+# PhotonTorch Simulation Environment
+
+The simulation environment module contains a single class: Environment
+
+This class contains all the necessary parameters to initialize a network for a simulation.
+
+'''
 
 #############
 ## Imports ##
 #############
 
-import torch
-import numpy as np
+# Standard Library
 import warnings
 from copy import deepcopy
+
+# Torch
+import torch
+
+# Other
+import numpy as np
 
 
 #################
@@ -15,28 +27,34 @@ from copy import deepcopy
 #################
 
 class Environment(object):
-    ''' Simulation Environment '''
+    ''' Simulation Environment
+
+    The simulation environment is a smart data class that contains all
+    the necessary parameters to initialize a network for a simulation.
+
+    It is able to initialize parameters that depend on each other correctly.
+    Changing a parameter that depends on another, changes both.
+    '''
     def __init__(self, **kwargs):
 
-        ''' Environment __init__
+        ''' Environment
 
-        Arguments
-        ---------
-        t_start (float) [s]: start time of the simulation
-        t_end (float) [s]: end time of the simulation (not included)
-        dt (float) [s]: timestep of the simulation
-        wl (float) [m]: center wavelength of the simulation
-        wls (array) [m]: all wavelengths of the simulation
-        num_wl (int) : number of wavelengths in the simulation
-        use_delays (bool) : if delays are necessary in the simulation.
-                            You can set this to false in frequency domain simulations
-                            with constant input source.
-        num_batches (int) : number of parallel simulations to perform
-        num_timesteps (int) : number of timesteps in the simulation (overrules t_end)
-        t (array): time array (overrules t_start, t_end, dt and num_timesteps)
-        cuda (True, False, None): whether to use cuda in the simulation.
-                                  If `None`, the default of the network is used.
-        name (str) : name of the environment
+        Args:
+            t_start (float) [s]: start time of the simulation
+            t_end (float) [s]: end time of the simulation (not included)
+            dt (float) [s]: timestep of the simulation
+            wl (float) [m]: center wavelength of the simulation
+            wls (array) [m]: all wavelengths of the simulation
+            num_wl (int) : number of wavelengths in the simulation
+            use_delays (bool) : if delays are necessary in the simulation.
+                                You can set this to false in frequency domain simulations
+                                with constant input source.
+            num_batches (int) : number of parallel simulations to perform
+            num_timesteps (int) : number of timesteps in the simulation (overrules t_end)
+            t (array): time array (overrules t_start, t_end, dt and num_timesteps)
+            cuda (True, False, None): whether to use cuda in the simulation.
+                                    If `None`, the default of the network is used.
+            name (str) : name of the environment
         '''
 
         # wavelength
@@ -80,6 +98,7 @@ class Environment(object):
         # other keyword arguments are added to the attributes like so:
         for k, v in kwargs.items():
             self.__dict__[k] = v
+
     @property
     def c(self):
         ''' speed of light '''
@@ -87,13 +106,16 @@ class Environment(object):
 
     @property
     def wl(self):
+        ''' Wavelength of the simulation '''
         return np.mean(self.wls)
     @wl.setter
     def wl(self, value):
+        ''' Wavelength of the simulation '''
         self.wls = np.array([value])
 
     @property
     def num_wl(self):
+        ''' Number of wavelengths in the simulation '''
         return self.wls.shape[0]
 
     @property
@@ -143,4 +165,15 @@ class Environment(object):
         return new
 
     def __repr__(self):
-        return self.name + '(wl=%.2e, dt=%.2e)'%(self.wl, self.dt)
+        ''' String Representation of the environment '''
+        s = 'Simulation Environment:\n'
+        for k, v in self.__dict__:
+            if k == '_dt':
+                k = 'dt'
+            s = r'%s\t:\t%s'%(str(k), str(v))
+        return s
+
+    def __str__(self):
+        ''' String Representation of the environment '''
+        return repr(self)
+

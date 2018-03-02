@@ -1,4 +1,9 @@
-''' Torch tensor function extensions '''
+'''
+# Type Conversions
+
+Common type converstions between Python, Numpy and PyTorch.
+
+'''
 
 #############
 ## Imports ##
@@ -13,6 +18,9 @@ import torch
 ###########
 
 TORCH_TYPES = {
+    float:torch.FloatTensor,
+    int:torch.IntTensor,
+    bool:torch.ByteTensor,
     'uint8':torch.ByteTensor,
     'float':torch.FloatTensor,
     'float32':torch.FloatTensor,
@@ -55,6 +63,9 @@ TORCH_TYPES = {
 ## Numpy ##
 ###########
 NUMPY_TYPES = {
+    float:'float',
+    int:'int',
+    bool:'bool',
     'byte':'uint8',
     'float':'float32',
     'double':'float64',

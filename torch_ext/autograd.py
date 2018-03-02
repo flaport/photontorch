@@ -1,4 +1,16 @@
-''' Torch.autograd extensions '''
+'''
+# Torch Autograd Extensions
+
+The autograd extensions supply three main functions:
+
+  * `pinv`: a differentiable implementation of the pseudo inverse of a matrix
+  * `block_diag`: a differentiable implementation of a block diagonal matrix
+  * `batch_block_diag`: a differentiable implementation of a block diagonal matrix
+performed over a batch of matrices.
+
+The classes defined below are called inside these functions and should not be used directly.
+
+'''
 
 #############
 ## Imports ##
@@ -22,36 +34,49 @@ from .tensor import zeros
 
 ## PseudoInverse Function
 def pinv(input, rcond=1e-8):
-    '''
-    Calculate the generalized inverse of 2D Torch FloatTensor using the
-    singular-value decomposition (SVD) and including all
-    *large* singular values.
+    ''' Moore-Penrose Pseudo Inverse of a 2D FloatTensor.
 
-    Parameters
-    ----------
-    input : (M, N) tensor. Matrix to be pseudo-inverted.
-    rcond : float. Cutoff for small singular values.
+    Calculated using the singular-value decomposition with cutoff `rcond`.
 
-    Returns
-    -------
-    B : (N, M) FloatTensor. The pseudo-inverse of `input`.
+    Args:
+        input (2D torch.Tensor): Matrix to be pseudo-inverted.
+        rcond (float): Cutoff for small singular values.
+
+    Returns:
+    2D torch.Tensor: The pseudo-inverse of `input`.
+
     '''
     return PseudoInverse().apply(input, rcond=rcond)
 
-class PseudoInverse(Function):
-    '''
-    The Moore-Penrose pseudo inverse Functional
 
-    Note
-    ----
-    Do not use this torch Function directly.
-    Use `pinv` instead.
+class PseudoInverse(Function):
+    ''' Moore-Penrose Pseudo Inverse of a 2D FloatTensor.
+
+    Calculated using the singular-value decomposition with cutoff `rcond`.
+
+    Note:
+        Do not use this torch Autograd Function Class directly. Use `pinv` in stead.
+
     '''
     @staticmethod
     def forward(ctx, input, rcond=1e-8):
-        '''
-        The forward method calculates the pseudo-inverse and
-        saves the necessary variables for a backward pass
+        ''' PseudoInverse forward
+
+        The forward method calculates the pseudo-inverse and saves the necessary variables
+        for a backward pass in the context variable.
+
+        Args:
+            ctx (torch context): An object storing the information for backward pass.
+            input (2D torch.Tensor): Matrix to be pseudo-inverted.
+            rcond (float): Cutoff for small singular values.
+
+        Returns:
+            2D torch.Tensor: The pseudo-inverse of `input`.
+
+        Note:
+            This function is used by PyTorch internally and should not be used by the user.
+            Use the `.apply` function in stead.
+
         '''
         cutoff = rcond*input.max()
         # numpy way:
@@ -75,11 +100,25 @@ class PseudoInverse(Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        '''
-        The backward pass uses the formula for a (normal) inverse:
-        inv'(M) = -inv(M)@M'@inv(M).
+        ''' PseudoInverse backward
 
+        The backward pass uses the formula for the derivative of a matrix inverse:
+        ```math
+            M^{-1} = -M^{-1}\cdot M\cdot M^{-1}.
+        ```
         We assume this formula also works for the pseudo-inverse.
+
+        Args:
+            ctx (torch context): An object for accessing the stored information of
+                the forward pass.
+            grad_output (2d torch.Tensor): Matrix describing the gradient of the next layer.
+
+        Returns:
+            2d torch.Tensor: The gradient with respect to this layer.
+
+        Note:
+            This function is used by PyTorch internally and should not be used by the user.
+
         '''
 
         # some debugging with torch.autograd.gradcheck shows that we need
@@ -96,40 +135,46 @@ class PseudoInverse(Function):
 ####################
 
 def block_diag(*inputs):
-    '''
-    Create a block diagonal matrix from provided arrays.
+    ''' Block Diagonal Matrix
 
-    Given the inputs `A`, `B` and `C`, the output will have these
-    arrays arranged on the diagonal::
+    Create a block diagonal matrix from provided input matrices.
 
-        [[A, 0, 0],
-         [0, B, 0],
-         [0, 0, C]]
+    Args:
+        *inputs (2D torch.Tensors): Square Matrices to construct the block diagonal matrix from.
 
-    Parameters
-    ----------
-    A, B, C, ... : 2D square Torch FloatTensor Variables
+    Returns:
+        2D torch.Tensor: The Block diagonal matrix.
 
-    Returns
-    -------
-    D : 2d square Torch FloatTensor Variable with A, B, C, ... on the diagonal
     '''
     return BlockDiag().apply(*inputs)
 
 class BlockDiag(Function):
-    '''
-    Construct a block diagonal matrix from a sequence of inputs
+    ''' Block Diagonal Matrix
 
-    Note
-    ----
-    Do not use this torch Function directly.
-    Use `block_diag` instead.
+    Create a block diagonal matrix from provided input matrices.
+
+    Note:
+        Do not use this torch Autograd Function Class directly. Use `block_diag` in stead.
+
     '''
     @staticmethod
     def forward(ctx, *inputs):
-        '''
-        The forward method creates the block diagonal matrix and
-        saves the locations of the submatrices for the backward pass
+        ''' BlockDiag forward
+
+        The forward method creates the block diagonal matrix and saves the variables
+        for a backward pass in the context variable.
+
+        Args:
+            ctx (torch context): An object storing the information for backward pass.
+            *inputs (2D torch.Tensors): Square Matrices to construct the block diagonal matrix from.
+
+        Returns:
+            2D torch.Tensor: The block diagonal matrix
+
+        Note:
+            This function is used by PyTorch internally and should not be used by the user.
+            Use the `.apply` function in stead.
+
         '''
         # we assume all inputs are square. TODO: implement a check for this
         # Get total size of block diagonal matrix
@@ -146,13 +191,27 @@ class BlockDiag(Function):
         return M
 
     @staticmethod
-    def backward(ctx, M):
-        '''
-        The backward pass selects the relevant submatrices of the gradient
+    def backward(ctx, grad_output):
+        ''' BlockDiag backward
+
+        The backward pass selects the relevant submatrices from the gradients of the
+        block diagonal matrix and returns them as the requested gradients of the input
+        matrices.
+
+        Args:
+            ctx (torch context): An object storing the indices of the submatrices
+            grad_output: The gradients of the block diagonal matrix.
+
+        Returns:
+            The gradients of the submatrices of the block diagonal matrix.
+
+        Note:
+            This function is used by PyTorch internally and should not be used by the user.
+
         '''
         outputs = []
         for i, j in ctx.idxs:
-            output = M[i:j, i:j]
+            output = grad_output[i:j, i:j]
             outputs.append(output)
         return tuple(outputs)
 
@@ -162,40 +221,49 @@ class BlockDiag(Function):
 #################################
 
 def batch_block_diag(*inputs):
-    '''
-    Create a block diagonal matrix from provided arrays.
+    ''' Block Diagonal Matrix
 
-    Given the inputs `A`, `B` and `C`, the output will have these
-    arrays arranged on the diagonal::
+    Create a block diagonal matrix from the provided batch input matrices.
 
-        [[A, 0, 0],
-         [0, B, 0],
-         [0, 0, C]]
+    Args:
+        *inputs (3D torch.Tensors): Tensors to construct the batch block diagonal matrix from.
+            - The shape of the inputs should be (#batches, dim, dim).
+            - The first dimension size (the batch size) of all inputs should be the same.
 
-    Parameters
-    ----------
-    A, B, C, ... : 2D square Torch FloatTensor Variables
+    Returns:
+        3D torch.Tensor: The Batch Block diagonal matrix.
 
-    Returns
-    -------
-    D : 2d square Torch FloatTensor Variable with A, B, C, ... on the diagonal
     '''
     return BatchBlockDiag().apply(*inputs)
 
 class BatchBlockDiag(Function):
-    '''
-    Construct a block diagonal matrix from a sequence of inputs
+    ''' Batch Block Diagonal Matrix
 
-    Note
-    ----
-    Do not use this torch Function directly.
-    Use `block_diag` instead.
+    Create a batch block diagonal matrix from provided input matrices.
+
+    Note:
+        Do not use this torch Autograd Function Class directly. Use `batch_block_diag` in stead.
+
     '''
     @staticmethod
     def forward(ctx, *inputs):
-        '''
-        The forward method creates the block diagonal matrix and
-        saves the locations of the submatrices for the backward pass
+        ''' BatchBlockDiag forward
+
+        The forward method creates the batch block diagonal matrix and saves the variables
+        for a backward pass in the context variable.
+
+        Args:
+            ctx (torch context): An object storing the information for backward pass.
+            *inputs (3D torch.Tensors): Tensors of Batch Square Matrices to construct the
+                batch block diagonal matrix from.
+
+        Returns:
+            3D torch.Tensor: The batch block diagonal matrix
+
+        Note:
+            This function is used by PyTorch internally and should not be used by the user.
+            Use the `.apply` function in stead.
+
         '''
         # we assume all inputs are square. and the same for each batch
         # TODO: implement a check for this
@@ -214,12 +282,26 @@ class BatchBlockDiag(Function):
         return M
 
     @staticmethod
-    def backward(ctx, M):
-        '''
-        The backward pass selects the relevant submatrices of the gradient
+    def backward(ctx, grad_output):
+        ''' BlockDiag backward
+
+        The backward pass selects the relevant submatrices from the gradients of the
+        batch block diagonal matrix and returns them as the requested gradients of the input
+        matrices.
+
+        Args:
+            ctx (torch context): An object storing the indices of the submatrices
+            grad_output: The gradients of the batch block diagonal matrix.
+
+        Returns:
+            The gradients of the submatrices of the batch block diagonal matrix.
+
+        Note:
+            This function is used by PyTorch internally and should not be used by the user.
+
         '''
         outputs = []
         for i, j in ctx.idxs:
-            output = M[:, i:j, i:j]
+            output = grad_output[:, i:j, i:j]
             outputs.append(output)
         return tuple(outputs)

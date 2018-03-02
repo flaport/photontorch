@@ -1,4 +1,9 @@
-''' Waveguides Module '''
+'''
+# Waveguides
+
+Waveguides are a special kind of Connection with delay.
+
+'''
 
 #############
 ## Imports ##
@@ -26,10 +31,9 @@ class Waveguide(Connection):
     A waveguide is not trainable (for now)
 
     Connections
-    -----------
-    waveguide['ij']:
+        waveguide['ij']:
 
-    i ---- j
+        i ---- j
 
     '''
 
@@ -41,20 +45,17 @@ class Waveguide(Connection):
                  phase=None,
                  phase_bounds=(0,2*np.pi),
                  name=None):
-        '''
-        Waveguide Initialization
+        ''' Waveguide
 
-        Parameters
-        ----------
-        length : float. Length of the waveguide in meter.
-        neff = 4.0 : float. Effective index of the waveguide
-        loss = 0 : float. Loss in the waveguide [dB/m]
-        length_bounds : tuple. bounds in which to optimize the length
-        phase : float : if a phase is given, the phase introduced
-                        by the wavelength becomes decoupled from the length.
-                        This can be useful for training purposes.
-        phase_bounds : tuple : bounds in which to optimize the phase.
-        name : str. Name of the specific waveguide
+        Args:
+            length (float): Length of the waveguide in meter.
+            neff = 4.0 (float). Effective index of the waveguide
+            loss = 0 (float): Loss in the waveguide [dB/m]
+            length_bounds (tuple): bounds in which to optimize the length
+            phase (float): if a phase is given, the phase introduced by the wavelength
+                becomes decoupled from the length. This can be useful for training purposes.
+            phase_bounds (tuple): bounds in which to optimize the phase.
+            name (str): Name of the specific waveguide
         '''
         Connection.__init__(self, name=name)
         # Handle inputs
@@ -84,7 +85,7 @@ class Waveguide(Connection):
 
     @property
     def rS(self):
-        ''' real part of the scattering matrix '''
+        ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         if self.phase is not None:
             cos_phase = self.phase.cos().double()
         else:
@@ -99,7 +100,7 @@ class Waveguide(Connection):
 
     @property
     def iS(self):
-        ''' imaginary part of the scattering matrix '''
+        ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         if self.phase is not None:
             sin_phase = self.phase.sin().double()
         else:
