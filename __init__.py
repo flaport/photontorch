@@ -57,6 +57,9 @@ from .components.terms import Detector
 # Mirrors
 from .components.mirrors import Mirror
 
+# MMIs
+from .components.mmis import Mmi21
+
 # Waveguides
 from .components.waveguides import Waveguide
 from .components.waveguides import Connection
