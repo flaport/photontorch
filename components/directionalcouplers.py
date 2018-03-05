@@ -31,7 +31,7 @@ class DirectionalCoupler(Component):
 
     Connections
         dc['ijkl']:
-        k        l
+        l        k
         \______/
         /------\
         i        j
@@ -95,7 +95,7 @@ class DirectionalCouplerWithLength(Component):
 
     Connections:
         dc['ijkl']:
-        k        l
+        l        k
         \______/
         /------\
         i        j
@@ -170,7 +170,7 @@ class RealisticDirectionalCoupler(Component):
 
     Connections:
         dc['ijkl']:
-        k        l
+        l        k
         \______/
         /------\
         i        j

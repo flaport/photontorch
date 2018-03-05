@@ -16,6 +16,7 @@ from collections import OrderedDict
 from .network import Network
 from ..components.terms import Term
 from ..components.component import Component
+from ..components.connection import Connection
 from ..components.directionalcouplers import DirectionalCouplerWithLength
 from ..torch_ext.nn import Buffer
 from ..torch_ext.autograd import block_diag
@@ -68,29 +69,32 @@ class DirectionalCouplerNetwork(Network, Component):
         ''' DirectionalCouplerNetwork
 
         Args:
-            shape: (tuple) : shape of the network.
-            dc (DirectionalCoupler) : zero length directional coupler.
-            wg (Waveguide) : a waveguide containing all the properties of a single directional
-                            coupler arm, such as the length and the effective index.
-            couplings(numpy ndarray) : Desired couplings for the grating couplers. This
-                                        array should have the same length as the shape of
-                                        the network. If None, all directional couplers
-                                        default to a coupling of 0.5.
-            lengths (numpy ndarray) : optional. Lengths of the directional couplers. If None
-                                        all lengths will be equal to the length of the
-                                        specified directional coupler.
-            phases (numpy ndarray) : optional. Phases introduced by the directional couplers. If None
-                                        all phases will be coupled to the length of the direcional coupler.
-            terms A dictionary with source and Detector locations in the form
-                    terms = {3:Source(), 15:Detector(), ...}.
-                    any other not specified terms will be terminated by terms['default'].
-                    If the 'default' key is not specified in terms, the other free nodes will
-                    be terminated by a Term().
+            shape: (tuple): shape of the network.
+            dc (DirectionalCoupler) : master directional coupler. All the directional
+                couplers will take over the properties of this directional coupler,
+                except when explicitly overwritten.
+            wg (Waveguide): a waveguide containing all the properties of a single
+                directional coupler arm, such as the length and the effective index.
+            couplings=None (np.ndarray): Desired couplings for the grating couplers. This
+                array should have the same length as the shape of the network. If None,
+                all directional couplers default to the coupling of the master directional
+                coupler.
+            lengths=None (np.ndarray): Lengths of the directional couplers.
+                If None all lengths will be equal to the length of the master
+                directional coupler.
+            phases=None (np.ndarray): optional. Phases introduced by the directional
+                couplers. If None all phases will be coupled to the length of the
+                direcional coupler.
+            terms (dict): A dictionary with source and Detector locations in the form
+                terms = {3:Source(), 15:Detector(), ...}. All not specified port locations
+                will get a Connection as term, as to make it possible to connect to
+                other networks (while keeping the port order).
 
         Note:
             The directional coupler and the waveguide will be combined in a
             DirectionalCouplerWithLength. This conversion happens internally and is not
             required up front.
+
         '''
 
         Component.__init__(self, name=name)
@@ -141,6 +145,9 @@ class DirectionalCouplerNetwork(Network, Component):
             terms = {}
         self.num_terms = 8 + 2*(I-2) + 2*(J-2)
         self.terms = OrderedDict(terms)
+        for t in range(self.num_terms):
+            if t not in self.terms:
+                self.terms[t] = Connection(name='t'+str(t))
 
         # save order of terms (to reorder in terms clockwise direction):
         self._order = Buffer(torch.from_numpy(np.hstack((
@@ -169,11 +176,11 @@ class DirectionalCouplerNetwork(Network, Component):
             term = Term()
         if self.is_cuda:
             term = term.cuda()
-        for t in range(self.num_terms):
-            if t not in self.terms:
+        for k, t in list(self.terms.items()):
+            if isinstance(t, Connection):
                 term = term.copy()
-                term.name = str(t)
-                self.terms[t] = term
+                term.name = t.name
+                self.terms[k] = term
                 setattr(self, term.name, term)
         return self
 
