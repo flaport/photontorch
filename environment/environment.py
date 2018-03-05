@@ -14,6 +14,7 @@ This class contains all the necessary parameters to initialize a network for a s
 # Standard Library
 import warnings
 from copy import deepcopy
+from collections import OrderedDict
 
 # Torch
 import torch
@@ -166,11 +167,24 @@ class Environment(object):
 
     def __repr__(self):
         ''' String Representation of the environment '''
-        s = 'Simulation Environment:\n'
-        for k, v in self.__dict__:
-            if k == '_dt':
-                k = 'dt'
-            s = r'%s\t:\t%s'%(str(k), str(v))
+        env = OrderedDict()
+        _env = deepcopy(self.__dict__)
+        env['name'] = _env.pop('name',None)
+        env['dt'] = '%.2e'%_env.pop('_dt', None)
+        env['t_start'] = '%.2e'%self.t_start if self.t_start != 0 else 0
+        env['t_end'] = '%.2e'%self.t_end if self.t_end != 0 else 0
+        del _env['t']
+        wls = _env.pop('wls', None)
+        if wls is not None and len(self.wls) == 1:
+            env['wl'] = '%.2e'%wls[0]
+        else:
+            env['wls'] = _env.pop('wls')
+        env.update(_env)
+
+        s =     'Simulation Environment:\n'
+        s = s + '-----------------------\n'
+        for k, v in env.items():
+            s = s + '%s : %s\n'%(str(k), str(v))
         return s
 
     def __str__(self):
