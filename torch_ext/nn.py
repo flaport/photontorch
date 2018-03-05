@@ -95,8 +95,8 @@ class BoundedParameter(_Module_):
     def __repr__(self):
         ''' String representation of a bounded parameter '''
         if self.bounds is not None:
-            b0 = '0' if bounds[0] == 0 else '%.2f'%bounds[0] if abs(bounds[0]) > 0.01 else '%.2e'%bounds[1]
-            b1 = '0' if bounds[1] == 0 else '%.2f'%bounds[1] if abs(bounds[1]) > 0.01 else '%.2e'%bounds[1]
+            b0 = '0' if self.bounds[0] == 0 else '%.2f'%self.bounds[0] if abs(self.bounds[0]) > 0.01 else '%.2e'%self.bounds[1]
+            b1 = '0' if self.bounds[1] == 0 else '%.2f'%self.bounds[1] if abs(self.bounds[1]) > 0.01 else '%.2e'%self.bounds[1]
             bounds = '('+b0+','+b1+')'
             name = 'BoundedParameter with bounds '+bounds+':'
         else:

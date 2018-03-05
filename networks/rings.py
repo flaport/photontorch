@@ -34,7 +34,7 @@ class AllPass(Network):
 
     Connections:
         allpass['ij']
-            ___
+             ___
             /   \
             \___/
         i-----------j
@@ -172,6 +172,36 @@ class RingNetwork(DirectionalCouplerNetwork):
             terms=terms,
             name=name,
         )
+        ''' RingNetwork
+
+        Args:
+            shape: (tuple): shape of the network.
+            dc (DirectionalCoupler) : master directional coupler. All the directional
+                couplers will take over the properties of this directional coupler,
+                except when explicitly overwritten.
+            wg (Waveguide): a waveguide containing all the properties of a single
+                directional coupler arm, such as the length and the effective index.
+            couplings=None (np.ndarray): Desired couplings for the grating couplers. This
+                array should have the same length as the shape of the network. If None,
+                all directional couplers default to the coupling of the master directional
+                coupler.
+            lengths=None (np.ndarray): Lengths of the directional couplers.
+                If None all lengths will be equal to the length of the master
+                directional coupler.
+            phases=None (np.ndarray): optional. Phases introduced by the directional
+                couplers. If None all phases will be coupled to the length of the
+                direcional coupler.
+            terms (dict): A dictionary with source and Detector locations in the form
+                terms = {3:Source(), 15:Detector(), ...}. All not specified port locations
+                will get a Connection as term, as to make it possible to connect to
+                other networks (while keeping the port order).
+
+        Note:
+            The directional coupler and the waveguide will be combined in a
+            DirectionalCouplerWithLength. This conversion happens internally and is not
+            required up front.
+
+        '''
         # Change default term order to term order of ring network
         I, J = self.shape
         k0 = (I%2 == 0) & (J%2 == 1)
@@ -266,7 +296,7 @@ class RingNetworkExample(Network):
             wg=Waveguide(length=min_length, neff=_env.neff, length_bounds=(min_length, max_length)), # Base Waveguide
             lengths = min_length + r.rand(6,6)*(max_length-min_length), # override initial waveguide lengths
             name='dcnw',
-        ).terminate(term=Connection()) # Terminate the network with a connection to the outside
+        )
 
         # waveguide definition for the outside of the network:
         def wg():
