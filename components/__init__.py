@@ -24,6 +24,9 @@ from .terms import Detector
 # Mirrors
 from .mirrors import Mirror
 
+# MMIs
+from .mmis import Mmi21
+
 # Waveguides
 from .waveguides import Waveguide
 from .waveguides import Connection
