@@ -90,6 +90,7 @@ import matplotlib.pyplot as plt
 from .connector import Connector
 from ..components.component import Component
 from ..components.terms import Term
+from ..components.terms import Source
 from ..components.terms import Detector
 from ..torch_ext.autograd import block_diag
 from ..torch_ext.autograd import batch_block_diag
@@ -148,8 +149,14 @@ class Network(Component, SourceInjector):
             nw = Network(wg1['ij']*dc['jklm']*wg2['mn'])
 
         Note:
-            The initializer of the network does not check if the number of indices
+            - The initializer of the network does not check if the number of indices
             given corresponds to the number of ports in the component.
+            - Alternatively, if you run out of letters, you can also index with an
+            integer:
+                conn = comp['ijkl'] = comp[106,107,108,109]
+            This can be useful for very large networks. However, note that these
+            integers are internally converted back into a string and that you thus
+            need python 3 with native unicode support for integers > 256.
         '''
 
         Component.__init__(self, name=kwargs.pop('name', None))
@@ -473,8 +480,8 @@ class Network(Component, SourceInjector):
         for i in range(self.env.num_timesteps):
 
             # get state
-            rx = torch.sum(self.buffermask*rbuffer, dim=0) + source[0,i].clone()
-            ix = torch.sum(self.buffermask*ibuffer, dim=0) + source[1,i].clone()
+            rx = torch.sum(self.buffermask*rbuffer, dim=0) + source[0,i]
+            ix = torch.sum(self.buffermask*ibuffer, dim=0) + source[1,i]
 
             # connect memory-less components
             # rx and ix need to be calculated at the same time because of dependencies on each other
@@ -533,17 +540,29 @@ class Network(Component, SourceInjector):
         plt.legend()
         return plots
 
+    @property
+    def sources(self):
+        ''' get a tuple with all the sources in the network '''
+        return (comp for comp in self.components if isinstance(comp, Source))
+
+    @property
+    def detectors(self):
+        ''' get a tuple with all the detectors in the network '''
+        return (comp for comp in self.components if isinstance(comp, Detector))
 
     @property
     def delays(self):
+        ''' get all the delays in the network '''
         return torch.cat([comp.delays for comp in self.components])
 
     @property
     def detectors_at(self):
+        ''' get the locations of the detectors in the network '''
         return torch.cat([comp.detectors_at for comp in self.components])
 
     @property
     def sources_at(self):
+        ''' get the locations of the sources in the network '''
         return torch.cat([comp.sources_at for comp in self.components])
 
     @property

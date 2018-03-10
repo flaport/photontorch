@@ -84,11 +84,13 @@ class ConstantSource(BaseSource):
         Create a source with constant amplitude
 
         Args:
-            amplitude=1 (float): the amplitude of the network. One can also specify an
-                array of amplitudes, corresponding to the different batches of the simulation
-
-        Note:
-            Different amplitudes for different source nodes is not yet supported.
+            amplitude=1 (float | dict):
+                * float: the amplitude of the network. One can also specify an
+                    array of amplitudes, corresponding to the different batches of the simulation
+                    If a float is given, all Source terms will get the same amplitude
+                * dict: One can also specify a dictionary with amplitudes. The keys
+                    specify the name of the Source Term, while the values specify the
+                    amplitude.
 
         '''
         # initialize the base version
@@ -96,46 +98,71 @@ class ConstantSource(BaseSource):
         BaseSource.__init__(self)
 
         # shape of the virtual array returned by this source:
-        self.real_source = self.nw.new_variable(self.nw.zeros((
+        real_source = self.nw.zeros((
             self.nw.env.num_wl, # number of wavelengths in the simulation
             self.nw.nmc, # number of memory containing nodes in the network
             self.nw.env.num_batches, # number of parallel simulations
-        ), cuda=self.nw.is_cuda))
-        self.imag_source = torch.zeros_like(self.real_source)
-
+        ))
+        imag_source = torch.zeros_like(real_source)
 
         # set amplitude of the source nodes to one
         # remember that the source nodes are the first nodes listed in the network
-        self.real_source[:, :self.nw.num_sources] = 1
-        self.imag_source[:, :self.nw.num_sources] = 1
+        real_source[:, :self.nw.num_sources] = 1
+        imag_source[:, :self.nw.num_sources] = 1
 
+        # change amplitudes from 1 to specified amplitude.
+        if isinstance(amplitude, dict):
+            for i, source in enumerate(self.nw.sources):
+                if source.name in amplitude:
+                    amp = amplitude[source.name]
+                    real_amplitude, imag_amplitude = self._handle_amplitude(amp)
+                    real_source[:,i:i+1,:] *= real_amplitude
+                    imag_source[:,i:i+1,:] *= imag_amplitude
+        else:
+            real_amplitude, imag_amplitude = self._handle_amplitude(amplitude)
+            real_source *= real_amplitude
+            imag_source *= imag_amplitude
+
+        # save source values as variables
+        self.real_source = self.nw.new_variable(real_source)
+        self.imag_source = self.nw.new_variable(imag_source)
+
+    def _handle_amplitude(self, amplitude):
+        ''' Handle the amplitude of the source to form a torch FloatTensor
+
+        Args:
+            amplitude (float | np.ndarray | torch.Tensor): the amplitude of the source.
+                if an array is given, the different amplitudes correspond to different
+                batches.
+
+        Returns:
+            real_amplitude (torch.FloatTensor), imag_amplitude (torch.FloatTensor)
+        '''
         # make amplitude a tensor:
-        if torch.is_tensor(amplitude):
-            amplitude = self.nw.new_variable(amplitude)
         if is_variable(amplitude):
+            amplitude = amplitude.data
+        if torch.is_tensor(amplitude):
             real_amplitude = amplitude
             imag_amplitude = torch.zeros_like(amplitude)
         else:
             real_amplitude = np.asarray(np.real(amplitude))
             imag_amplitude = np.asarray(np.imag(amplitude))
-            if real_amplitude.ndim == 0: # Torch cannot handle 0D tensors
-                real_amplitude = real_amplitude[None] # make 1D
-                imag_amplitude = imag_amplitude[None] # make 1D
+            if real_amplitude.ndim == 0: # Torch cannot _handle 0D tensors
+                real_amplitude = real_amplitude[None] # make 1D (will cast to # batches)
+                imag_amplitude = imag_amplitude[None] # make 1D (will cast to # batches)
             # make a tensor from the amplitude:
-            real_amplitude = self.nw.new_variable(torch.from_numpy(real_amplitude))
-            imag_amplitude = self.nw.new_variable(torch.from_numpy(imag_amplitude))
+            real_amplitude = self.nw.new_tensor(real_amplitude)
+            imag_amplitude = self.nw.new_tensor(imag_amplitude)
 
         # make sure the amplitude is a 3D tensor (so it can cast to the shape of the source)
-        if len(real_amplitude.size()) == 1:
+        if len(real_amplitude.size()) == 1: # will cast to # nodes
             real_amplitude.unsqueeze_(0)
             imag_amplitude.unsqueeze_(0)
-        if len(real_amplitude.size()) == 2:
+        if len(real_amplitude.size()) == 2: # will cast to # timesteps
             real_amplitude.unsqueeze_(0)
             imag_amplitude.unsqueeze_(0)
 
-        # multiply the source (right now still with amplitude 1) with the amplitude:
-        self.real_source *= real_amplitude
-        self.imag_source *= imag_amplitude
+        return real_amplitude, imag_amplitude
 
     def __getitem__(self, key):
         ''' Get the source signal at a certain timestep.
@@ -160,44 +187,93 @@ class TimeSource(ConstantSource):
         ''' TimeSource
 
         Args:
-            signal (np.ndarray): the time signal of the source.
+            signal (np.ndarray | dict): the time signal of the source.
         '''
-        ConstantSource.__init__(self, 1)
-        self.store_signal(signal)
+        # Initialize with amplitude 1 at the active source nodes
+        if isinstance(signal, dict):
+            ConstantSource.__init__(self, amplitude={k:1 for k in signal})
+            self.loc = [i for i, src in enumerate(self.nw.sources) if src.name in signal]
+            real_signals, imag_signals = [], []
+            for sgl in signal.values():
+                r_sgl, i_sgl = self._handle_signal(sgl)
+                real_signals += [r_sgl]
+                imag_signals += [i_sgl]
+            real_signal = torch.cat(real_signals, dim=1)
+            imag_signal = torch.cat(imag_signals, dim=1)
+        else:
+            ConstantSource.__init__(self, amplitude=1)
+            self.loc = slice(None, None, None)
+            real_signal, imag_signal = self._handle_signal(signal)
 
-    def store_signal(self, signal):
-        ''' Handle and store the time signal of the source into a torch FloatTensor
+        self.real_signal = self.nw.new_variable(real_signal)
+        self.imag_signal = self.nw.new_variable(imag_signal)
 
-        This method sets the attributes real_source and imag_source.
+    @property
+    def signal(self):
+        ''' Numpy representation of the source signal '''
+        signal = self.real_signal.data.cpu().numpy()
+        isignal = self.imag_signal.data.cpu().numpy()
+        if not (isignal == 0).all():
+            signal = np.asarray(signal, dtype=complex)
+            signal += 1j*isignal
+        return signal
+
+    def _handle_signal(self, signal):
+        ''' Handle the time signal of the source to form a torch FloatTensor
 
         Args:
-            signal (np.ndarray): the time signal of the source. If a 2D signal is given,
-                then he second dimension signifies the different signal for different batches.
+            signal (np.ndarray | torch.Tensor): the time signal of the source. if a 2D
+                array is given, the second dimension corresponds to the different
+                batches.
 
-        Note:
-            different source signals for different input nodes is not yet supported.
+        Returns:
+            real_signal (torch.FloatTensor), imag_signal (torch.FloatTensor)
         '''
-        if isinstance(signal, np.ndarray):
-            real_signal = self.nw.new_variable(np.real(signal))
-            imag_signal = self.nw.new_variable(np.imag(signal))
-        elif torch.is_tensor(signal):
-            real_signal = self.nw.new_variable(signal)
-            imag_signal = torch.zeros_like(real_signal)
-        else:
+        # make amplitude a tensor:
+        if is_variable(signal):
+            signal = signal.data
+        if torch.is_tensor(signal):
             real_signal = signal
-            imag_signal = torch.zeros_like(real_signal)
-        self.real_signal = real_signal
-        self.imag_signal = imag_signal
-        self.is_real = (self.imag_signal == 0).all()
-        # Store numpy version of the signal for fast acces:
-        self.signal = self.real_signal.data.cpu().numpy()
-        if not self.is_real:
-            self.signal = np.asarray(self.signal, dtype=complex)
-            self.signal += self.imag_signal.data.cpu().numpy()
+            imag_signal = torch.zeros_like(signal)
+        else:
+            real_signal = self.nw.new_tensor(np.asarray(np.real(signal)))
+            imag_signal = self.nw.new_tensor(np.asarray(np.imag(signal)))
 
-        if len(self.real_signal.size()) == 1:
-            self.real_signal.unsqueeze_(1)
-            self.imag_signal.unsqueeze_(1)
+        # make sure the signal is a 3D tensor (so it can cast to the shape of the source)
+        if len(real_signal.size()) == 1: # will cast to # batches
+            real_signal.unsqueeze_(-1)
+            imag_signal.unsqueeze_(-1)
+        if len(real_signal.size()) == 2: # will cast to # nodes
+            real_signal.unsqueeze_(1)
+            imag_signal.unsqueeze_(1)
+
+        return real_signal, imag_signal
+
+    def expand(self, clear_memory=False):
+        ''' Create a full torch variable from the current source
+
+        Using an expanded source will speed up simulations in exchange for more RAM usage.
+
+        Args:
+            clear_memory=False (bool): clear the memory (this will make the current source
+            unusable.)
+
+        Returns
+            A torch variable containing all the source data for all the MC nodes of the
+            network.
+
+        '''
+        ret = self.nw.new_variable(torch.zeros(self.size()))
+        ret[:,:,self.loc,:] = torch.cat((
+            self.real_signal*self.real_source[:,self.loc],
+            self.imag_signal*self.imag_source[:,self.loc],
+        ), dim=0)
+        # free up memory
+        if clear_memory:
+            for k in self.__dict__.keys():
+                self.__delattr__(k)
+            del self
+        return ret
 
     def __getitem__(self, key):
         ''' Get the source signal at a certain timestep.
@@ -210,10 +286,13 @@ class TimeSource(ConstantSource):
         if time_idx >= self.real_signal.shape[0]:
             return 0*self.real_source # no signal anymore
         elif key[0] == 0: # Real Part
-            return self.real_signal[time_idx]*self.real_source
+            ret = torch.zeros_like(self.real_source)
+            ret[:,self.loc] = self.real_signal[time_idx:time_idx+1]*self.real_source[:,self.loc]
+            return ret
         elif key[0] == 1: # Imag Part
-            return self.imag_signal[time_idx]*self.real_source # self.real_source, because we
-                                                               # initialized with amplitude 1.
+            ret = torch.zeros_like(self.imag_source)
+            ret[:,self.loc] = self.imag_signal[time_idx:time_idx+1]*self.imag_source[:,self.loc]
+            return ret
 
 
 ################
@@ -222,33 +301,28 @@ class TimeSource(ConstantSource):
 
 class BitSource(TimeSource):
     ''' A source with a bit stream as signal '''
-    def __init__(self, bits, bitrate, rising_fraction=0.1):
+    def __init__(self, bits, bitrate, rising_fraction=0.1, amplitude=1):
         ''' BitSource
 
         Args:
-            bits (np.ndarray(bool)): The bits to create the signal for. If a 2D bit array
-                is given, then the second dimension results in different bits for different batches.
+            bits (np.ndarray(bool) | dict): The bits to create the signal for.
+                If a 2D bit array is given, then the second dimension results in
+                different bits for different batches. A dictionary of bits is also
+                possible: in that case, the keys correspond to the names of the different
+                Source Terms.
             bitrate: The bitrate of the signal.
+            amplitude = (float | dict): The amplitude of the bitstream. If a dictionary
+                is specified, the keys indicate the name of the Source Term and the
+                values their respective amplitude.
             rising_fraction: The fraction of the bit period that the signal rises or falls
 
-        Note:
-            Different bit signals for different input nodes (or different amplitudes for
-            different input nodes) is not yet supported.
-
         '''
-
-        # set variables
-        self.bits = np.asarray(bits)
-        if self.bits.ndim == 1: # bits should be 2D
-            self.bits = self.bits[:,None]
+        self.amplitude = amplitude
         self.samplerate = 1/self.nw.env.dt
         self.rising_fraction = rising_fraction
-
-        # set properties:
-        self.bitrate = bitrate
-
-        # finish initialization
-        TimeSource.__init__(self, self.signal)
+        self.bitlength = int(self.samplerate/bitrate + 0.5)
+        self.bits = self._handle_bits(bits)
+        TimeSource.__init__(self, self._signal(self.bits, self.amplitude))
 
     @property
     def bitrate(self):
@@ -277,8 +351,7 @@ class BitSource(TimeSource):
             small, this difference will be negligeable.
 
         '''
-        self.bitlength = int(self.samplerate/value + 0.5)
-        self.store_signal(self._signal(self.bits))
+        self.__init__(self.bits, value, self.rising_fraction, self.weights)
 
     @property
     def riselength(self):
@@ -289,15 +362,36 @@ class BitSource(TimeSource):
         '''
         return int(self.rising_fraction*self.bitlength+0.5)
 
-    def _signal(self, bits):
+    def _handle_bits(self, bits):
+        ''' Create numpy array of bits in the expected form '''
+        if isinstance(bits, dict):
+            return {k:self._handle_bits(b) for k, b in bits.items()}
+        bits = np.asarray(bits)
+        if bits.ndim == 1: # bits should be 2D
+            bits = bits[:,None]
+        return bits
+
+    def _signal(self, bits, amplitude=1):
         ''' Calculate a bit signal according to the specified bits
 
         Args:
-            bits: (np.ndarray(bool)): The bits to calculate the signal for.
+            bits: (np.ndarray(bool) | dict): The bits to calculate the signal for. If
+                a dictionary is specified, then the keys signify the Source Term name
+                and the value specify the bits for that source term.
+            amplitude=1 (float | dict): The amplitude / phase for the different input
+                Source Terms. In case of a dictionary, the keys specifiy the source
+                term name and the values specify the source term amplitudes/phases.
 
         Returns:
             np.ndarray: the bit stream signal.
         '''
+        if isinstance(bits, dict) and isinstance(amplitude, dict):
+            return {k:self._signal(b,amplitude=amplitude.get(k,1)) for k, b in bits.items()}
+        elif isinstance(amplitude, dict):
+            return {k:self._signal(bits, a) for k, a in amplitude.items()}
+        elif isinstance(bits, dict):
+            return {k:self._signal(b) for k, b in bits.items()}
+
         crop_start = self.bitlength // 2
         crop_end = self.bitlength // 2 + self.bitlength % 2
 
@@ -309,7 +403,7 @@ class BitSource(TimeSource):
             batch_signal = np.hstack([self._edge(b1, b2) for b1, b2 in zip(_bits,bits_)])
             signals[i] = batch_signal[crop_start:-crop_end]
 
-        signal = np.stack(signals, -1)
+        signal = float(amplitude)*np.stack(signals, -1)
         return signal
 
     def _edge(self, b1, b2):
