@@ -323,14 +323,3 @@ class DirectionalCouplerNetwork(Network, Component):
         if self.initialized:
             new.initialize(self.env.copy())
         return new
-
-    def __getitem__(self, key):
-        '''
-        Special getitem.
-        A string will create a connector, while any other key will be passed to the
-        dc_array.
-        '''
-        if isinstance(key, str):
-            return Component.__getitem__(self, key)
-        # else:
-        return self.dc_array.__getitem__(key)
