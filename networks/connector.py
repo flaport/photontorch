@@ -6,12 +6,6 @@ together into a Network.
 '''
 
 ###############
-## Constants ##
-###############
-
-CHARS = ''.join([chr(i) for i in range(256)]).replace(',','')
-
-###############
 ## Connector ##
 ###############
 
@@ -51,6 +45,15 @@ class Connector(object):
 
           conn = comp['ijkl']
 
+        - As an alternative to a string index, a tuple of integers can be given. These
+          integers will be converted internally to a string:
+
+          conn = comp['ijkl'] = comp[106,107,108,109]
+
+          This can be useful for creating very large networks and when you run
+          out of strings to index (Note that in python 2, the maximum integer number
+          is 256, as unicode is not natively supported)
+
         - The connector does not check whether the number of indices given does correspond
           to the number of ports of the component.
 
@@ -60,6 +63,10 @@ class Connector(object):
         Please do not use this initializer directly. In stead use the __getitem__ of a component.
         comp['ijkl'] -> Conn('ijkl',[comp])
         '''
+        if not isinstance(s, (str, tuple, list)):
+            s = [s]
+        if isinstance(s, (tuple, list)):
+            s = ''.join(i if isinstance(i, str) else chr(i) for i in s)
         if s[0] == ',':
             self.__init__(s[1:], components)
             return
@@ -73,14 +80,6 @@ class Connector(object):
     def idxs(self):
         ''' Get free indices of the connector object '''
         return self._idxs(self.s)
-
-    @property
-    def _available_idxs(self):
-        ''' Get the available indices of the component '''
-        s = CHARS
-        for c in self.idxs:
-            s = s.replace(c, '')
-        return s
 
     def _idxs(self, s):
         if ',' in s:
