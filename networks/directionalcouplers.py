@@ -143,7 +143,7 @@ class DirectionalCouplerNetwork(Network, Component):
         # Create term dictionary
         if terms is None:
             terms = {}
-        self.num_terms = 8 + 2*(I-2) + 2*(J-2)
+        self.num_terms = 2*I + 2*J
         self.terms = OrderedDict(terms)
         for t in range(self.num_terms):
             if t not in self.terms:
@@ -152,10 +152,10 @@ class DirectionalCouplerNetwork(Network, Component):
         # save order of terms (to reorder in terms clockwise direction):
         self._order = Buffer(torch.from_numpy(np.hstack((
             np.arange(1, J+2, 1), # North row
-            np.arange(J+3, 4+(J-2)+2*(J-2), 2), # East column
-            [8+2*(I-2)+2*(J-2)-2, 8+2*(I-2)+2*(J-2)-1], # South-East Corner
-            np.arange(4+(J-2)+2*(I-2), 8+2*(I-2)+2*(J-2)-2, 1)[::-1], #South Row
-            np.arange(J+2, 4+(J-2)+2*(J-2), 2)[::-1], # left column
+            np.arange(J+3, (J+3)+2*(I-2), 2), # East column
+            [2*J+2*(I-2)+2, 2*J+2*(I-2)+3], # South-East Corner
+            np.arange(J+2*(I-2)+2, 2*J+2*(I-2)+2, 1)[::-1], #South Row
+            np.arange(J+2, J+2*(I-2)+2, 2)[::-1], # left column
             [0], # half of north west corner
         ))).long())
 
