@@ -64,6 +64,9 @@ from . import network
 # Base Network
 from .network import Network
 
+# Array Network
+from .array import ArrayNetwork
+
 # Ring Networks
 from .rings import AllPass
 from .rings import AddDrop
