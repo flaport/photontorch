@@ -209,10 +209,10 @@ class RingNetwork(DirectionalCouplerNetwork):
         self._order = Buffer(torch.from_numpy(np.hstack((
             np.arange(1, J, 1), # North row
             [J, J+1] if J%2 else [J+1, J], #North East Corner
-            np.arange(J+3, 4+(J-2)+2*(J-2), 2), # East column
-            [8+2*(I-2)+2*(J-2)-2+k0, 8+2*(I-2)+2*(J-2)-2+k1], # South-East Corner
-            np.arange(4+(J-2)+2*(I-2), 8+2*(I-2)+2*(J-2)-2, 1)[::-1], #South Row
-            np.arange(J+2, 4+(J-2)+2*(J-2), 2)[::-1], # left column
+            np.arange(J+3, J+2+2*(I-2), 2), # East column
+            [2*J+2*(I-2)+2+k0, 2*J+2*(I-2)+2+k1], # South-East Corner
+            np.arange(J+2*(I-2)+2, 2*J+2*(I-2)+2, 1)[::-1], #South Row
+            np.arange(J+2, J+2*(I-2)+2, 2)[::-1], # left column
             [0], # half of north west corner
         ))).long())
 
