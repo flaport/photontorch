@@ -59,6 +59,7 @@ from .components.mirrors import Mirror
 
 # MMIs
 from .components.mmis import Mmi21
+from .components.mmis import Mmi33
 
 # Waveguides
 from .components.waveguides import Waveguide
@@ -77,6 +78,9 @@ from .components.directionalcouplers import DirectionalCouplerWithLength
 
 # Base Network
 from .networks.network import Network
+
+# Array Network
+from .networks.array import ArrayNetwork
 
 # Ring Networks
 from .networks.rings import AllPass

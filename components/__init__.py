@@ -26,6 +26,7 @@ from .mirrors import Mirror
 
 # MMIs
 from .mmis import Mmi21
+from .mmis import Mmi33
 
 # Waveguides
 from .waveguides import Waveguide
