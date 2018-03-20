@@ -57,6 +57,9 @@ from .components.terms import Detector
 # Mirrors
 from .components.mirrors import Mirror
 
+# SOAs
+from .components.soas import SimpleSoa
+
 # MMIs
 from .components.mmis import Mmi21
 from .components.mmis import Mmi33
@@ -78,6 +81,10 @@ from .components.directionalcouplers import DirectionalCouplerWithLength
 
 # Base Network
 from .networks.network import Network
+
+# Matrix Network
+from .networks.matrix import MatrixNetwork
+from .networks.matrix import UnitaryMatrixNetwork
 
 # Array Network
 from .networks.array import ArrayNetwork
