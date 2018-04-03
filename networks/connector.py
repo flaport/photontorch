@@ -67,14 +67,17 @@ class Connector(object):
             s = [s]
         if isinstance(s, (tuple, list)):
             s = ''.join(i if isinstance(i, str) else chr(i) for i in s)
-        if s[0] == ',':
+        if len(s) > 0  and s[0] == ',':
             self.__init__(s[1:], components)
             return
-        if s[-1] == ',':
+        if len(s) > 0 and s[-1] == ',':
             self.__init__(s[:-1], components)
             return
         self.s = s
         self.components = components
+    
+    def copy(self):
+        return Connector(self.s, [comp.copy() for comp in self.components])
 
     @property
     def idxs(self):
