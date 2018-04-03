@@ -88,6 +88,8 @@ class BoundedParameter(_Module_):
             self._datavar = Buffer(data=data, requires_grad=False)
         else: # If the bounds are valid, we normalize the data between 0 and 1 and calculate its
               # weights by taking the inverse sigmoid
+            if ((data < bounds[0]) | (data > bounds[1])).any():
+                raise ValueError('BoundedParameters data is not compatible with bounds')
             scaled_data = (data - bounds[0])/(bounds[1]-bounds[0])
             weights = -torch.log(1/scaled_data-1) # inverse sigmoid
             self.weights = Parameter(data=weights, requires_grad=requires_grad)
