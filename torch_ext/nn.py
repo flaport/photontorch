@@ -381,6 +381,18 @@ class Module(_Module_):
         )
         return data
 
+    def fix(self):
+        ''' Make all parameters of the module untrainable '''
+        def fix(module):
+            ''' helper function '''
+            for k,v in module._modules.items():
+                module._modules[k] = fix(v)
+            for k in module._parameters.keys():
+                data = module._parameters.pop(k).data
+                module.register_buffer(k, Buffer(data))
+            return module
+        return fix(self)
+
     def copy(self):
         ''' Create a deep copy of the Module '''
         return copy.deepcopy(self)
