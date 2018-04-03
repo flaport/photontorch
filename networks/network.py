@@ -457,21 +457,25 @@ class Network(Component, SourceInjector):
         return rbuffer, ibuffer
 
     @require_initialization
-    def forward(self, source):
+    def forward(self, source, power=True):
         '''
         Forward pass of the network.
 
         Args:
             source : should be a FloatTensor of size
-                    (2 = (real|imag), # time, # wavelength, # mc nodes, # batches)
-             OR     a Source object from photontorch.sources that returns a FloatTensor when
-                     indexed.
+                (2 = (real|imag), # time, # wavelength, # mc nodes, # batches) OR a
+                Source object from photontorch.sources that returns a FloatTensor when
+                indexed.
+            power=True (bool): Wether to return a real-valued power or the
+                complex-valued field.
 
         Returns:
-            detected (torch.Floattensor): a tensor with shape (# time, # wavelengths, # detectors, # batches)
+            detected (torch.Floattensor): a tensor with shape
+            (# time, # wavelengths, # detectors, # batches) if power==True
+            (2 = (real|imag), # time, # wavelengths, # detectors, # batches) if power==False
         '''
 
-        detected = self.new_variable(self.zeros((self.env.num_timesteps, self.env.num_wl, self.nmc, self.env.num_batches)))
+        detected = self.new_variable(self.zeros((2, self.env.num_timesteps, self.env.num_wl, self.nmc, self.env.num_batches)))
 
         ## Get new buffer
         rbuffer, ibuffer = self.new_buffer()
@@ -488,7 +492,8 @@ class Network(Component, SourceInjector):
             rx, ix = (self._rC).bmm(rx) - (self._iC).bmm(ix), (self._rC).bmm(ix) + (self._iC).bmm(rx)
 
             # get output state
-            detected[i] = torch.pow(rx, 2) + torch.pow(ix, 2)
+            detected[0, i] = rx
+            detected[1, i] = ix
 
             # connect memory-containing components
             # rx and ix need to be calculated at the same time because of dependencies on each other
@@ -498,7 +503,11 @@ class Network(Component, SourceInjector):
             rbuffer = torch.cat((rx.unsqueeze(0), rbuffer[0:-1]), dim=0)
             ibuffer = torch.cat((ix.unsqueeze(0), ibuffer[0:-1]), dim=0)
 
-        return detected[:, :, -self.num_detectors:]
+        detected = detected[:, :, :, -self.num_detectors:]
+        if power:
+            detected = detected[0]**2 + detected[1]**2
+
+        return detected
 
     def plot(self, type, detected, **kwargs):
         ''' Plot detected power versus time or wavelength
@@ -539,6 +548,10 @@ class Network(Component, SourceInjector):
             plot.set_label(label + ': ' + name if label != '' else name)
         plt.legend()
         return plots
+
+    @property
+    def terminated(self):
+        return ((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).all()
 
     @property
     def sources(self):
