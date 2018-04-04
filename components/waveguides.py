@@ -69,13 +69,15 @@ class Waveguide(Connection):
             dtype='double',
             requires_grad=(length_bounds is not None) and (length_bounds[0]!=length_bounds[1]),
         )
-        self.phase = None
         if phase is not None:
+            no_bounds = phase_bounds is None
             self.phase = self.new_bounded_parameter(
                 data=phase%(2*np.pi),
                 bounds=phase_bounds,
-                requires_grad=(phase_bounds is not None) and (phase_bounds[0] != phase_bounds[1]),
+                requires_grad=no_bounds or ((not no_bounds) and (phase_bounds[0] != phase_bounds[1])),
             )
+        else:
+            self.phase = None
 
     @property
     def delays(self):
