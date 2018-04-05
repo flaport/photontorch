@@ -64,6 +64,10 @@ from . import network
 # Base Network
 from .network import Network
 
+# Matrix Networks
+from .matrix import MatrixNetwork
+from .matrix import UnitaryMatrixNetwork
+
 # Array Network
 from .array import ArrayNetwork
 
