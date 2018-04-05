@@ -200,7 +200,7 @@ class Network(Component, SourceInjector):
     def copy(self):
         ''' create a (deep) copy of the network '''
         components = [comp.copy() for comp in self.components]
-        new = self.__class__(self.s, *components)
+        new = self.__class__(self.s, *components, name=self.name)
         if self.initialized:
             new.initialize(self.env.copy())
         return new
@@ -277,12 +277,8 @@ class Network(Component, SourceInjector):
 
         ## Check if network is fully connected
         C = self.C
-        fully_connected = ((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).all()
-        if not fully_connected:
-            def forward(*args, **kwargs):
-                ''' Forward function for not fully connected Nework '''
-                raise ValueError('Network not Fully Connected')
-            self.forward = forward
+        self.fully_connected = ((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).all()
+        if not self.fully_connected:
             return # Stop initialization here.
 
         ## delays
@@ -474,8 +470,15 @@ class Network(Component, SourceInjector):
             (# time, # wavelengths, # detectors, # batches) if power==True
             (2 = (real|imag), # time, # wavelengths, # detectors, # batches) if power==False
         '''
-
-        detected = self.new_variable(self.zeros((2, self.env.num_timesteps, self.env.num_wl, self.nmc, self.env.num_batches)))
+        if power:
+            detected = self.new_variable(self.zeros((self.env.num_timesteps, self.env.num_wl, self.num_detectors, self.env.num_batches)))
+            def update_detected():
+                detected[i] = (torch.pow(rx, 2) + torch.pow(ix, 2))[:,-self.num_detectors:]
+        else:
+            detected = self.new_variable(self.zeros((2, self.env.num_timesteps, self.env.num_wl, self.num_detectors, self.env.num_batches)))
+            def update_detected():
+                detected[0,i] = rx[:,-self.num_detectors:]
+                detected[1,i] = ix[:,-self.num_detectors:]
 
         ## Get new buffer
         rbuffer, ibuffer = self.new_buffer()
@@ -491,9 +494,7 @@ class Network(Component, SourceInjector):
             # rx and ix need to be calculated at the same time because of dependencies on each other
             rx, ix = (self._rC).bmm(rx) - (self._iC).bmm(ix), (self._rC).bmm(ix) + (self._iC).bmm(rx)
 
-            # get output state
-            detected[0, i] = rx
-            detected[1, i] = ix
+            update_detected()
 
             # connect memory-containing components
             # rx and ix need to be calculated at the same time because of dependencies on each other
@@ -502,10 +503,6 @@ class Network(Component, SourceInjector):
             # update buffer
             rbuffer = torch.cat((rx.unsqueeze(0), rbuffer[0:-1]), dim=0)
             ibuffer = torch.cat((ix.unsqueeze(0), ibuffer[0:-1]), dim=0)
-
-        detected = detected[:, :, :, -self.num_detectors:]
-        if power:
-            detected = detected[0]**2 + detected[1]**2
 
         return detected
 
