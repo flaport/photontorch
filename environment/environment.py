@@ -118,6 +118,13 @@ class Environment(object):
     def num_wl(self):
         ''' Number of wavelengths in the simulation '''
         return self.wls.shape[0]
+    @num_wl.setter
+    def num_wl(self, value):
+        ''' Number of wavelengths in the simulation '''
+        if value == 1:
+            self.wls = np.mean(self.wls, keepdims=True)
+        else:
+            self.wls = np.linspace(self.wls[0], self.wls[-1], value, endpoint=True)
 
     @property
     def num_timesteps(self):
