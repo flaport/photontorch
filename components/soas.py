@@ -48,10 +48,11 @@ class SimpleSoa(Component):
         '''
         Component.__init__(self, name=name)
 
+        no_bounds = amplification_bounds is None
         self.amplification = self.new_bounded_parameter(
             data=amplification,
             bounds=amplification_bounds,
-            requires_grad=(amplification_bounds is not None) and (amplification_bounds[0]!=amplification_bounds[1]),
+            requires_grad=no_bounds or ((not no_bounds) and (amplification_bounds[0]!=amplification_bounds[1])),
         )
 
     @property
