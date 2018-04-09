@@ -243,6 +243,12 @@ class Buffer(Variable):
     def __repr__(self):
         ''' String representation of a buffer '''
         return 'Buffer containing:' + self.data.__repr__()
+    def __deepcopy__(self, memo):
+        result = type(self)(self.data.clone())
+        result.requires_grad = self.requires_grad
+        result.volatile = self.volatile
+        memo[id(self)] = result
+        return result
 
 
 ######################
@@ -405,9 +411,9 @@ class Module(_Module_):
         '''
         new = super(Module, self).cuda(device=device)
         for k, v in self._parameters.items():
-            self._parameters[k] = v.cuda(device=device)
+            self._parameters[k] = Parameter(v.cuda(device=device).data)
         for k, v in self._buffers.items():
-            self._buffers[k] = v.cuda(device=device)
+            self._buffers[k] = Buffer(v.cuda(device=device).data)
         for k, v in self._modules.items():
             self._modules[k] = v.cuda(device=device)
         new.is_cuda = True
@@ -417,9 +423,9 @@ class Module(_Module_):
         ''' Transform the Module to live on the CPU '''
         new = super(Module, self).cpu()
         for k, v in self._parameters.items():
-            self._parameters[k] = v.cpu()
+            self._parameters[k] = Parameter(v.cpu().data)
         for k, v in self._buffers.items():
-            self._buffers[k] = v.cpu()
+            self._buffers[k] = Buffer(v.cpu().data)
         for k, v in self._modules.items():
             self._modules[k] = v.cpu()
         new.is_cuda = False
