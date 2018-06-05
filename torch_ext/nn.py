@@ -6,9 +6,9 @@ The Neural Network Extensions Consist out of three main objects:
   * `BoundedParameter`: A bounded parameter acts like a
 `torch.nn.Parameter` that is bounded between a certain range. Under the hood it is
 actually a `torch.nn.Module`, but for all intents and purposes it can be considered
-to act like a `torch.autograd.Variable` or `torch.nn.Parameter`.
+to act like a `torch.nn.Parameter`.
 
-  * `Buffer`: A special kind of `torch.autograd.Variable` that automatically will
+  * `Buffer`: A special kind of tensor that automatically will
 be added to the `._buffers` attribute of the Module. Buffers are typically used as
 parameters of the model that do not require gradients or optimization, but that are
 indispensible for the definition of your object.
@@ -30,7 +30,6 @@ import copy
 ## Torch
 import torch
 from torch.nn import Parameter
-from torch.autograd import Variable
 from torch.nn import Module as _Module_
 
 ## Other
@@ -78,7 +77,7 @@ class BoundedParameter(_Module_):
         '''
         super(BoundedParameter, self).__init__()
         if not torch.is_tensor(data):
-            raise RuntimeError('Variable data has to be a tensor, but got %s'%type(data).__name__)
+            raise RuntimeError('paramter data has to be a tensor, but got %s'%type(data).__name__)
 
         self._datavar = None # To store the variable if no bounds are specified
         self.bounds = bounds # Store the bounds
@@ -134,10 +133,10 @@ class BoundedParameter(_Module_):
     def datavar(self):
         '''@property
 
-        The Variable the bounded Parameter is trying to emulate
+        The tensor the bounded Parameter is trying to emulate
 
         Returns:
-            torch.autograd.Variable
+            torch.autograd.tensor
         '''
         if self._datavar is not None: # this happens when no bounds were specified
             return self._datavar
@@ -227,7 +226,7 @@ class BoundedParameter(_Module_):
 ############
 ## Buffer ##
 ############
-class Buffer(Variable):
+class Buffer(torch.Tensor):
     ''' A variable of a module that is automatically registered in _buffers
 
     Each Module has an OrderedDict named _buffers. In this Dictionary, all model related
@@ -240,15 +239,13 @@ class Buffer(Variable):
         For the automatic registration of the Buffer to work, you need to use the torch_ext
         subclass Module of torch.nn.Module.
     '''
+    def __new__(cls, data=None, requires_grad=True):
+        if data is None:
+            data = torch.Tensor()
+        return torch.Tensor._make_subclass(cls, data, requires_grad)
+
     def __repr__(self):
-        ''' String representation of a buffer '''
-        return 'Buffer containing:' + self.data.__repr__()
-    def __deepcopy__(self, memo):
-        result = type(self)(self.data.clone())
-        result.requires_grad = self.requires_grad
-        result.volatile = self.volatile
-        memo[id(self)] = result
-        return result
+        return 'Buffer containing:\n' + super(Parameter, self).__repr__()
 
 
 ######################
@@ -259,7 +256,7 @@ class Module(_Module_):
     ''' Torch.nn Module extension with some extra features:
 
     In PhotonTorch, often new variables need to be created on the fly. Therefore, three
-    new functions (`new_variable`, `new_buffer`, `new_parameter`) were created to easily
+    new functions (`new_tensor`, `new_buffer`, `new_parameter`) were created to easily
     create these, with the requested type and cuda flag.
 
     Buffers are automatically registerd in the _buffers attribute
@@ -314,7 +311,7 @@ class Module(_Module_):
         '''
         return self.zeros(shape, dtype=dtype, cuda=cuda) + 1
 
-    def new_tensor(self, data, dtype='float', cuda=None):
+    def new_tensor(self, data, dtype='float', cuda=None, requires_grad=False):
         '''
         Create a torch tensor from given data.
 
@@ -323,6 +320,7 @@ class Module(_Module_):
             dtype (str): type of the new tensor
             cuda (bool): if the new tensor should be cuda or not.
                 None defaults to self.is_cuda
+            requires_grad (bool): if the new tensor should be trainable or not
         '''
         dtype = NUMPY_TYPES.get(dtype, dtype)
         if not isinstance(data, torch.Tensor):
@@ -336,28 +334,16 @@ class Module(_Module_):
             return data.cuda()
         return data
 
-    def new_variable(self, data, dtype='float', cuda=None, requires_grad=False):
-        '''
-        Create a torch Variable from given data.
-
-        Args:
-            data (torch.Tensor | np.ndarray | list): data to convert to a Variable
-            dtype (str): type of the new Variable
-            cuda (bool): if the new tensor should be cuda or not.
-                None defaults to self.is_cuda
-        '''
-        return Variable(self.new_tensor(data, dtype=dtype, cuda=cuda), requires_grad=requires_grad)
-
     def new_parameter(self, data, dtype='float', cuda=None, requires_grad=True):
         '''
         Create a torch Parameter or Buffer from given data.
 
         Args:
-            data (torch.Tensor | np.ndarray | list): data to convert to a Variable
+            data (torch.Tensor | np.ndarray | list): data to convert to a parameter
             dtype (str): type of the new Parameter
             cuda (bool): if the new tensor should be cuda or not.
                 None defaults to self.is_cuda
-
+            requires_grad (bool): if the new parameter should be trainable or not
         Note:
             if requires_grad=False, a Buffer will be created in stead of a parameter.
         '''
@@ -372,7 +358,7 @@ class Module(_Module_):
         Create a Bounded Parameter, Parameter or Buffer from given data.
 
         Args:
-            data (torch.Tensor | np.ndarray | list): data to convert to a Variable
+            data (torch.Tensor | np.ndarray | list): data to convert to a parameter
             bounds=None (tuple): bounds in which to optimize the parameter
             dtype (str): type of the new Parameter
             cuda (bool): if the new tensor should be cuda or not.

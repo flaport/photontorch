@@ -10,9 +10,6 @@ import torch
 ## Other
 import numpy as np
 
-## Relative
-from ..torch_ext import is_variable
-
 
 #################
 ## Base Source ##
@@ -124,8 +121,8 @@ class ConstantSource(BaseSource):
             imag_source *= imag_amplitude
 
         # save source values as variables
-        self.real_source = self.nw.new_variable(real_source)
-        self.imag_source = self.nw.new_variable(imag_source)
+        self.real_source = self.nw.new_tensor(real_source)
+        self.imag_source = self.nw.new_tensor(imag_source)
 
     def _handle_amplitude(self, amplitude):
         ''' Handle the amplitude of the source to form a torch FloatTensor
@@ -139,8 +136,6 @@ class ConstantSource(BaseSource):
             real_amplitude (torch.FloatTensor), imag_amplitude (torch.FloatTensor)
         '''
         # make amplitude a tensor:
-        if is_variable(amplitude):
-            amplitude = amplitude.data
         if torch.is_tensor(amplitude):
             real_amplitude = amplitude
             imag_amplitude = torch.zeros_like(amplitude)
@@ -205,8 +200,8 @@ class TimeSource(ConstantSource):
             self.loc = slice(None, None, None)
             real_signal, imag_signal = self._handle_signal(signal)
 
-        self.real_signal = self.nw.new_variable(real_signal)
-        self.imag_signal = self.nw.new_variable(imag_signal)
+        self.real_signal = self.nw.new_tensor(real_signal)
+        self.imag_signal = self.nw.new_tensor(imag_signal)
 
     @property
     def signal(self):
@@ -230,8 +225,6 @@ class TimeSource(ConstantSource):
             real_signal (torch.FloatTensor), imag_signal (torch.FloatTensor)
         '''
         # make amplitude a tensor:
-        if is_variable(signal):
-            signal = signal.data
         if torch.is_tensor(signal):
             real_signal = signal
             imag_signal = torch.zeros_like(signal)
@@ -263,7 +256,7 @@ class TimeSource(ConstantSource):
             network.
 
         '''
-        ret = self.nw.new_variable(torch.zeros(self.size()))
+        ret = self.nw.new_tensor(torch.zeros(self.size()))
         ret[:,:,self.loc,:] = torch.cat((
             self.real_signal*self.real_source[:,self.loc],
             self.imag_signal*self.imag_source[:,self.loc],

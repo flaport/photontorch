@@ -11,7 +11,6 @@ Some non-differentiable, but useful functions that act on (or create) torch tens
 
 ## Torch
 import torch
-from torch.autograd import Variable
 from torch.nn import Parameter
 
 ## Relative
@@ -23,17 +22,6 @@ from .nn import Buffer
 ###############
 ## Functions ##
 ###############
-
-def is_variable(var):
-    ''' Check if an object is Variable-like
-
-    Args:
-        var (object): Object to check
-
-    Returns:
-        bool
-    '''
-    return isinstance(var, (Variable, Parameter, BoundedParameter, Buffer))
 
 def zeros(shape, type='float', cuda=False):
     ''' Create an empty torch tensor filled with zeros.

@@ -91,12 +91,12 @@ class Waveguide(Connection):
         if self.phase is not None:
             cos_phase = self.phase.cos().double()
         else:
-            wls = self.new_variable(self.env.wls, dtype='double')
+            wls = self.new_tensor(self.env.wls, dtype='double')
             cos_phase = torch.cos(2*pi*self.neff*self.length/wls)
         re = 10**(-self.loss*self.length/10)*cos_phase
         # we can safely convert back to single precision now:
         re = re.float()
-        S = self.new_variable([[[0, 1],
+        S = self.new_tensor([[[0, 1],
                                 [1, 0]]])
         return re.view(-1,1,1)*S
 
@@ -106,11 +106,11 @@ class Waveguide(Connection):
         if self.phase is not None:
             sin_phase = self.phase.sin().double()
         else:
-            wls = self.new_variable(self.env.wls, dtype='double')
+            wls = self.new_tensor(self.env.wls, dtype='double')
             sin_phase = torch.sin(2*pi*self.neff*self.length/wls)
         ie = 10**(-self.loss*self.length/10)*sin_phase
         # we can safely convert back to single precision now:
         ie = ie.float()
-        S = self.new_variable([[[0, 1],
+        S = self.new_tensor([[[0, 1],
                                 [1, 0]]])
         return ie.view(-1,1,1)*S
