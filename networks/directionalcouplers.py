@@ -188,7 +188,7 @@ class DirectionalCouplerNetwork(Network, Component):
     def couplings(self):
         ''' Get array with couplings of the directional couplers '''
         I, J = self.dc_array.shape
-        couplings = self.new_tensor(np.zeros((I, J)))
+        couplings = self.tensor(np.zeros((I, J)))
         for i in range(I):
             for j in range(J):
                 couplings.data[i, j] = self.dc_array[i, j].dc.kappa2.data[0]
@@ -200,13 +200,13 @@ class DirectionalCouplerNetwork(Network, Component):
         I, J = self.dc_array.shape
         for i in range(I):
             for j in range(J):
-                self.dc_array[i,j].dc.kappa2.data = self.new_tensor([array[i,j]])
+                self.dc_array[i,j].dc.kappa2.data = self.tensor([array[i,j]])
 
     @property
     def lengths(self):
         ''' Get array with couplings of the directional couplers '''
         I, J = self.dc_array.shape
-        lengths = self.new_tensor(np.zeros((I, J)))
+        lengths = self.tensor(np.zeros((I, J)))
         for i in range(I):
             for j in range(J):
                 lengths.data[i, j] = self.dc_array[i, j].wg.length.data[0]
@@ -218,7 +218,7 @@ class DirectionalCouplerNetwork(Network, Component):
         I, J = self.dc_array.shape
         for i in range(I):
             for j in range(J):
-                self.dc_array[i,j].wg.length.data = self.new_tensor([array[i,j]], dtype='double')
+                self.dc_array[i,j].wg.length.data = self.tensor([array[i,j]], dtype='double')
 
     @property
     def phases(self):
@@ -228,7 +228,7 @@ class DirectionalCouplerNetwork(Network, Component):
         I, J = self.dc_array.shape
         if self.dc.wg.phase is None:
             return None
-        phases = self.new_tensor(np.zeros((I, J)))
+        phases = self.tensor(np.zeros((I, J)))
         for i in range(I):
             for j in range(J):
                 phases.data[i, j] = self.dc_array[i, j].wg.phase.data[0]
@@ -245,7 +245,7 @@ class DirectionalCouplerNetwork(Network, Component):
                                  'they are coupled to the length')
         for i in range(I):
             for j in range(J):
-                self.dc_array[i,j].wg.phase.data = self.new_tensor([array[i,j]])
+                self.dc_array[i,j].wg.phase.data = self.tensor([array[i,j]])
 
 
     @property

@@ -111,7 +111,7 @@ class Component(Module):
         Returns:
             torch.FloatTensor of only ones and zeros with shape (# num ports, # num ports).
         '''
-        return self.new_tensor(np.zeros((self.num_ports, self.num_ports)), 'float')
+        return self.tensor(np.zeros((self.num_ports, self.num_ports)), 'float')
 
     @property
     def delays(self):
@@ -120,7 +120,7 @@ class Component(Module):
         Returns:
             torch.FloatTensor with the delays in each node of the component. Shape: (# num ports, )
         '''
-        return self.new_tensor(np.zeros(self.num_ports), 'float')
+        return self.tensor(np.zeros(self.num_ports), 'float')
 
     @property
     def sources_at(self):
@@ -129,7 +129,7 @@ class Component(Module):
         Returns:
             torch.ByteTensor containing the locations of the sources in the component. shape: (# num ports, )
         '''
-        return self.new_tensor(np.zeros(self.num_ports), 'byte')
+        return self.tensor(np.zeros(self.num_ports), 'byte')
 
     @property
     def detectors_at(self):
@@ -138,7 +138,7 @@ class Component(Module):
         Returns:
             torch.ByteTensor containing the locations of the detectors in the component. shape: (# num ports, )
         '''
-        return self.new_tensor(np.zeros(self.num_ports), 'byte')
+        return self.tensor(np.zeros(self.num_ports), 'byte')
 
     @property
     def free_idxs(self):

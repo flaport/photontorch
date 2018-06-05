@@ -365,7 +365,7 @@ class Network(Component, SourceInjector):
                 ''' Batch multiply with normal matrix '''
                 return torch.matmul(S.permute(0,2,1),C.t()).permute(0,2,1)
 
-            eye = torch.cat([self.new_tensor(np.eye(nml), 'float').unsqueeze_(0)]*self.env.num_wl, dim=0)
+            eye = torch.cat([self.tensor(np.eye(nml), 'float').unsqueeze_(0)]*self.env.num_wl, dim=0)
             rP = eye - cmm(Cmlml, rSmlml)
             iP = -cmm(Cmlml, iSmlml)
 
@@ -439,7 +439,7 @@ class Network(Component, SourceInjector):
         return wrapped
 
     @require_initialization
-    def new_buffer(self):
+    def buffer(self):
         ''' Create buffer to keep the hidden states of the Network (RNN)
         The buffer has shape (# time, # wavelengths, # mc nodes, # batches)
 
@@ -469,17 +469,17 @@ class Network(Component, SourceInjector):
             (2 = (real|imag), # time, # wavelengths, # detectors, # batches) if power==False
         '''
         if power:
-            detected = self.new_tensor(self.zeros((self.env.num_timesteps, self.env.num_wl, self.num_detectors, self.env.num_batches)))
+            detected = self.tensor(self.zeros((self.env.num_timesteps, self.env.num_wl, self.num_detectors, self.env.num_batches)))
             def update_detected():
                 detected[i] = (torch.pow(rx, 2) + torch.pow(ix, 2))[:,-self.num_detectors:]
         else:
-            detected = self.new_tensor(self.zeros((2, self.env.num_timesteps, self.env.num_wl, self.num_detectors, self.env.num_batches)))
+            detected = self.tensor(self.zeros((2, self.env.num_timesteps, self.env.num_wl, self.num_detectors, self.env.num_batches)))
             def update_detected():
                 detected[0,i] = rx[:,-self.num_detectors:]
                 detected[1,i] = ix[:,-self.num_detectors:]
 
         ## Get new buffer
-        rbuffer, ibuffer = self.new_buffer()
+        rbuffer, ibuffer = self.buffer()
 
         # solve
         for i in range(self.env.num_timesteps):
@@ -514,7 +514,7 @@ class Network(Component, SourceInjector):
         '''
         label = kwargs.pop('label','')
         if torch.is_tensor(detected):
-            detected = detected.cpu().numpy()
+            detected = detected.detach().cpu().numpy()
         if detected.ndim == 1:
             detected = detected[:, None]
         type = {'time':'t', 't':'t',

@@ -121,8 +121,8 @@ class ConstantSource(BaseSource):
             imag_source *= imag_amplitude
 
         # save source values as variables
-        self.real_source = self.nw.new_tensor(real_source)
-        self.imag_source = self.nw.new_tensor(imag_source)
+        self.real_source = self.nw.tensor(real_source)
+        self.imag_source = self.nw.tensor(imag_source)
 
     def _handle_amplitude(self, amplitude):
         ''' Handle the amplitude of the source to form a torch FloatTensor
@@ -146,8 +146,8 @@ class ConstantSource(BaseSource):
                 real_amplitude = real_amplitude[None] # make 1D (will cast to # batches)
                 imag_amplitude = imag_amplitude[None] # make 1D (will cast to # batches)
             # make a tensor from the amplitude:
-            real_amplitude = self.nw.new_tensor(real_amplitude)
-            imag_amplitude = self.nw.new_tensor(imag_amplitude)
+            real_amplitude = self.nw.tensor(real_amplitude)
+            imag_amplitude = self.nw.tensor(imag_amplitude)
 
         # make sure the amplitude is a 3D tensor (so it can cast to the shape of the source)
         if len(real_amplitude.size()) == 1: # will cast to # nodes
@@ -200,8 +200,8 @@ class TimeSource(ConstantSource):
             self.loc = slice(None, None, None)
             real_signal, imag_signal = self._handle_signal(signal)
 
-        self.real_signal = self.nw.new_tensor(real_signal)
-        self.imag_signal = self.nw.new_tensor(imag_signal)
+        self.real_signal = self.nw.tensor(real_signal)
+        self.imag_signal = self.nw.tensor(imag_signal)
 
     @property
     def signal(self):
@@ -229,8 +229,8 @@ class TimeSource(ConstantSource):
             real_signal = signal
             imag_signal = torch.zeros_like(signal)
         else:
-            real_signal = self.nw.new_tensor(np.asarray(np.real(signal)))
-            imag_signal = self.nw.new_tensor(np.asarray(np.imag(signal)))
+            real_signal = self.nw.tensor(np.asarray(np.real(signal)))
+            imag_signal = self.nw.tensor(np.asarray(np.imag(signal)))
 
         # make sure the signal is a 3D tensor (so it can cast to the shape of the source)
         if len(real_signal.size()) == 1: # will cast to # batches
@@ -256,7 +256,7 @@ class TimeSource(ConstantSource):
             network.
 
         '''
-        ret = self.nw.new_tensor(torch.zeros(self.size()))
+        ret = self.nw.tensor(torch.zeros(self.size()))
         ret[:,:,self.loc,:] = torch.cat((
             self.real_signal*self.real_source[:,self.loc],
             self.imag_signal*self.imag_source[:,self.loc],

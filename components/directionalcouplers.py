@@ -54,7 +54,7 @@ class DirectionalCoupler(Component):
         '''
         Component.__init__(self, name=name)
 
-        self.kappa2 = self.new_bounded_parameter(
+        self.kappa2 = self.bounded_parameter(
             data=kappa2,
             bounds=kappa2_bounds,
             requires_grad=(kappa2_bounds is not None) and (kappa2_bounds[0]!=kappa2_bounds[1]),
@@ -64,7 +64,7 @@ class DirectionalCoupler(Component):
     def rS(self):
         ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         t = torch.cat([((1-self.kappa2)**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
-        S = self.new_tensor([[[0, 1, 0, 0],
+        S = self.tensor([[[0, 1, 0, 0],
                                 [1, 0, 0, 0],
                                 [0, 0, 0, 1],
                                 [0, 0, 1, 0]]])
@@ -77,7 +77,7 @@ class DirectionalCoupler(Component):
         shape: (# num wavelengths, # num ports, # num ports)
         '''
         k = torch.cat([(self.kappa2**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
-        S = self.new_tensor([[[0, 0, 1, 0],
+        S = self.tensor([[[0, 0, 1, 0],
                                 [0, 0, 0, 1],
                                 [1, 0, 0, 0],
                                 [0, 1, 0, 0]]])
@@ -135,7 +135,7 @@ class DirectionalCouplerWithLength(Component):
         t = (1-self.dc.kappa2)**0.5 # Transmission
         rS_wg_t = self.wg.rS*t
         iS_wg_k = self.wg.iS*k
-        rS = self.new_tensor([[[0, 0, 0, 0],
+        rS = self.tensor([[[0, 0, 0, 0],
                                  [0, 0, 0, 0],
                                  [0, 0, 0, 0],
                                  [0, 0, 0, 0]]]*self.env.num_wl)
@@ -152,7 +152,7 @@ class DirectionalCouplerWithLength(Component):
         t = (1-self.dc.kappa2)**0.5 # Transmission
         iS_wg_t = self.wg.iS*t
         rS_wg_k = self.wg.rS*k
-        iS = self.new_tensor([[[0, 0, 0, 0],
+        iS = self.tensor([[[0, 0, 0, 0],
                                  [0, 0, 0, 0],
                                  [0, 0, 0, 0],
                                  [0, 0, 0, 0]]]*self.env.num_wl)
@@ -227,8 +227,8 @@ class RealisticDirectionalCoupler(Component):
         dn = self.n0 + self.de1_n0*dwl + 0.5*self.de2_n0*dwl**2
         kappa0 = self.k0 + self.de1_k0*dwl + 0.5*self.de2_k0*dwl**2
         kappa1 = pi*dn/wl
-        tau = self.new_tensor(np.cos(kappa0 + kappa1*self.length)).view(-1,1,1)
-        S = self.new_tensor([[[0, 1, 0, 0],
+        tau = self.tensor(np.cos(kappa0 + kappa1*self.length)).view(-1,1,1)
+        S = self.tensor([[[0, 1, 0, 0],
                                 [1, 0, 0, 0],
                                 [0, 0, 0, 1],
                                 [0, 0, 1, 0]]])
@@ -242,8 +242,8 @@ class RealisticDirectionalCoupler(Component):
         dn = self.n0 + self.de1_n0*dwl + 0.5*self.de2_n0*dwl**2
         kappa0 = self.k0 + self.de1_k0*dwl + 0.5*self.de2_k0*dwl**2
         kappa1 = pi*dn/wl
-        kappa = self.new_tensor(-np.sin(kappa0 + kappa1*self.length)).view(-1,1,1)
-        S = self.new_tensor([[[0, 0, 1, 0],
+        kappa = self.tensor(-np.sin(kappa0 + kappa1*self.length)).view(-1,1,1)
+        S = self.tensor([[[0, 0, 1, 0],
                                 [0, 0, 0, 1],
                                 [1, 0, 0, 0],
                                 [0, 1, 0, 0]]])
