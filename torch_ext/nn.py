@@ -256,7 +256,7 @@ class Module(_Module_):
     ''' Torch.nn Module extension with some extra features:
 
     In PhotonTorch, often new variables need to be created on the fly. Therefore, three
-    new functions (`new_tensor`, `new_buffer`, `new_parameter`) were created to easily
+    new functions (`tensor`, `buffer`, `parameter`) were created to easily
     create these, with the requested type and cuda flag.
 
     Buffers are automatically registerd in the _buffers attribute
@@ -311,7 +311,7 @@ class Module(_Module_):
         '''
         return self.zeros(shape, dtype=dtype, cuda=cuda) + 1
 
-    def new_tensor(self, data, dtype='float', cuda=None, requires_grad=False):
+    def tensor(self, data, dtype='float', cuda=None, requires_grad=False):
         '''
         Create a torch tensor from given data.
 
@@ -334,7 +334,7 @@ class Module(_Module_):
             return data.cuda()
         return data
 
-    def new_parameter(self, data, dtype='float', cuda=None, requires_grad=True):
+    def parameter(self, data, dtype='float', cuda=None, requires_grad=True):
         '''
         Create a torch Parameter or Buffer from given data.
 
@@ -347,12 +347,12 @@ class Module(_Module_):
         Note:
             if requires_grad=False, a Buffer will be created in stead of a parameter.
         '''
-        data = self.new_tensor(data, dtype=dtype, cuda=cuda)
+        data = self.tensor(data, dtype=dtype, cuda=cuda)
         if not requires_grad: # if no optimization required, register data as Buffer
             return Buffer(data=data, requires_grad=False)
         return Parameter(data, requires_grad=True)
 
-    def new_bounded_parameter(self, data, bounds=None, dtype='float',
+    def bounded_parameter(self, data, bounds=None, dtype='float',
                               cuda=None, requires_grad=True):
         '''
         Create a Bounded Parameter, Parameter or Buffer from given data.
@@ -365,9 +365,9 @@ class Module(_Module_):
                 None defaults to self.is_cuda
         '''
         if bounds is None:
-            return self.new_parameter(data, dtype=dtype, cuda=cuda, requires_grad=requires_grad)
+            return self.parameter(data, dtype=dtype, cuda=cuda, requires_grad=requires_grad)
         data = BoundedParameter(
-            self.new_tensor(data, dtype=dtype, cuda=cuda),
+            self.tensor(data, dtype=dtype, cuda=cuda),
             bounds=bounds,
             requires_grad=requires_grad
         )

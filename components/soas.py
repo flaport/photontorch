@@ -49,7 +49,7 @@ class SimpleSoa(Component):
         Component.__init__(self, name=name)
 
         no_bounds = amplification_bounds is None
-        self.amplification = self.new_bounded_parameter(
+        self.amplification = self.bounded_parameter(
             data=amplification,
             bounds=amplification_bounds,
             requires_grad=no_bounds or ((not no_bounds) and (amplification_bounds[0]!=amplification_bounds[1])),
@@ -59,7 +59,7 @@ class SimpleSoa(Component):
     def rS(self):
         ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         a = torch.cat([(1*self.amplification).view(1,1,1)]*self.env.num_wl, dim=0)
-        S = self.new_tensor([[[0, 1],
+        S = self.tensor([[[0, 1],
                                 [1, 0]]])
         return a*S
 
@@ -67,6 +67,6 @@ class SimpleSoa(Component):
     def iS(self):
         ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         a = torch.cat([(1*self.amplification).view(1,1,1)]*self.env.num_wl, dim=0)
-        S = self.new_tensor([[[0, 0],
+        S = self.tensor([[[0, 0],
                                 [0, 0]]])
         return a*S

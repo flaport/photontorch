@@ -54,8 +54,8 @@ class Mmi21(Component):
         Real part of the scattering matrix
         shape: (# wavelengths, # ports, # ports)
         '''
-        t = (1.0/2.0)**0.5*self.new_tensor(np.ones_like(self.env.wls)).view(-1,1,1)
-        S = self.new_tensor([[[0, 1, 1],
+        t = (1.0/2.0)**0.5*self.tensor(np.ones_like(self.env.wls)).view(-1,1,1)
+        S = self.tensor([[[0, 1, 1],
                                 [1, 0, 0],
                                 [1, 0, 0]]])
         return t*S
@@ -67,8 +67,8 @@ class Mmi21(Component):
         Imag part of the scattering matrix
         shape: (# wavelengths, # ports, # ports)
         '''
-        t = (1.0/2.0**0.5)*self.new_tensor(np.zeros_like(self.env.wls)).view(-1,1,1)
-        S = self.new_tensor([[[0, 0, 0],
+        t = (1.0/2.0**0.5)*self.tensor(np.zeros_like(self.env.wls)).view(-1,1,1)
+        S = self.tensor([[[0, 0, 0],
                                 [0, 0, 0],
                                 [0, 0, 0]]])
         return t*S
@@ -109,8 +109,8 @@ class Mmi33(Component):
         Real part of the scattering matrix
         shape: (# wavelengths, # ports, # ports)
         '''
-        t = (1.0/3.0**0.5)*self.new_tensor(np.ones_like(self.env.wls)).view(-1,1,1)
-        S = self.new_tensor([[[0, 0, 0, 1, 1, 1],
+        t = (1.0/3.0**0.5)*self.tensor(np.ones_like(self.env.wls)).view(-1,1,1)
+        S = self.tensor([[[0, 0, 0, 1, 1, 1],
                                 [0, 0, 0, 1, 1, 1],
                                 [0, 0, 0, 1, 1, 1],
                                 [1, 1, 1, 0, 0, 0],
@@ -125,8 +125,8 @@ class Mmi33(Component):
         Imag part of the scattering matrix
         shape: (# wavelengths, # ports, # ports)
         '''
-        t = (1.0/3.0**0.5)*self.new_tensor(np.zeros_like(self.env.wls)).view(-1,1,1)
-        S = self.new_tensor([[[0, 0, 0, 0, 0, 0],
+        t = (1.0/3.0**0.5)*self.tensor(np.zeros_like(self.env.wls)).view(-1,1,1)
+        S = self.tensor([[[0, 0, 0, 0, 0, 0],
                                 [0, 0, 0, 0, 0, 0],
                                 [0, 0, 0, 0, 0, 0],
                                 [0, 0, 0, 0, 0, 0],

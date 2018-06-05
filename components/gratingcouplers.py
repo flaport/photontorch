@@ -70,11 +70,11 @@ class GratingCoupler(Component):
         loss = np.sqrt(self.Tmax*np.exp(-(self.wl0-self.env.wls)**2/(2*sigma**2)))
         S = np.array([[[0, 1],
                        [1, 0]]])
-        return self.new_tensor(loss[:,None,None]*S)
+        return self.tensor(loss[:,None,None]*S)
 
     @property
     def iS(self):
         ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
-        S = self.new_tensor([[[self.R_in, 0],
+        S = self.tensor([[[self.R_in, 0],
                                 [0,    self.R]]])
         return torch.cat([S]*self.env.num_wl, dim=0)

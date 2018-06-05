@@ -63,7 +63,7 @@ class Waveguide(Connection):
         self.loss = loss
         # as the phase is very sensitive on the length, we need double precision to
         # store the length of the waveguide:
-        self.length = self.new_bounded_parameter(
+        self.length = self.bounded_parameter(
             data=length,
             bounds=length_bounds,
             dtype='double',
@@ -71,7 +71,7 @@ class Waveguide(Connection):
         )
         if phase is not None:
             no_bounds = phase_bounds is None
-            self.phase = self.new_bounded_parameter(
+            self.phase = self.bounded_parameter(
                 data=phase%(2*np.pi),
                 bounds=phase_bounds,
                 requires_grad=no_bounds or ((not no_bounds) and (phase_bounds[0] != phase_bounds[1])),
@@ -91,12 +91,12 @@ class Waveguide(Connection):
         if self.phase is not None:
             cos_phase = self.phase.cos().double()
         else:
-            wls = self.new_tensor(self.env.wls, dtype='double')
+            wls = self.tensor(self.env.wls, dtype='double')
             cos_phase = torch.cos(2*pi*self.neff*self.length/wls)
         re = 10**(-self.loss*self.length/10)*cos_phase
         # we can safely convert back to single precision now:
         re = re.float()
-        S = self.new_tensor([[[0, 1],
+        S = self.tensor([[[0, 1],
                                 [1, 0]]])
         return re.view(-1,1,1)*S
 
@@ -106,11 +106,11 @@ class Waveguide(Connection):
         if self.phase is not None:
             sin_phase = self.phase.sin().double()
         else:
-            wls = self.new_tensor(self.env.wls, dtype='double')
+            wls = self.tensor(self.env.wls, dtype='double')
             sin_phase = torch.sin(2*pi*self.neff*self.length/wls)
         ie = 10**(-self.loss*self.length/10)*sin_phase
         # we can safely convert back to single precision now:
         ie = ie.float()
-        S = self.new_tensor([[[0, 1],
+        S = self.tensor([[[0, 1],
                                 [1, 0]]])
         return ie.view(-1,1,1)*S

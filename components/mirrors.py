@@ -48,7 +48,7 @@ class Mirror(Component):
         '''
         Component.__init__(self, name=name)
 
-        self.R = self.new_bounded_parameter(
+        self.R = self.bounded_parameter(
             data=R,
             bounds=R_bounds,
             requires_grad=(R_bounds is not None) and (R_bounds[0]!=R_bounds[1]),
@@ -58,7 +58,7 @@ class Mirror(Component):
     def rS(self):
         ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         r = torch.cat([(self.R**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
-        S = self.new_tensor([[[1, 0],
+        S = self.tensor([[[1, 0],
                                 [0, 1]]])
         return r*S
 
@@ -66,6 +66,6 @@ class Mirror(Component):
     def iS(self):
         ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         t = torch.cat([((1-self.R)**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
-        S = self.new_tensor([[[0, 1],
+        S = self.tensor([[[0, 1],
                                 [1, 0]]])
         return t*S
