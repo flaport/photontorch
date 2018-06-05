@@ -359,7 +359,7 @@ class UnitaryMatrixNetwork(Network):
             source = np.zeros((2, 1, 1, nw.nmc, array.shape[1]))
             source[0, 0, 0, :array.shape[0], :] = np.real(array)
             source[1, 0, 0, :array.shape[0], :] = np.imag(array)
-            source = nw.new_variable(source)
+            source = nw.new_tensor(source)
             return source
 
         # Start training:
@@ -368,7 +368,7 @@ class UnitaryMatrixNetwork(Network):
             env = env.copy(num_batches=k)
             top.initialize(env)
             source = new_source(top, U)
-            target = top.new_variable(np.eye(k))
+            target = top.new_tensor(np.eye(k))
             top, btm = top.split(k-1)
             for i in range(max_epochs):
                 btm.initialize(env)
@@ -395,7 +395,7 @@ class UnitaryMatrixNetwork(Network):
         env = env.copy(num_batches=2)
         top.initialize(env)
         source = new_source(top, U)
-        target = top.new_variable(np.eye(2))
+        target = top.new_tensor(np.eye(2))
         for i in range(max_epochs):
             top.initialize(env)
             prediction = top(source)[0,0,:,:]
@@ -456,7 +456,7 @@ class UnitaryMatrixNetwork(Network):
         source = np.zeros((2,1,1,self.nmc,other.shape[1]))
         source[0,0,0,:other.shape[0],:] = np.real(other)
         source[1,0,0,:other.shape[0],:] = np.imag(other)
-        source = self.new_variable(source)
+        source = self.new_tensor(source)
 
         # Propagate
         result = self(source, power=False)[:,0,0,:,:].data.cpu().numpy()
@@ -684,7 +684,7 @@ class MatrixNetwork(Network):
         source = np.zeros((2,1,1,self.nmc,other.shape[1]))
         source[0,0,0,:other.shape[0],:] = np.real(other)
         source[1,0,0,:other.shape[0],:] = np.imag(other)
-        source = self.new_variable(source)
+        source = self.new_tensor(source)
 
         # Propagate
         result = self(source, power=False)[:,0,0,:,:].data.cpu().numpy()

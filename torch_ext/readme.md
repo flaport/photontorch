@@ -13,13 +13,13 @@ Below you can find a short summary:
 performed over a batch of matrices.
 
 ## Neural Network Extensions
-  * `Buffer`: A special kind of `torch.autograd.Variable` that automatically will
+  * `Buffer`: A special kind of tensor that automatically will
 be added to the `._buffers` attribute of the Module. Buffers are typically used as
 parameters of the model that do not require gradients.
   * `BoundedParameter`: A bounded parameter acts like a
 `torch.nn.Parameter` that is bounded between a certain range. Under the hood it is
 actually a `torch.nn.Module`, but for all intents and purposes it can be considered
-to act like a `torch.autograd.Variable` or `torch.nn.Parameter`.
+to act like a `torch.nn.Parameter`.
   * `Module`: Extends `torch.nn.Module`, with some extra features (such as automatically)
 registering a `[Buffer](.nn.Buffer)` in its `._buffers` attribute, modified `.cuda()` calls and some
 extra functionalities.

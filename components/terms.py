@@ -32,11 +32,11 @@ class Term(Component):
     @property
     def rS(self):
         ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
-        return self.new_variable([[[0]]]*self.env.num_wl, 'float')
+        return self.new_tensor([[[0]]]*self.env.num_wl, 'float')
     @property
     def iS(self):
         ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
-        return self.new_variable([[[0]]]*self.env.num_wl, 'float')
+        return self.new_tensor([[[0]]]*self.env.num_wl, 'float')
 
 ############
 ## Source ##
@@ -47,7 +47,7 @@ class Source(Term):
     '''
     @property
     def sources_at(self):
-        return self.new_variable([1], 'byte')
+        return self.new_tensor([1], 'byte')
 
 
 ##############
@@ -59,4 +59,4 @@ class Detector(Term):
     '''
     @property
     def detectors_at(self):
-        return self.new_variable([1], 'byte')
+        return self.new_tensor([1], 'byte')

@@ -58,7 +58,7 @@ class Mirror(Component):
     def rS(self):
         ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         r = torch.cat([(self.R**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
-        S = self.new_variable([[[1, 0],
+        S = self.new_tensor([[[1, 0],
                                 [0, 1]]])
         return r*S
 
@@ -66,6 +66,6 @@ class Mirror(Component):
     def iS(self):
         ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         t = torch.cat([((1-self.R)**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
-        S = self.new_variable([[[0, 1],
+        S = self.new_tensor([[[0, 1],
                                 [1, 0]]])
         return t*S

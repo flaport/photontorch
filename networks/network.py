@@ -80,7 +80,6 @@ import functools
 
 ## Torch
 import torch
-from torch.autograd import Variable
 
 ## Others
 import numpy as np
@@ -366,7 +365,7 @@ class Network(Component, SourceInjector):
                 ''' Batch multiply with normal matrix '''
                 return torch.matmul(S.permute(0,2,1),C.t()).permute(0,2,1)
 
-            eye = torch.cat([self.new_variable(np.eye(nml), 'float').unsqueeze_(0)]*self.env.num_wl, dim=0)
+            eye = torch.cat([self.new_tensor(np.eye(nml), 'float').unsqueeze_(0)]*self.env.num_wl, dim=0)
             rP = eye - cmm(Cmlml, rSmlml)
             iP = -cmm(Cmlml, iSmlml)
 
@@ -424,7 +423,7 @@ class Network(Component, SourceInjector):
         buffermask = self.zeros((int(self._delays.max())+2, 1, self.nmc, 1))
         for i, d in enumerate(self._delays):
             buffermask[int(d), 0, i, 0] = 1.0
-        self.buffermask = Variable(buffermask)
+        self.buffermask = buffermask
 
         self.initialized = True
 
@@ -447,9 +446,8 @@ class Network(Component, SourceInjector):
         Note:
             obviously, this is a different buffer than Model buffers
         '''
-        buffer = self.zeros((self.buffermask.size(0), self.env.num_wl, self.nmc, self.env.num_batches))
-        rbuffer = Variable(buffer.clone())
-        ibuffer = Variable(buffer)
+        rbuffer = self.zeros((self.buffermask.size(0), self.env.num_wl, self.nmc, self.env.num_batches))
+        ibuffer = rbuffer.clone()
         return rbuffer, ibuffer
 
     @require_initialization
@@ -471,11 +469,11 @@ class Network(Component, SourceInjector):
             (2 = (real|imag), # time, # wavelengths, # detectors, # batches) if power==False
         '''
         if power:
-            detected = self.new_variable(self.zeros((self.env.num_timesteps, self.env.num_wl, self.num_detectors, self.env.num_batches)))
+            detected = self.new_tensor(self.zeros((self.env.num_timesteps, self.env.num_wl, self.num_detectors, self.env.num_batches)))
             def update_detected():
                 detected[i] = (torch.pow(rx, 2) + torch.pow(ix, 2))[:,-self.num_detectors:]
         else:
-            detected = self.new_variable(self.zeros((2, self.env.num_timesteps, self.env.num_wl, self.num_detectors, self.env.num_batches)))
+            detected = self.new_tensor(self.zeros((2, self.env.num_timesteps, self.env.num_wl, self.num_detectors, self.env.num_batches)))
             def update_detected():
                 detected[0,i] = rx[:,-self.num_detectors:]
                 detected[1,i] = ix[:,-self.num_detectors:]
@@ -515,9 +513,7 @@ class Network(Component, SourceInjector):
             **kwargs: matplotlib plot keyword arguments.
         '''
         label = kwargs.pop('label','')
-        if isinstance(detected, Variable):
-            detected = detected.data.cpu().numpy()
-        if isinstance(detected, torch.Tensor):
+        if torch.is_tensor(detected):
             detected = detected.cpu().numpy()
         if detected.ndim == 1:
             detected = detected[:, None]

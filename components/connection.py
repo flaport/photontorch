@@ -43,9 +43,9 @@ class Connection(Component):
     @property
     def rS(self):
         ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
-        return self.new_variable([[[0, 1], [1, 0]]]*self.env.num_wl)
+        return self.new_tensor([[[0, 1], [1, 0]]]*self.env.num_wl)
 
     @property
     def iS(self):
         ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
-        return self.new_variable([[[0, 0], [0, 0]]]*self.env.num_wl)
+        return self.new_tensor([[[0, 0], [0, 0]]]*self.env.num_wl)

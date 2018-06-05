@@ -31,6 +31,12 @@ neural network. This enables the use of native PyTorch optimizers to optimize th
 (c) Floris Laporte
 
 '''
+# Test pytorch version
+import torch
+torch_version = torch.__version__.split('.')
+if torch_version[0] == '0' and int(torch_version[1]) < 4:
+    raise ImportError('Torch version [%s] is not compatible with'
+                      'minimum required version >= 0.4.x'%torch.__version__)
 
 # Useful while in development...
 import sys
@@ -117,4 +123,3 @@ from .torch_ext.nn import BoundedParameter
 # tensor
 from .torch_ext.tensor import zeros
 from .torch_ext.tensor import where
-from .torch_ext.tensor import is_variable
