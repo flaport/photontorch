@@ -47,6 +47,6 @@ def where(bytetensor):
         Only works for 1D ByteTensors for now.
     '''
     idxs = torch.zeros_like(bytetensor).long()
-    torch.arange(0, idxs.size(0), 1, out=idxs)
+    torch.arange(0, idxs.shape[0], 1, out=idxs)
     idxs = idxs[bytetensor]
     return idxs

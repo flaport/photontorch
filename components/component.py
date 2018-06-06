@@ -19,6 +19,9 @@ Each Component is generally defined by several key properties:
 ## Imports ##
 #############
 
+# Standard library
+from copy import copy, deepcopy
+
 ## Other
 import numpy as np
 
@@ -51,6 +54,13 @@ class Component(Module):
             name = self.__class__.__name__.lower()
         self.name = name
 
+        # set attributes
+        self._env = None
+        self.C = self.buffer(self.get_C())
+        self.free_idxs = self.buffer(self.get_free_idxs())
+        self.sources_at = self.buffer(self.get_sources_at())
+        self.detectors_at = self.buffer(self.get_detectors_at())
+
     def initialize(self, env):
         ''' Simulation initialization for the component.
 
@@ -76,6 +86,10 @@ class Component(Module):
         if (self.sources_at & self.detectors_at).any():
             raise ValueError('Sources and Detectors cannot be combined in the same node.')
 
+        self.delays = self.get_delays()
+        self.rS = self.get_rS()
+        self.iS = self.get_iS()
+
     @property
     def env(self):
         '''@property
@@ -84,8 +98,7 @@ class Component(Module):
         '''
         return self._env
 
-    @property
-    def rS(self):
+    def get_rS(self):
         ''' Real Part of the Scattering matrix of the component.
 
         Returns:
@@ -94,8 +107,7 @@ class Component(Module):
         raise NotImplementedError('The real part of the scattering matrix '
                                   'of %s does not exist'%self.name)
 
-    @property
-    def iS(self):
+    def get_iS(self):
         ''' Imaginary Part of the Scattering matrix of the component.
 
         Returns:
@@ -104,8 +116,7 @@ class Component(Module):
         raise NotImplementedError('The imaginary part of the scattering matrix '
                                   'of %s does not exist'%self.name)
 
-    @property
-    def C(self):
+    def get_C(self):
         ''' Connection matrix of the component.
 
         Returns:
@@ -113,8 +124,7 @@ class Component(Module):
         '''
         return self.tensor(np.zeros((self.num_ports, self.num_ports)), 'float')
 
-    @property
-    def delays(self):
+    def get_delays(self):
         ''' Delays introduced by the component.
 
         Returns:
@@ -122,8 +132,7 @@ class Component(Module):
         '''
         return self.tensor(np.zeros(self.num_ports), 'float')
 
-    @property
-    def sources_at(self):
+    def get_sources_at(self):
         ''' The locations of the sources in the component.
 
         Returns:
@@ -131,8 +140,7 @@ class Component(Module):
         '''
         return self.tensor(np.zeros(self.num_ports), 'byte')
 
-    @property
-    def detectors_at(self):
+    def get_detectors_at(self):
         ''' The locations of the detectors in the component.
 
         Returns:
@@ -140,11 +148,9 @@ class Component(Module):
         '''
         return self.tensor(np.zeros(self.num_ports), 'byte')
 
-    @property
-    def free_idxs(self):
+    def get_free_idxs(self):
         ''' Free indices to make connections to '''
-        C = self.C
-        return where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1).data)
+        return self.tensor(where(((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).ne(1)))
 
     def __repr__(self):
         ''' String Representation of the component '''
@@ -169,3 +175,15 @@ class Component(Module):
         '''
         from ..networks.connector import Connector
         return Connector(key, [self])
+
+    def __deepcopy__(self, memo):
+        ''' Create a copy of the component '''
+        new = copy(self)
+        if new.env is not None:
+            del new.rS
+            del new.iS
+            del new.delays
+        new = deepcopy(super(Component, new), memo)
+        if new.env is not None:
+            new.initialize(new.env)
+        return new

@@ -75,7 +75,7 @@ class BlockDiag(Function):
         '''
         # we assume all inputs are square. TODO: implement a check for this
         # Get total size of block diagonal matrix
-        sizes = [m.size(0) for m in inputs]
+        sizes = [m.shape[0] for m in inputs]
         idxs = list(np.cumsum([0]+sizes))
         total_size = int(idxs[-1])
         # Get start and end indices of blocks in matrix
@@ -165,8 +165,8 @@ class BatchBlockDiag(Function):
         # we assume all inputs are square. and the same for each batch
         # TODO: implement a check for this
         # Get total size of block diagonal matrix
-        batch_size = inputs[0].size(0)
-        sizes = [m.size(1) for m in inputs]
+        batch_size = inputs[0].shape[0]
+        sizes = [m.shape[1] for m in inputs]
         idxs = list(np.cumsum([0]+sizes))
         total_size = int(idxs[-1])
         # Get start and end indices of blocks in matrix

@@ -182,10 +182,10 @@ class Environment(object):
         env['t_end'] = '%.2e'%self.t_end if self.t_end != 0 else 0
         del _env['t']
         wls = _env.pop('wls', None)
-        if wls is not None and len(self.wls) == 1:
+        if wls is not None and len(wls) == 1:
             env['wl'] = '%.2e'%wls[0]
         else:
-            env['wls'] = _env.pop('wls')
+            env['wls'] = wls
         env.update(_env)
 
         s =     'Simulation Environment:\n'

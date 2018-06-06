@@ -48,8 +48,7 @@ class Mmi21(Component):
         '''
         Component.__init__(self, name=name)
 
-    @property
-    def rS(self):
+    def get_rS(self):
         '''
         Real part of the scattering matrix
         shape: (# wavelengths, # ports, # ports)
@@ -61,8 +60,7 @@ class Mmi21(Component):
         return t*S
 
 
-    @property
-    def iS(self):
+    def get_iS(self):
         '''
         Imag part of the scattering matrix
         shape: (# wavelengths, # ports, # ports)
@@ -103,8 +101,7 @@ class Mmi33(Component):
         '''
         Component.__init__(self, name=name)
 
-    @property
-    def rS(self):
+    def get_rS(self):
         '''
         Real part of the scattering matrix
         shape: (# wavelengths, # ports, # ports)
@@ -119,8 +116,7 @@ class Mmi33(Component):
         return t*S
 
 
-    @property
-    def iS(self):
+    def get_iS(self):
         '''
         Imag part of the scattering matrix
         shape: (# wavelengths, # ports, # ports)

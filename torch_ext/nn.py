@@ -245,7 +245,7 @@ class Buffer(torch.Tensor):
         return torch.Tensor._make_subclass(cls, data, requires_grad)
 
     def __repr__(self):
-        return 'Buffer containing:\n' + super(Parameter, self).__repr__()
+        return 'Buffer containing:\n' + super(Buffer, self).__repr__()
 
 
 ######################
@@ -352,6 +352,21 @@ class Module(_Module_):
             return Buffer(data=data, requires_grad=False)
         return Parameter(data, requires_grad=True)
 
+    def buffer(self, data, dtype='float', cuda=None, requires_grad=False):
+        '''
+        Create a torch Parameter or Buffer from given data.
+
+        Args:
+            data (torch.Tensor | np.ndarray | list): data to convert to a parameter
+            dtype (str): type of the new Parameter
+            cuda (bool): if the new tensor should be cuda or not.
+                None defaults to self.is_cuda
+            requires_grad (bool): if the new parameter should be trainable or not
+        Note:
+            if requires_grad=False, a Buffer will be created in stead of a parameter.
+        '''
+        return self.parameter(data, dtype=dtype, cuda=cuda, requires_grad=requires_grad)
+
     def bounded_parameter(self, data, bounds=None, dtype='float',
                               cuda=None, requires_grad=True):
         '''
@@ -386,7 +401,6 @@ class Module(_Module_):
         return fix(self)
 
     def copy(self):
-        ''' Create a deep copy of the Module '''
         return copy.deepcopy(self)
 
     def cuda(self, device=None):
