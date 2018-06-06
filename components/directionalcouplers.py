@@ -60,8 +60,7 @@ class DirectionalCoupler(Component):
             requires_grad=(kappa2_bounds is not None) and (kappa2_bounds[0]!=kappa2_bounds[1]),
         )
 
-    @property
-    def rS(self):
+    def get_rS(self):
         ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         t = torch.cat([((1-self.kappa2)**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
         S = self.tensor([[[0, 1, 0, 0],
@@ -70,8 +69,7 @@ class DirectionalCoupler(Component):
                                 [0, 0, 1, 0]]])
         return t*S
 
-    @property
-    def iS(self):
+    def get_iS(self):
         '''
         Imag part of the scattering matrix
         shape: (# num wavelengths, # num ports, # num ports)
@@ -123,13 +121,11 @@ class DirectionalCouplerWithLength(Component):
         self.dc.initialize(env)
         Component.initialize(self, env)
 
-    @property
-    def delays(self):
+    def get_delays(self):
         ''' Delays of the directional coupler '''
         return torch.cat((self.wg.delays, self.wg.delays))
 
-    @property
-    def rS(self):
+    def get_rS(self):
         ''' real part of the scattering matrix '''
         k = self.dc.kappa2**0.5 # coupling
         t = (1-self.dc.kappa2)**0.5 # Transmission
@@ -145,8 +141,7 @@ class DirectionalCouplerWithLength(Component):
         rS[:,1::2, 1::2] = -iS_wg_k
         return rS
 
-    @property
-    def iS(self):
+    def get_iS(self):
         ''' imag part of the scattering matrix '''
         k = self.dc.kappa2**0.5 # coupling
         t = (1-self.dc.kappa2)**0.5 # Transmission
@@ -219,8 +214,7 @@ class RealisticDirectionalCoupler(Component):
         self.de2_n0 = de2_n0
         self.wl0 = 1.55e-6
 
-    @property
-    def rS(self):
+    def get_rS(self):
         ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         wl = self.env.wls
         dwl = wl - self.wl0
@@ -234,8 +228,7 @@ class RealisticDirectionalCoupler(Component):
                                 [0, 0, 1, 0]]])
         return tau*S
 
-    @property
-    def iS(self):
+    def get_iS(self):
         ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         wl = self.env.wls
         dwl = wl - self.wl0

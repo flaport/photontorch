@@ -29,12 +29,10 @@ class Term(Component):
 
     num_ports = 1
 
-    @property
-    def rS(self):
+    def get_rS(self):
         ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         return self.tensor([[[0]]]*self.env.num_wl, 'float')
-    @property
-    def iS(self):
+    def get_iS(self):
         ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         return self.tensor([[[0]]]*self.env.num_wl, 'float')
 
@@ -45,8 +43,7 @@ class Source(Term):
     '''
     A source is a special kind of Term where power is injected in the system
     '''
-    @property
-    def sources_at(self):
+    def get_sources_at(self):
         return self.tensor([1], 'byte')
 
 
@@ -57,6 +54,5 @@ class Detector(Term):
     '''
     A detector is a Term where the power is saved
     '''
-    @property
-    def detectors_at(self):
+    def get_detectors_at(self):
         return self.tensor([1], 'byte')

@@ -79,14 +79,12 @@ class Waveguide(Connection):
         else:
             self.phase = None
 
-    @property
-    def delays(self):
+    def get_delays(self):
         ''' The delay per node is given by the propagation time in the waveguide '''
         delay = self.neff*self.length/c
         return torch.cat([delay, delay]).float()
 
-    @property
-    def rS(self):
+    def get_rS(self):
         ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         if self.phase is not None:
             cos_phase = self.phase.cos().double()
@@ -100,8 +98,7 @@ class Waveguide(Connection):
                                 [1, 0]]])
         return re.view(-1,1,1)*S
 
-    @property
-    def iS(self):
+    def get_iS(self):
         ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         if self.phase is not None:
             sin_phase = self.phase.sin().double()
