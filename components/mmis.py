@@ -26,12 +26,11 @@ from .component import Component
 class Mmi21(Component):
     r''' A 2x1 MMI is a transition from two waveguides to one
 
-    Connections
-        mmi21['ijk']:
-              j
-         i___/
+    Terms:
+              1
+         0___/
              \
-              k
+              2
 
     Note:
         This MMI introduces no delays (for now)
@@ -82,9 +81,9 @@ class Mmi33(Component):
     Connections
         mmi33['ijklmn']:
 
-         i___  ___l
-         j___\/___m
-         k___/\___n
+         0___  ___3
+         1___\/___4
+         2___/\___5
 
     Note:
         This MMI introduces no delays (for now)

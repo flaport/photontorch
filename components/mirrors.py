@@ -29,10 +29,9 @@ class Mirror(Component):
 
     A mirror has one trainable parameter: the reflectivity R.
 
-    Connections:
-        mirror['ij']:
+    Terms:
             |
-        i --|-- j
+        0 --|-- 1
             |
     '''
 

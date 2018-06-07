@@ -99,9 +99,9 @@ class BoundedParameter(_Module_):
             b0 = '0' if self.bounds[0] == 0 else '%.2f'%self.bounds[0] if abs(self.bounds[0]) > 0.01 else '%.2e'%self.bounds[1]
             b1 = '0' if self.bounds[1] == 0 else '%.2f'%self.bounds[1] if abs(self.bounds[1]) > 0.01 else '%.2e'%self.bounds[1]
             bounds = '('+b0+','+b1+')'
-            name = 'BoundedParameter with bounds '+bounds+':'
+            name = 'BoundedParameter with bounds '+bounds+':\n'
         else:
-            name = 'BoundedParameter with no bounds:'
+            name = 'BoundedParameter with no bounds:\n'
         return name + self.data.__repr__()
 
     def copy(self):

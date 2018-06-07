@@ -30,10 +30,9 @@ class Waveguide(Connection):
 
     A waveguide is not trainable (for now)
 
-    Connections
-        waveguide['ij']:
+    Terms:
 
-        i ---- j
+        0 ---- 1
 
     '''
 

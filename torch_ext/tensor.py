@@ -11,12 +11,9 @@ Some non-differentiable, but useful functions that act on (or create) torch tens
 
 ## Torch
 import torch
-from torch.nn import Parameter
 
 ## Relative
 from .types import TORCH_TYPES
-from .nn import BoundedParameter
-from .nn import Buffer
 
 
 ###############

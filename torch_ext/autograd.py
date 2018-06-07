@@ -17,7 +17,6 @@ The classes defined below are called inside these functions and should not be us
 #############
 
 ## Torch
-import torch
 from torch.autograd import Function
 
 ## Other

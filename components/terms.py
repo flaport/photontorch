@@ -25,6 +25,9 @@ class Term(Component):
 
     It terminates an unconnected node.
 
+    Terms:
+        --0
+
     '''
 
     num_ports = 1
@@ -42,6 +45,9 @@ class Term(Component):
 class Source(Term):
     '''
     A source is a special kind of Term where power is injected in the system
+
+    Terms:
+        --0
     '''
     def get_sources_at(self):
         return self.tensor([1], 'byte')
@@ -53,6 +59,9 @@ class Source(Term):
 class Detector(Term):
     '''
     A detector is a Term where the power is saved
+
+    Terms:
+        --0
     '''
     def get_detectors_at(self):
         return self.tensor([1], 'byte')
