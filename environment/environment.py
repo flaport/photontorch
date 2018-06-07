@@ -50,7 +50,6 @@ class Environment(object):
             use_delays (bool) : if delays are necessary in the simulation.
                                 You can set this to false in frequency domain simulations
                                 with constant input source.
-            num_batches (int) : number of parallel simulations to perform
             num_timesteps (int) : number of timesteps in the simulation (overrules t_end)
             t (array): time array (overrules t_start, t_end, dt and num_timesteps)
             cuda (True, False, None): whether to use cuda in the simulation.
@@ -79,9 +78,6 @@ class Environment(object):
             self.t = np.arange(t_start, t_end, dt)
         else:
             self.t = np.arange(t_start, num_timesteps*dt, dt)
-
-        # batches
-        self.num_batches = kwargs.pop('num_batches', 1)
 
         # use delays
         # (set to False to speed up frequency calculations with constant source)
