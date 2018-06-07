@@ -29,12 +29,11 @@ class DirectionalCoupler(Component):
 
     A directional coupler has one trainable parameter: the squared coupling kappa2.
 
-    Connections
-        dc['ijkl']:
-        l        k
+    Terms:
+       3        2
         \______/
         /------\
-        i        j
+       0        1
 
     Note:
         This directional coupler introduces no delays (for now)
@@ -91,12 +90,11 @@ class DirectionalCouplerWithLength(Component):
     It is merely a holder of a directional coupler and a waveguide, and combines both
     in a 4-port component.
 
-    Connections:
-        dc['ijkl']:
-        l        k
+    Terms:
+        3        2
         \______/
         /------\
-        i        j
+        0        1
 
     Note:
         This version of a directional coupler is prefered over a wg-wg-wg-wg-dc network
@@ -163,12 +161,11 @@ class RealisticDirectionalCoupler(Component):
 
     The realistic directional coupler is based on the CapheModel of Umar Khan
 
-    Connections:
-        dc['ijkl']:
-        l        k
+    Terms:
+        3       2
         \______/
         /------\
-        i        j
+        0       1
 
     Notes:
      - This directional coupler introduces no delays (for now)

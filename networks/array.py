@@ -98,7 +98,7 @@ class ArrayNetwork(Network):
         s = ','.join([s for s in connections.ravel() if s != ''])
 
         # components list:
-        components = [connection.components[0].copy() for connection in array.ravel() if connection is not None]
+        components = [connection.components[0] for connection in array.ravel() if connection is not None]
 
         # an array with the free ports:
         free_ports = connections.copy()

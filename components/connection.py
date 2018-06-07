@@ -27,10 +27,9 @@ from .component import Component
 class Connection(Component):
     ''' A connection connects two ports without delays and without reflection.
 
-    Connections:
-        connection['ij']:
+    Terms:
 
-        i-j
+        0---1
 
     Note:
         It is generally recommended to make connections with the connection matrix, but if it's

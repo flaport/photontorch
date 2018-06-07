@@ -77,6 +77,8 @@ This equation is valid, even if \({\rm imag}(P)^{-1}\) does not exist.
 # Standard library
 import warnings
 import functools
+from copy import copy
+from collections import OrderedDict
 
 ## Torch
 import torch
@@ -101,6 +103,8 @@ from ..sources.inject import SourceInjector
 ## Network ##
 #############
 
+from torch.nn import Module
+
 class Network(Component, SourceInjector):
     ''' a Network (circuit) of Components
 
@@ -111,63 +115,72 @@ class Network(Component, SourceInjector):
     It's two core method's are `initialize` and `forward`.
 
     '''
-    def __init__(self, *args, **kwargs):
-        '''
-        Initialization of the network.
+
+    # components and connections are defined here for easy subclassing
+    components = None
+    connections = None
+
+    def __init__(self, components=None, connections=None, name=None):
+        ''' Network initialization
 
         Args:
-            There are three accepted forms for the arguments of a new network:
-
-            1. First option:
-            s = args[0] of type str
-            components = args[1:] of type component
-
-            s is a string specifying how the components are connected. It follows
-            the einstein summation convention.
-            e.g.
-            nw = Network('ij,jklm,mn', wg1, dc, wg2)
-            makes a connection between two waveguides and a directional coupler.
-            The connection is made where equal indices occur:
-                last port of wg1 is connected to first port of dc
-                last port of dc is connected to first port of wg2.
-
-            2. Second option:
-            args is a list of list with args[i][0] of type component and args[i][1] of type
-            str. Also follows the einstein summation convention.
-            e.g.
-            nw = Network(
-                (wg1, 'ij'),
-                (dc, 'jklm'),
-                (wg3, 'mn')
-            )
-
-            3. Third option:
-            args[0] is a Connector object that resulted from multiplication (connecting) of
-            indexed components:
-            e.g.
-            nw = Network(wg1['ij']*dc['jklm']*wg2['mn'])
+            components (dict): a dictionary containing the components of the network.
+                keys (str): new names for the components (will override the component name)
+                values (Component): component
+            connections (list[str]): a list containing the connections of the network.
+                the connection string can have two formats:
+                    1. "comp1:port1:comp2:port2": signifying a connection between ports (always reflexive)
+                    2. "comp:port:output_port": signifying a connection to an output port index
+            name (str): name of the network
 
         Note:
-            - The initializer of the network does not check if the number of indices
-            given corresponds to the number of ports in the component.
-            - Alternatively, if you run out of letters, you can also index with an
-            integer:
-                conn = comp['ijkl'] = comp[106,107,108,109]
-            This can be useful for very large networks. However, note that these
-            integers are internally converted back into a string and that you thus
-            need python 3 with native unicode support for integers > 256.
+            be careful not to repeat keys in your component dictionary.
+
+        Note:
+            the order of the components is determined by the order of the connections
         '''
 
-        # parse arguments
-        self.s, self.components = self._parse_args(args)
+        # Save name of component
+        self.name = name
 
-        # number of ports
-        self.num_ports = np.sum(comp.num_ports for comp in self.components)
+        # Save components
+        if self.connections is None:
+            self.connections = connections
 
-        Component.__init__(self, name=kwargs.pop('name', None))
+        # Check which components are actually used
+        def is_int(s):
+            try:
+                int(s)
+                return True
+            except ValueError:
+                return False
+        used_components = [conn.split(':') for conn in self.connections]
+        used_components = set([comp for tup in used_components for comp in tup if not is_int(comp)])
+
+        # Save components
+        if self.components is not None and components is None:
+            components = self.components
+        self.components = OrderedDict()
+        for name in used_components:
+            comp = copy(components[name]) # shallow copy
+            comp.name = name
+            self.components[name] = comp
+
+        ## Get component starting indices in the connection matrix
+        self.num_ports = sum(comp.num_ports for comp in self.components.values())
+
+        ## We will reorder the obtained C and S matrices:
+        self.order = self.get_order()
+
+        ## Initialize
+        Component.__init__(self, name=self.name)
+
+        ## Check if network is fully connected
+        self.terminated = ((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).all()
 
         # Add all the possible sources to this network:
-        self._inject_sources()
+        if self.terminated:
+            self._inject_sources()
 
         # register components as attributes:
         self._register_components()
@@ -175,35 +188,23 @@ class Network(Component, SourceInjector):
         # flag to see if the network is initialized with an environment.
         self.initialized = False
 
-        ## Check if network is fully connected
-        self.terminated = ((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).all()
 
     def _register_components(self):
         ''' Register Components as submodules of the network
 
         Pytorch requires submodules to be registered as attributes of a module.
-        This tries to registers all components in self.components under the component's
-        name. If the attribute name is already taken, an integer suffix is added.
+        This method registers all components in self.components under the component's
+        name. If the attribute name is already taken, an error will be raised
 
         Note:
             This Method should only be called one single in the __init__.
         '''
-        # PyTorch requires submodules to be registered as attributes
-        # For the parameters to be found by autograd:
-        for comp in self.components:
-            i = 0
-            name = comp.name + ' '
-            while hasattr(self, name.strip()):
-                k = 1 if i == 0 else int(np.log10(float(i))) + 1
-                i += 1
-                name = name[:-k] + str(i)
-            if i == 0:
-                name = name[:-1]
+        for name, comp in self.components.items():
             setattr(self, name, comp)
 
     def copy(self):
         ''' create a (deep) copy of the network '''
-        components = [comp.copy() for comp in self.components]
+        components = [comp.copy() for comp in self.components.values()]
         new = self.__class__(self.s, *components, name=self.name)
         if self.initialized:
             new.initialize(self.env.copy())
@@ -220,7 +221,7 @@ class Network(Component, SourceInjector):
             term = Term()
         if self.is_cuda:
             term = term.cuda()
-        connector = Connector(self.s, self.components)
+        connector = Connector(self.s, self.components.values())
         idxs = connector.idxs
         for i in idxs:
             term = term.copy()
@@ -269,7 +270,7 @@ class Network(Component, SourceInjector):
         self.initialized = False
 
         ## Initialize components in the network
-        for comp in self.components:
+        for comp in self.components.values():
             comp.initialize(env)
 
         ## Initialize network
@@ -323,7 +324,11 @@ class Network(Component, SourceInjector):
         # MC subset of Connection matrix
         Cmcmc = C[mc,:][:,mc]
 
-        if self.nml: # Only do the following steps if there is at least one ml node:
+        if self.nml == 0:
+            rC = torch.stack([Cmcmc]*self.env.num_wl, dim=0)
+            iC = torch.zeros_like(rC)
+        else:
+            # Only do the following steps if there is at least one ml node:
 
             # ML subsets of scattering matrix:
             rSmlml = rS[:,ml,:][:,:,ml]
@@ -334,45 +339,45 @@ class Network(Component, SourceInjector):
             Cmlmc = C[ml,:][:,mc]
             Cmlml = C[ml,:][:,ml]
 
-            ## helper matrices
-            # P = I - Cmlml@Smlml
-            def cmm(C, S):
-                ''' Batch multiply with normal matrix '''
+            ## Helper function bmm
+            def bmm(C, S):
+                ''' Batch multiply a normal matrix [C] with a batched matrix [S] '''
                 return torch.matmul(S.permute(0,2,1),C.t()).permute(0,2,1)
 
-            eye = torch.stack([self.tensor(np.eye(self.nml), 'float')]*self.env.num_wl, dim=0)
-            rP = eye - cmm(Cmlml, rSmlml)
-            iP = -cmm(Cmlml, iSmlml)
-
             ## reduced connection matrix
+            # C = Cmcml@Smlml@inv(P)@Cmlmc + Cmcmc (we do this in 3 steps)
+            # (with P a helper matrix defined below)
 
-            # C = Cmcml@Smlml@inv(P)@Cmlmc + Cmcmc (we do this in 5 steps)
+            # 1. x = Cmcml@Smlml
+            rx, ix = bmm(Cmcml, rSmlml), bmm(Cmcml, iSmlml)
 
-            # 1. Calculation of inv(P) = X + i*Y
+            # 2. Calculation of x@inv(P) := x@(X + i*Y)
+            # with inv(P) = (X + iY)
+
+            # P = I - Cmlml@Smlml
+            rP = torch.stack([self.tensor(np.eye(self.nml), 'float')]*self.env.num_wl, dim=0)
+            # iP will be defined below
+
             # note that real(inv(P)) != inv(real(P)) in most cases!
             # for a matrix P = rP + i*iP, with rP invertible it is easy to check that
             # the inverse is given by inv(P) = X + i*Y, with
             # X = inv(rP + iP@inv(rP)@iP)
             # Y = -X@iP@inv(rP)
-            inv_rP = torch.stack([torch.inverse(rp) for rp in rP], dim=0)
-            X = torch.stack([torch.inverse(rp + (ip).mm(inv_rp).mm(ip)) for rp, ip, inv_rp in zip(rP, iP, inv_rP)], dim=0)
-            Y = -(X).bmm(iP).bmm(inv_rP)
+            if Cmlml.sum() == 0:
+                X = rP
+                rx, ix = (rx).bmm(X), (ix).bmm(X)
+            else:
+                rP = rP - bmm(Cmlml, rSmlml)
+                iP = -bmm(Cmlml, iSmlml)
 
-            # 2. x = Cmcml@Smlml
-            rx, ix = cmm(Cmcml, rSmlml), cmm(Cmcml, iSmlml)
+                inv_rP = torch.stack([torch.inverse(rp) for rp in rP], dim=0)
+                X = torch.stack([torch.inverse(rp + (ip).mm(inv_rp).mm(ip)) for rp, ip, inv_rp in zip(rP, iP, inv_rP)], dim=0)
+                Y = -(X).bmm(iP).bmm(inv_rP)
 
-            # 3. x = x@invP [rx and ix calculated at the same time: they depend on each other]
-            rx, ix = (rx).bmm(X) - (ix).bmm(Y), (rx).bmm(Y) + (ix).bmm(X)
+                rx, ix = (rx).bmm(X) - (ix).bmm(Y), (rx).bmm(Y) + (ix).bmm(X)
 
-            # 4. x = x@Cmlmc
-            rx, ix = torch.matmul(rx, Cmlmc), torch.matmul(ix, Cmlmc)
-
-            # 5. C = x + Cmcmc
-            rC = rx + Cmcmc[None]
-            iC = ix
-        else:
-            rC = torch.stack([Cmcmc]*self.env.num_wl, dim=0)
-            iC = torch.zeros_like(rC)
+            # 3. C = x@Cmlmc + Cmcmc
+            rC, iC = torch.matmul(rx, Cmlmc) + Cmcmc[None], torch.matmul(ix, Cmlmc)
 
         ## Save the reduced matrices
         self._delays = delays[mc]
@@ -445,8 +450,12 @@ class Network(Component, SourceInjector):
         for i in range(self.env.num_timesteps):
 
             # get state
-            rx = torch.sum(self.buffermask*rbuffer, dim=0) + source[0,i]
-            ix = torch.sum(self.buffermask*ibuffer, dim=0) + source[1,i]
+            rx = torch.sum(self.buffermask*rbuffer, dim=0)
+            ix = torch.sum(self.buffermask*ibuffer, dim=0)
+
+            # add source
+            rx = rx + source[0,i]
+            ix = ix + source[1,i]
 
             # connect memory-less components
             # rx and ix need to be calculated at the same time because of dependencies on each other
@@ -492,7 +501,7 @@ class Network(Component, SourceInjector):
         elif type in ['wl', 'wls', 'wavelength', 'wavelengths']:
             plt.xlabel('wavelength [%sm]'%prefix)
         plt.ylabel("intensity [a.u.]")
-        names = [comp.name for comp in self.components if isinstance(comp, Detector)]
+        names = [comp.name for comp in self.components.values() if isinstance(comp, Detector)]
         if len(names) == 1 and len(plots) > 1:
             names = [names[0] + str(i) for i, _ in enumerate(plots)]
         for i, (name, plot) in enumerate(zip(names, plots)):
@@ -504,23 +513,58 @@ class Network(Component, SourceInjector):
 
     def get_delays(self):
         ''' get all the delays in the network '''
-        return torch.cat([comp.delays for comp in self.components])
+        return torch.cat([comp.delays for comp in self.components.values()])[self.order]
 
     def get_detectors_at(self):
         ''' get the locations of the detectors in the network '''
-        return torch.cat([comp.detectors_at for comp in self.components])
+        return torch.cat([comp.detectors_at for comp in self.components.values()])[self.order]
 
     def get_sources_at(self):
         ''' get the locations of the sources in the network '''
-        return torch.cat([comp.sources_at for comp in self.components])
+        return torch.cat([comp.sources_at for comp in self.components.values()])[self.order]
 
     def get_rS(self):
         ''' Combined real part of the S-matrix of all the components in the network '''
-        return batch_block_diag(*(comp.rS for comp in self.components))
+        return batch_block_diag(*(comp.rS for comp in self.components.values()))[:,self.order,:][:,:,self.order]
 
     def get_iS(self):
         ''' Combined imaginary part of the S-matrix of all the components in the network '''
-        return batch_block_diag(*(comp.iS for comp in self.components))
+        return batch_block_diag(*(comp.iS for comp in self.components.values()))[:,self.order,:][:,:,self.order]
+
+    def get_order(self):
+        start_idxs = list(np.cumsum([0]+[comp.num_ports for comp in self.components.values()])[:-1])
+        start_idxs = OrderedDict(zip(self.components.keys(), start_idxs))
+        free_idxs = [comp.free_idxs for comp in self.components.values()]
+        free_idxs = OrderedDict(zip(self.components.keys(), free_idxs))
+
+        def parse_connection(conn):
+            conn_list = conn.split(':')
+            if len(conn_list) == 4:
+                return None, None
+            comp, i, j = conn_list
+            if comp not in self.components:
+                raise ValueError('Component %s not found during reordering'%comp)
+            i, j = int(i), int(j)
+            i = int(start_idxs[comp] + free_idxs[comp][i])
+            return i, j
+
+        order_dict = {}
+        for conn in self.connections:
+            i, j = parse_connection(conn)
+            if i is not None:
+                order_dict[j] = i
+
+        order = []
+        for j in range(len(order_dict)):
+            i = order_dict[j]
+            order.append(i)
+
+        for i in range(self.num_ports):
+            if i not in order_dict.values():
+                order.append(i)
+
+        return order
+
 
     def get_C(self):
         ''' Combined Connection matrix of all the components in the network
@@ -531,58 +575,35 @@ class Network(Component, SourceInjector):
         Note:
             To create the connection matrix, the connection string is parsed.
         '''
-        Ns = np.cumsum([0]+[comp.num_ports for comp in self.components])
-        free_idxs = [comp.free_idxs for comp in self.components]
 
-        C = block_diag(*(comp.C for comp in self.components))
+        C = block_diag(*(comp.C for comp in self.components.values()))
 
-        # add loops
-        for k, j1, j2 in self._parse_loops():
-            idxs = free_idxs[k]
-            i = Ns[k] + idxs[j1]
-            j = Ns[k] + idxs[j2]
-            C[i, j] = C[j, i] = 1.0
+        start_idxs = list(np.cumsum([0]+[comp.num_ports for comp in self.components.values()])[:-1])
+        start_idxs = OrderedDict(zip(self.components.keys(), start_idxs))
+        free_idxs = [comp.free_idxs for comp in self.components.values()]
+        free_idxs = OrderedDict(zip(self.components.keys(), free_idxs))
 
-        # add connections
-        for i1, j1, i2, j2  in self._parse_connections():
-            idxs1 = free_idxs[i1]
-            idxs2 = free_idxs[i2]
-            i = Ns[i1] + idxs1[j1]
-            j = Ns[i2] + idxs2[j2]
-            C[i, j] = C[j, i] = 1.0
+        def parse_connection(conn):
+            conn_list = conn.split(':')
+            if len(conn_list) < 4:
+                return None, None
+            comp1, i1, comp2, i2 = conn_list
+            i1, i2 = int(i1), int(i2)
+            if comp1 == comp2 and i1 == i2:
+                raise IndexError('Cannot connect two equal ports')
+            for i, comp in [(i1,comp1), (i2, comp2)]:
+                if comp not in self.components:
+                    raise ValueError('Component %s not found during connecting'%comp)
+                if i >= len(free_idxs[comp]):
+                    raise ValueError('Component %s only has %i ports. Port index '
+                                     '%i too high'%(comp, len(free_idxs[comp]), i))
+            j1 = start_idxs[comp1] + free_idxs[comp1][i1]
+            j2 = start_idxs[comp2] + free_idxs[comp2][i2]
+            return int(j1), int(j2)
 
-        return C
+        for conn in self.connections:
+            i, j = parse_connection(conn)
+            if i is not None:
+                C[i,j] = C[j,i] = 1.0
 
-    @staticmethod
-    def _parse_args(args):
-        if isinstance(args[0], str):
-            s = args[0]
-            components = tuple(args[1:])
-        elif isinstance(args[0], Connector):
-            s = args[0].s
-            components = tuple(args[0].components)
-        else:
-            components, s = zip(*args)
-            s = ','.join(s)
-        return s, components
-
-    def _parse_loops(self):
-        S = self.s.split(',')
-        loops = []
-        for i, s in enumerate(S):
-            for j1, c1 in enumerate(s[:-1]):
-                for j2, c2 in enumerate(s[j1+1:], start=j1+1):
-                    if c1 == c2:
-                        loops += [(i, j1, j2)]
-        return loops
-
-    def _parse_connections(self):
-        S = self.s.split(',')
-        connections = []
-        for i1, s1 in enumerate(S[:-1]):
-            for i2, s2 in enumerate(S[i1+1:], start=i1+1):
-                for j1, c1 in enumerate(s1):
-                    for j2, c2 in enumerate(s2):
-                        if c1 == c2:
-                            connections += [(i1, j1, i2, j2)]
-        return connections
+        return C[self.order,:][:,self.order]

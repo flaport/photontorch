@@ -24,7 +24,7 @@ from . import sources
 def is_source(cls):
     ''' Check if a specific class is a Source '''
     try:
-        return issubclass(cls, sources.BaseSource)
+        return issubclass(cls, sources.Source)
     except TypeError:
         return False
 

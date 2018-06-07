@@ -11,9 +11,6 @@
 ## Torch
 import torch
 
-## Other
-import numpy as np
-
 ## Relative
 from .component import Component
 
@@ -29,10 +26,9 @@ class SimpleSoa(Component):
 
     A simple SOA has one trainable parameter: the amplification.
 
-    Connections:
-        soa['ij']:
+    Terms:
 
-        i ---- j
+        0 ---- 1
 
     '''
 

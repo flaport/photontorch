@@ -31,13 +31,12 @@ class GratingCoupler(Component):
 
     A Grating Coupler has one trainable parameter: the reflectivity R.
 
-    Connections:
-        gc['ij']:
+    Terms:
 
-          i
+          0
            \
             \
-        _|-|_|-|_|-|___ j
+        _|-|_|-|_|-|___ 1
 
     Note:
         A Grating Coupler is not trainable (for now).
