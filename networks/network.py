@@ -85,7 +85,6 @@ import torch
 
 ## Others
 import numpy as np
-import matplotlib.pyplot as plt
 
 ## Relative
 from .connector import Connector
@@ -96,16 +95,13 @@ from ..components.terms import Detector
 from ..torch_ext.autograd import block_diag
 from ..torch_ext.autograd import batch_block_diag
 from ..torch_ext.tensor import where
-from ..sources.inject import SourceInjector
 
 
 #############
 ## Network ##
 #############
 
-from torch.nn import Module
-
-class Network(Component, SourceInjector):
+class Network(Component):
     ''' a Network (circuit) of Components
 
     The Network is the core of Photontorch. This is where everything comes together.
@@ -119,6 +115,12 @@ class Network(Component, SourceInjector):
     # components and connections are defined here for easy subclassing
     components = None
     connections = None
+
+    # dedicated plotting function for plotting detected power
+    from .plot import plot
+
+    # for adding the different source classes to the network
+    from ..sources.add import add_sources
 
     def __init__(self, components=None, connections=None, name=None):
         ''' Network initialization
@@ -155,7 +157,10 @@ class Network(Component, SourceInjector):
             except ValueError:
                 return False
         used_components = [conn.split(':') for conn in self.connections]
-        used_components = set([comp for tup in used_components for comp in tup if not is_int(comp)])
+        # here we would like to use an ordered set, but this does not exist.
+        # therefore, we use an OrderedDict, for which we don't care about
+        # the values. [all for python 2 compatibility...]
+        used_components = OrderedDict([(comp,None) for tup in used_components for comp in tup if not is_int(comp)])
 
         # Save components
         if self.components is not None and components is None:
@@ -180,7 +185,7 @@ class Network(Component, SourceInjector):
 
         # Add all the possible sources to this network:
         if self.terminated:
-            self._inject_sources()
+            self.add_sources()
 
         # register components as attributes:
         self._register_components()
@@ -280,9 +285,6 @@ class Network(Component, SourceInjector):
         if not self.terminated:
             return # Stop initialization here.
 
-        ## Start initialization for the environment
-        C = self.C
-
         ## delays
         # delays can be turned off for frequency calculations
         # with constant input sources
@@ -317,12 +319,11 @@ class Network(Component, SourceInjector):
         ## S-matrix subsets
 
         # MC subsets of scattering matrix:
-        rS, iS = self.rS, self.iS
-        rSmcmc = rS[:,mc,:][:,:,mc]
-        iSmcmc = iS[:,mc,:][:,:,mc]
+        rSmcmc = self.rS[:,mc,:][:,:,mc]
+        iSmcmc = self.iS[:,mc,:][:,:,mc]
 
         # MC subset of Connection matrix
-        Cmcmc = C[mc,:][:,mc]
+        Cmcmc = self.C[mc,:][:,mc]
 
         if self.nml == 0:
             rC = torch.stack([Cmcmc]*self.env.num_wl, dim=0)
@@ -331,13 +332,13 @@ class Network(Component, SourceInjector):
             # Only do the following steps if there is at least one ml node:
 
             # ML subsets of scattering matrix:
-            rSmlml = rS[:,ml,:][:,:,ml]
-            iSmlml = iS[:,ml,:][:,:,ml]
+            rSmlml = self.rS[:,ml,:][:,:,ml]
+            iSmlml = self.iS[:,ml,:][:,:,ml]
 
             # ML subsets of connection matrix:
-            Cmcml = C[mc,:][:,ml]
-            Cmlmc = C[ml,:][:,mc]
-            Cmlml = C[ml,:][:,ml]
+            Cmcml = self.C[mc,:][:,ml]
+            Cmlmc = self.C[ml,:][:,mc]
+            Cmlml = self.C[ml,:][:,ml]
 
             ## Helper function bmm
             def bmm(C, S):
@@ -404,14 +405,14 @@ class Network(Component, SourceInjector):
         return wrapped
 
     @require_initialization
-    def simulation_buffer(self):
+    def simulation_buffer(self, num_batches):
         ''' Create buffer to keep the hidden states of the Network (RNN)
         The buffer has shape (# time, # wavelengths, # mc nodes, # batches)
 
         Note:
             obviously, this is a different buffer than Model buffers
         '''
-        rbuffer = self.zeros((int(self._delays.max())+1, self.env.num_wl, self.nmc, self.env.num_batches))
+        rbuffer = self.zeros((int(self._delays.max())+1, self.env.num_wl, self.nmc, num_batches))
         ibuffer = rbuffer.clone()
         return rbuffer, ibuffer
 
@@ -433,18 +434,21 @@ class Network(Component, SourceInjector):
             (# time, # wavelengths, # detectors, # batches) if power==True
             (2 = (real|imag), # time, # wavelengths, # detectors, # batches) if power==False
         '''
+
+        num_batches = source.shape[-1]
+
         if power:
-            detected = self.tensor(self.zeros((self.env.num_timesteps, self.env.num_wl, self.num_detectors, self.env.num_batches)))
+            detected = self.tensor(self.zeros((self.env.num_timesteps, self.env.num_wl, self.num_detectors, num_batches)))
             def update_detected():
                 detected[i] = (torch.pow(rx, 2) + torch.pow(ix, 2))[:,-self.num_detectors:]
         else:
-            detected = self.tensor(self.zeros((2, self.env.num_timesteps, self.env.num_wl, self.num_detectors, self.env.num_batches)))
+            detected = self.tensor(self.zeros((2, self.env.num_timesteps, self.env.num_wl, self.num_detectors, num_batches)))
             def update_detected():
                 detected[0,i] = rx[:,-self.num_detectors:]
                 detected[1,i] = ix[:,-self.num_detectors:]
 
         ## Get new buffer
-        rbuffer, ibuffer = self.simulation_buffer()
+        rbuffer, ibuffer = self.simulation_buffer(num_batches)
 
         # solve
         for i in range(self.env.num_timesteps):
@@ -473,43 +477,6 @@ class Network(Component, SourceInjector):
 
         return detected
 
-    def plot(self, type, detected, **kwargs):
-        ''' Plot detected power versus time or wavelength
-
-        Args:
-            type ('t' or 'wl'): type of the plot.
-            detected (np.ndarray | torch.Tensor): Detected signal
-            **kwargs: matplotlib plot keyword arguments.
-        '''
-        label = kwargs.pop('label','')
-        if torch.is_tensor(detected):
-            detected = detected.detach().cpu().numpy()
-        if detected.ndim == 1:
-            detected = detected[:, None]
-        type = {'time':'t', 't':'t',
-                'wl':'wls', 'wls':'wls',
-                'f':'wls', 'freq':'wls','frequency':'wls'}[type]
-        x = (self.env.__dict__[type])[:detected.shape[0]]
-        detected = detected[:x.shape[0]]
-        f = (int(np.log10(max(x))+0.5)//3)*3-3
-        x = x*10**-f # no inplace operation, since that would change the original x...
-        prefix = {12:'T', 9:'G', 6:'M', 3:'k', 0:'', -3:'m',
-                  -6:r'$\mu$', -9:'n', -12:'p', -15:'f'}[f]
-        plots = plt.plot(x, detected, **kwargs)
-        if type in ['time', 't']:
-            plt.xlabel("time [%ss]"%prefix)
-        elif type in ['wl', 'wls', 'wavelength', 'wavelengths']:
-            plt.xlabel('wavelength [%sm]'%prefix)
-        plt.ylabel("intensity [a.u.]")
-        names = [comp.name for comp in self.components.values() if isinstance(comp, Detector)]
-        if len(names) == 1 and len(plots) > 1:
-            names = [names[0] + str(i) for i, _ in enumerate(plots)]
-        for i, (name, plot) in enumerate(zip(names, plots)):
-            if name == '' or name is None:
-                name = str(i)
-            plot.set_label(label + ': ' + name if label != '' else name)
-        plt.legend()
-        return plots
 
     def get_delays(self):
         ''' get all the delays in the network '''
