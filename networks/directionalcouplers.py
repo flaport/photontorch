@@ -191,7 +191,7 @@ class DirectionalCouplerNetwork(Network, Component):
         couplings = self.tensor(np.zeros((I, J)))
         for i in range(I):
             for j in range(J):
-                couplings.data[i, j] = self.dc_array[i, j].dc.kappa2.data[0]
+                couplings.data[i, j] = self.dc_array[i, j].dc.coupling.data[0]
         return couplings
 
     @couplings.setter
@@ -200,7 +200,7 @@ class DirectionalCouplerNetwork(Network, Component):
         I, J = self.dc_array.shape
         for i in range(I):
             for j in range(J):
-                self.dc_array[i,j].dc.kappa2.data = self.tensor([array[i,j]])
+                self.dc_array[i,j].dc.coupling.data = self.tensor([array[i,j]])
 
     @property
     def lengths(self):

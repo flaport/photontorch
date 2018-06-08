@@ -27,7 +27,7 @@ from ..constants import pi
 class DirectionalCoupler(Component):
     r''' A directional coupler is a memory-less component with 4 ports.
 
-    A directional coupler has one trainable parameter: the squared coupling kappa2.
+    A directional coupler has one trainable parameter: the squared coupling coupling.
 
     Terms:
        3        2
@@ -41,27 +41,27 @@ class DirectionalCoupler(Component):
 
     num_ports = 4
 
-    def __init__(self, kappa2=0.5, kappa2_bounds=(0, 1), name=None):
+    def __init__(self, coupling=0.5, coupling_bounds=(0, 1), name=None):
         '''
         Directional Coupler initialization
 
         Args:
-            kappa2 (float): squared coupling of the directional coupler (between 0 and 1)
-            kappa2_bounds (tuple): Bounds in which to optimize the squared coupling.
-                If None, kappa2 will not be optimized.
+            coupling (float): squared coupling of the directional coupler (between 0 and 1)
+            coupling_bounds (tuple): Bounds in which to optimize the squared coupling.
+                If None, coupling will not be optimized.
             name (str). name of this specific directional coupler
         '''
         Component.__init__(self, name=name)
 
-        self.kappa2 = self.bounded_parameter(
-            data=kappa2,
-            bounds=kappa2_bounds,
-            requires_grad=(kappa2_bounds is not None) and (kappa2_bounds[0]!=kappa2_bounds[1]),
+        self.coupling = self.bounded_parameter(
+            data=coupling,
+            bounds=coupling_bounds,
+            requires_grad=(coupling_bounds is not None) and (coupling_bounds[0]!=coupling_bounds[1]),
         )
 
     def get_rS(self):
         ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
-        t = torch.cat([((1-self.kappa2)**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
+        t = torch.cat([((1-self.coupling)**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
         S = self.tensor([[[0, 1, 0, 0],
                                 [1, 0, 0, 0],
                                 [0, 0, 0, 1],
@@ -73,7 +73,7 @@ class DirectionalCoupler(Component):
         Imag part of the scattering matrix
         shape: (# num wavelengths, # num ports, # num ports)
         '''
-        k = torch.cat([(self.kappa2**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
+        k = torch.cat([(self.coupling**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
         S = self.tensor([[[0, 0, 1, 0],
                                 [0, 0, 0, 1],
                                 [1, 0, 0, 0],
@@ -125,8 +125,8 @@ class DirectionalCouplerWithLength(Component):
 
     def get_rS(self):
         ''' real part of the scattering matrix '''
-        k = self.dc.kappa2**0.5 # coupling
-        t = (1-self.dc.kappa2)**0.5 # Transmission
+        k = self.dc.coupling**0.5 # coupling
+        t = (1-self.dc.coupling)**0.5 # Transmission
         rS_wg_t = self.wg.rS*t
         iS_wg_k = self.wg.iS*k
         rS = self.tensor([[[0, 0, 0, 0],
@@ -141,8 +141,8 @@ class DirectionalCouplerWithLength(Component):
 
     def get_iS(self):
         ''' imag part of the scattering matrix '''
-        k = self.dc.kappa2**0.5 # coupling
-        t = (1-self.dc.kappa2)**0.5 # Transmission
+        k = self.dc.coupling**0.5 # coupling
+        t = (1-self.dc.coupling)**0.5 # Transmission
         iS_wg_t = self.wg.iS*t
         rS_wg_k = self.wg.rS*k
         iS = self.tensor([[[0, 0, 0, 0],
