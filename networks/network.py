@@ -145,7 +145,7 @@ class Network(Component):
         # Save name of component
         self.name = name
 
-        # Save components
+        # Save connections
         if self.connections is None:
             self.connections = connections
 
@@ -165,6 +165,9 @@ class Network(Component):
         # Save components
         if self.components is not None and components is None:
             components = self.components
+        if isinstance(components, (tuple, list)):
+            components = OrderedDict([(comp.name, comp) for comp in components])
+
         self.components = OrderedDict()
         for name in used_components:
             comp = copy(components[name]) # shallow copy
@@ -216,23 +219,35 @@ class Network(Component):
         return new
 
 
-    def terminate(self, term=None):
+    def terminate(self, term=None, name=None):
         '''
         Terminate open conections with the term of your choice
 
-        Args (Term): Which term to use. Defaults to Term.
+        Args (Term | dict): Which term to use. Defaults to Term.
+            if dict: specify as many name:terms as free indices in the network
         '''
+        n = len(self.free_idxs)
         if term is None:
             term = Term()
+        if isinstance(term , Term):
+            term = {term.name+'_%i'%i:term.copy() for i in range(n)}
+        if isinstance(term, (list, tuple)):
+            term = {t.name:t for t in term}
         if self.is_cuda:
-            term = term.cuda()
-        connector = Connector(self.s, self.components.values())
-        idxs = connector.idxs
-        for i in idxs:
-            term = term.copy()
-            term.name = i
-            connector = connector*term[i]
-        return Network(connector, name=self.name)
+            term = {name:t.cuda() for name, t in term.items()}
+        components = {
+            self.name:self,
+        }
+        components.update(term)
+        connections = [name+':0:'+self.name+':%i'%i for i, name in enumerate(term)]
+        if name is None:
+            name = self.name+'_terminated'
+        nw = Network(components, connections, name=self.name)
+        nw.base = self
+        return nw
+
+    def unterminate(self):
+        return self.base
 
     def initialize(self, env):
         r''' Initialize
@@ -392,6 +407,9 @@ class Network(Component):
         self.buffermask[self._delays,:,range(self.nmc),:] = 1.0
 
         self.initialized = True
+
+        # finish initialization:
+        return self
 
     def require_initialization(func):
         '''Decorator.
