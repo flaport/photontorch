@@ -61,7 +61,7 @@ class Environment(object):
         wls = kwargs.pop('wls',None)
         self.wl = kwargs.pop('wl', 1.55e-6)
         if wls is not None:
-            self.wls = wls
+            self.wls = np.array(wls)
 
         # time data:
         dt = kwargs.pop('dt', 1e-14)
