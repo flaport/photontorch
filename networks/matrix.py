@@ -22,6 +22,7 @@ import numpy as np
 # Relative
 from .network import Network
 from .connector import Connector
+from ..components.soas import LinearSoa
 from ..components.waveguides import Waveguide
 from ..components.directionalcouplers import DirectionalCoupler
 from ..components.terms import Term, Source, Detector
@@ -66,20 +67,19 @@ class UnitaryMatrixNetwork(Network):
         ''' UnitaryMatrixNetwork
 
         Args:
-            shape: (tuple): shape of the unitary matrix (should be square for now).
+            shape: (tuple): shape of the unitary matrix (m <= n [for now]).
             dc (DirectionalCoupler) : master directional coupler. All the directional
                 couplers will take over the properties of this directional coupler.
             wg (Waveguide): master waveguide. A waveguide containing all the properties of the connections
                 between directional couplers. All waveguides in this network will take
                 over the properties of this waveguide.
         '''
-        self.name = name
-        m,n = shape
-        self.n = n
+        self.shape = shape
+        self.m, self.n = m, n = shape
 
         # checks
-        if m != n:
-            raise ValueError('A unitary matrix should be square [for now]')
+        if m > n:
+            raise ValueError('m <= n is expected [for now]')
         if not isinstance(dc, DirectionalCoupler):
             raise TypeError('A DirectionalCoupler instance is expected for dc')
         if not isinstance(wg, Waveguide):
@@ -88,18 +88,19 @@ class UnitaryMatrixNetwork(Network):
         # helper functions
         def new_wg(i, trainable):
             phase = 0.5 if wg.phase is None else wg.phase.data
-            new_wg = Waveguide(length=wg.length, neff=wg.neff, loss=wg.loss, phase=phase, trainable=trainable, name='wg_%i'%i)
+            new_wg = Waveguide(length=wg.length, neff=wg.neff, loss=wg.loss, phase=phase, trainable=trainable, name='wg%i'%i)
             return new_wg
         def new_dc(i):
-            new_dc = DirectionalCoupler(coupling=dc.coupling.data, trainable=True, name='dc_%i'%i)
+            new_dc = DirectionalCoupler(coupling=dc.coupling.data, trainable=True, name='dc%i'%i)
             return new_dc
 
         # Generate waveguides
-        trainable_locations = np.zeros((2*n-1,n), dtype=bool)
-        self.waveguides = np.zeros((2*n-1,n), dtype=object)
+        p = max(m,n)
+        trainable_locations = np.zeros((2*p-1,p), dtype=bool)
+        self.waveguides = np.zeros((2*p-1,p), dtype=object)
         self.waveguides.fill(None)
         k = -1
-        for i in range(2*n-1):
+        for i in range(2*m):
             for j in range((2*n-i)//2):
                 k+=1
                 self.waveguides[i,j] = new_wg(k, trainable=i%2)
@@ -107,12 +108,20 @@ class UnitaryMatrixNetwork(Network):
             if i%2==0:
                 self.waveguides[i,j] = new_wg(k, trainable=True)
                 trainable_locations[i,j] = True
-            else:
+            elif i<2*n-1:
                 self.waveguides[i,j+1] = self.waveguides[i-1,j+1]
         self.trainable_locations = list(zip(*np.where(trainable_locations)))
 
         # Generate directional couplers
-        self.directionalcouplers = [new_dc(i) for i in range(n*(n+1)//2)]
+        self.directionalcouplers = []
+        k = -1
+        for i in range(1,2*p,2):
+            for j in range((2*n-i)//2):
+                k += 1
+                if self.waveguides[i,j] is not None:
+                    self.directionalcouplers += [new_dc(k) if j<n else None]
+                else:
+                    self.directionalcouplers += [None]
 
         # Components dictionary:
         components = OrderedDict()
@@ -124,18 +133,40 @@ class UnitaryMatrixNetwork(Network):
                 components[dc.name] = dc
 
         # Connections list:
-        connections = [wg.name+':0:%i'%i for i, wg in enumerate(self.waveguides[0])]
-        connections += [wg.name+':1:%i'%(2*n-1-i) for i, wg in enumerate(list(self.waveguides[1::2,0]) + [self.waveguides[-1,0]])]
+        connections = [wg.name+':0:%i'%i for i, wg in enumerate(self.waveguides[0]) if wg is not None]
+        connections += [wg.name+':1:%i'%(m+n-1-i) for i, wg in enumerate(list(self.waveguides[1::2,0]) + [self.waveguides[-1,0]]) if wg is not None]
         k = -1
-        for i in range(1,2*n-1,2):
+        for i in range(1,2*p,2):
             for j in range((2*n-i)//2):
                 k += 1
-                connections += [
-                    self.waveguides[i-1,j].name + ':1:' + self.directionalcouplers[k].name + ':0',
-                    self.waveguides[i,j].name+':0:' + self.directionalcouplers[k].name + ':1',
-                    self.waveguides[i+1,j].name+':0:' + self.directionalcouplers[k].name + ':2',
-                    self.waveguides[i,j+1].name+':1:' + self.directionalcouplers[k].name + ':3',
-                ]
+
+                if self.directionalcouplers[k] is None:
+                    continue
+
+                try:
+                    connections += [self.waveguides[i-1,j].name + ':1:' + self.directionalcouplers[k].name + ':0']
+                except:
+                    t = Term(name=self.directionalcouplers[k].name+'_t0')
+                    components[t.name] = t
+                    connections += [t.name + ':0:' + self.directionalcouplers[k].name+':0']
+                try:
+                    connections += [self.waveguides[i,j].name+':0:' + self.directionalcouplers[k].name + ':1']
+                except:
+                    t = Term(name=self.directionalcouplers[k].name+'_t1')
+                    components[t.name] = t
+                    connections += [t.name + ':0:' + self.directionalcouplers[k].name+':1']
+                try:
+                    connections += [self.waveguides[i+1,j].name+':0:' + self.directionalcouplers[k].name + ':2']
+                except:
+                    t = Term(name=self.directionalcouplers[k].name+'_t2')
+                    components[t.name] = t
+                    connections += [t.name + ':0:' + self.directionalcouplers[k].name+':2']
+                try:
+                    connections += [self.waveguides[i,j+1].name+':1:' + self.directionalcouplers[k].name + ':3']
+                except:
+                    t = Term(name=self.directionalcouplers[k].name+'_t3')
+                    components[t.name] = t
+                    connections += [t.name + ':0:' + self.directionalcouplers[k].name+':3']
 
         # Termination Flag
         self.terminated = False
@@ -144,65 +175,81 @@ class UnitaryMatrixNetwork(Network):
         super(UnitaryMatrixNetwork, self).__init__(components, connections, name=name)
 
     def terminate(self, term=None, name=None):
+
+        env = self.env
+
         if self.terminated:
             return self # do nothing
+
         if term is None:
             term = OrderedDict()
             for i in range(self.n):
                 term['s%i'%i] = Source(name='s%i'%i)
-            for i in range(self.n):
+            for i in range(self.m):
                 term['d%i'%i] = Detector(name='d%i'%i)
         if isinstance(term , Term):
-            term = {term.name+'_%i'%i:term.copy() for i in range(n)}
+            term = OrderedDict([(term.name+'_%i'%i,term.copy()) for i in range(self.m+self.n)])
         if isinstance(term, (list, tuple)):
-            term = {t.name:t for t in term}
+            term = OrderedDict([(t.name,t) for t in term])
         if self.is_cuda:
-            term = {name:t.cuda() for name, t in term.items()}
+            term = OrderedDict([(name,t.cuda()) for name, t in term.items()])
+
         self.components.update(term)
 
-        connections = [wg.name+':0:'+t.name+':0' for t, wg in zip(list(term.values())[:self.n],self.waveguides[0])]
-        connections += [wg.name+':1:'+t.name+':0' for t, wg in zip(list(term.values())[self.n:],(list(self.waveguides[1::2,0]) + [self.waveguides[-1,0]])[::-1])]
+        input_waveguides = [wg for wg in self.waveguides[0] if wg is not None]
+        output_waveguides = [wg for wg in list(self.waveguides[1::2,0]) + [self.waveguides[-1,0]] if wg is not None][::-1]
+        connections = [wg.name+':0:'+t.name+':0' for t, wg in zip(list(term.values())[:self.n], input_waveguides)]
+        connections += [wg.name+':1:'+t.name+':0' for t, wg in zip(list(term.values())[self.n:], output_waveguides)]
 
-        self.connections[:2*self.n] = connections
+        self.connections[:self.m+self.n] = connections
 
         if name is None:
             name = self.name
 
         super(UnitaryMatrixNetwork, self).__init__(self.components, self.connections, name=name)
 
-        return self
+        if env is not None:
+            self.initialize(env)
 
+        return self
 
     def unterminate(self, name=None):
+
+        env = self.env
+
         if not self.terminated:
             return self # do nothing
-        connections = [wg.name+':0:%i'%i for i, wg in enumerate(self.waveguides[0])]
-        connections += [wg.name+':1:%i'%(2*n-1-i) for i, wg in enumerate(list(self.waveguides[1::2,0]) + [self.waveguides[-1,0]])]
-        self.connections[:2*self.n] = connections
+
+        connections = [wg.name+':0:%i'%i for i, wg in enumerate(self.waveguides[0]) if wg is not None]
+        connections += [wg.name+':1:%i'%(self.m+self.n-1-i) for i, wg in enumerate(list(self.waveguides[1::2,0]) + [self.waveguides[-1,0]]) if wg is not None]
+
+        self.connections[:self.m+self.n] = connections
 
         if name is None:
             name = self.name
 
         super(UnitaryMatrixNetwork, self).__init__(self.components, self.connections, name=name)
 
-        return self
+        if env is not None:
+            self.initialize(env)
 
+        return self
 
     def fit(self, U, max_epochs=1500, tol=1e-7, progress_bar=True, learning_rate=0.1):
         ''' Fit Unitary Matrix Network to a unitary matrix U '''
 
         # Perfom checks
-        if U.shape != (self.n, self.n):
+        if U.shape != (self.m, self.n):
             raise ValueError('Shape mismatch for fit.')
-        if not(np.allclose(U.T.conj().dot(U), np.eye(self.n)) and np.allclose(U.dot(U.T.conj()), np.eye(self.n))):
+        if not np.allclose(U.dot(U.T.conj()), np.eye(self.m)):
             raise ValueError('fit expects a unitary matrix')
 
         # Create Range (with or without progress bar)
         if progress_bar:
             from tqdm import trange
-            r = trange(self.n-1)
+            r = trange(self.m)
         else:
-            r = range(self.n-1)
+            r = range(self.m)
             r.set_postfix = lambda **kwargs: None # dummy function
 
         # Terminate network
@@ -237,15 +284,15 @@ class UnitaryMatrixNetwork(Network):
 
         # Create source and target
         source = new_source(U.T.conj())
-        target = new_source(np.eye(self.n,self.n))[...,:self.n,:]
+        target = new_source(np.eye(self.m,self.m))[...,:self.m,:]
         lossfunc = torch.nn.MSELoss()
 
         # Start training
         for i in r:
             loss = torch.tensor(1)
             optimizer = torch.optim.Adam(parameters(i), lr=learning_rate)
-            for _ in range(max_epochs):
-                r.set_postfix(loss='{loss:.{x}f}'.format(loss=loss.item(), x=int(-np.log10(tol)+0.5)))
+            for e in range(max_epochs):
+                r.set_postfix(epoch='%i'%e, loss='{loss:.{x}f}'.format(loss=loss.item(), x=int(-np.log10(tol)+0.5)))
                 if loss.item() < tol:
                     break
                 optimizer.zero_grad()
@@ -260,6 +307,42 @@ class UnitaryMatrixNetwork(Network):
             self.unterminate()
 
         return self
+
+    def transpose(self):
+        ''' switch detectors and sources
+        [this is an easy way around the fact that mxn matrices with m>n are not
+        implemented]
+
+        TODO: implement mxn matrices with m>n
+        '''
+
+        if not self.terminated:
+            raise Exception('The network needs to be terminated')
+
+        env = self.env
+
+        components = OrderedDict()
+        for name, comp in self.components.items():
+            if isinstance(comp, Source):
+                name = name.replace('s','d')
+                comp = Detector(name)
+            elif isinstance(comp, Detector):
+                name = name.replace('d','s')
+                comp = Source(name)
+            components[name] = comp
+
+        connections = []
+        for conn in self.connections:
+            conn = conn.replace('dc','@#').replace('d','$').replace('s','d').replace('$','s').replace('@#','dc')
+            connections += [conn]
+
+        super(UnitaryMatrixNetwork, self).__init__(components, connections, name=self.name)
+
+        if env is not None:
+            self.initialize(env)
+
+        return self
+
 
 
 ####################
@@ -286,7 +369,7 @@ class MatrixNetwork(Network):
         terminated with a Term.
     '''
 
-    def __init__(self, shape, dc, wg, soa, name=None):
+    def __init__(self, shape, dc, wg, soa, name='mn'):
         ''' MatrixNetwork
 
         Args:
@@ -302,189 +385,125 @@ class MatrixNetwork(Network):
             The parameters of the network will be randomly initialized. This will thus
             result in a unitary matrix with random values. You need to train the matrix
             for a specific output to set the matrix values.
-
         '''
-
         self.shape = shape
-        m, n = shape
+        self.m, self.n = m, n = shape
 
-        # Create unitary matrices
-        U = UnitaryMatrixNetwork((m,m), dc, wg, name='Unw')
-        V = UnitaryMatrixNetwork((n,n), dc, wg, name='Vnw')
+        # checks
+        if m > n:
+            raise ValueError('m <= n is expected [for now]')
+        if not isinstance(dc, DirectionalCoupler):
+            raise TypeError('A DirectionalCoupler instance is expected for dc')
+        if not isinstance(wg, Waveguide):
+            raise TypeError('A Waveguide instance is expected for wg')
+        if not isinstance(soa, LinearSoa):
+            raise TypeError('A LinearSoa instance is expected for soa')
 
-        # Connection strings for unitary matrices:
-        k = ord('a')
-        Uin = ''.join(chr(k) for k in range(k, k+m))
-        Uout = ''.join(chr(k) for k in range(k+m, k+2*m))
-        Vin = ''.join(chr(k) for k in range(k+2*m, k+2*m+n))
-        Vout = ''.join(chr(k) for k in range(k+2*m+n, k+2*m+2*n))
+        # helper functions
+        def new_soa(i):
+            return LinearSoa(amplification=soa.amplification.data[0].item(), trainable=True, name='soa%i'%i)
 
-        # Looking at the singular value decomposition USV, we see that
-        # we first have to describe the action of V, then amplify
-        # and then we have to describe the action of U.
+        # subnetworks
+        U = UnitaryMatrixNetwork((m,m), dc, wg, name='U')
+        V = UnitaryMatrixNetwork((m,n), dc, wg, name='V')
 
-        # Connector
-        conn = U[Uin+Uout]*V[Vin+Vout]
+        # soas
+        self.soas = [new_soa(i) for i in range(m)]
 
-        # Inputs
-        self.input_s = Vin
+        # components
+        components = OrderedDict([(soa.name, soa) for soa in self.soas])
+        components['U'] = U
+        components['V'] = V
 
-        # Amplification
-        self.soas = []
-        for vc, uc in zip(Vout, Uin):
-            soa = soa.copy()
-            soa.name = vc+uc
-            self.soas.append(soa)
-            conn = conn*soa[vc+uc]
+        # connections
+        connections = []
+        connections += ['U:%i:%i'%(i, i) for i in range(n)]
+        connections += ['U:%i:%i'%(m+i,i) for i in range(m)]
+        connections += ['V:%i:soa%i:0'%(n+i, i) for i in range(m)]
+        connections += ['U:%i:soa%i:1'%(i, i) for i in range(m)]
 
-        # Terms
-        if m > n: # Add terms to unused inputs of U:
-            for c in Uin[-(m-n):]:
-                conn = conn * Term(name=c)[c]
-            Uin = Uin[:-(m-n)]
-        elif m < n: # Add terms to unused outputs of V:
-            for c in Vout[-(n-m):]:
-                conn = conn*Term(name=c)[c]
-            Vout = Vout[:-(n-m)]
+        super(MatrixNetwork, self).__init__(components, connections, name=name)
 
-        # Outputs
-        self.output_s = Uout
+    def terminate(self, term=None, name=None):
 
-        # Initialize:
-        self.conn = conn
-        super(MatrixNetwork, self).__init__(conn, name=name)
+        env = self.env
 
-    def copy(self):
-        for dc in self.Vself.dcs.values():
-            dc = dc.components[0]
-            break
-        for wg in self.Vself.hwgs.values():
-            wg = wg.components[0]
-            break
-        for soa in self.soas:
-            break
-        new = self.__class__(self.shape, dc, wg, soa, name=self.name)
-        new.conn.components = [comp.copy() for comp in self.conn.components]
-        new.soas = [comp for comp in new.conn.components if isinstance(comp, soa.__class__)]
+        if self.terminated:
+            return self # do nothing
 
-        super(MatrixNetwork, new).__init__(new.conn, name=self.name)
+        if term is None:
+            term = OrderedDict()
+            for i in range(self.n):
+                term['s%i'%i] = Source(name='s%i'%i)
+            for i in range(self.m):
+                term['d%i'%i] = Detector(name='d%i'%i)
+        if isinstance(term , Term):
+            term = OrderedDict([(term.name+'_%i'%i,term.copy()) for i in range(self.m+self.n)])
+        if isinstance(term, (list, tuple)):
+            term = OrderedDict([(t.name,t) for t in term])
+        if self.is_cuda:
+            term = OrderedDict([(name,t.cuda()) for name, t in term.items()])
 
-        return new
+        self.components.update(term)
 
-    def terminate(self):
-        '''
-        A Matrix Network is terminated by Sources on V and detectors on U
-        '''
-        is_cuda = self.is_cuda
+        connections = ['V:'+str(i)+':'+t.name+':0' for i, t in enumerate(list(term.values())[:self.n])]
+        connections += ['U:'+str(self.m+i)+':'+t.name+':0' for i, t in enumerate(list(term.values())[self.n:])]
 
-        def maybe_cuda(comp):
-            return comp if not is_cuda else comp.cuda()
+        self.connections[:self.m+self.n] = connections
 
-        for c in self.input_s:
-            self.conn = self.conn*maybe_cuda(Source(name=c))[c]
-        for c in self.output_s:
-            self.conn = self.conn*maybe_cuda(Detector(name=c))[c]
+        if name is None:
+            name = self.name
 
-        super(MatrixNetwork, self).__init__(self.conn, name=self.name)
+        super(MatrixNetwork, self).__init__(self.components, self.connections, name=name)
 
-        self.is_cuda = is_cuda
+        if env is not None:
+            self.initialize(env)
 
         return self
 
-    def unterminate(self):
-        ''' Undo de termination of the network '''
-        is_cuda = self.is_cuda
+    def unterminate(self, name=None):
 
-        s = self.conn.s.split(',')
-        components = self.conn.components
-        s, self.components = zip(*[(ss, comp) for (ss, comp) in zip(s, components) if not isinstance(comp, Term)])
-        self.s = ','.join(s)
-        self.conn = Connector(self.s, self.components)
+        env = self.env
 
-        self.is_cuda = is_cuda
-        return self
+        if not self.terminated:
+            return self # do nothing
 
-    def fit(self, M, max_epochs=1000, tol=1e-7, progress_bar=True, optimizer=None, lossfunc=None):
-        ''' Fit Unitary Matrix Network to a unitary matrix U '''
-        m, n = self.shape
+        connections += ['U:%i:%i'%(i, i) for i in range(n)]
+        connections += ['U:%i:%i'%(m+i,i) for i in range(m)]
 
-        if self.shape != M.shape:
-            raise ValueError('Shape mismatch for fit')
+        self.connections[:self.m+self.n] = connections
 
-        U,S,V = np.linalg.svd(M)
+        if name is None:
+            name = self.name
 
-        self.Vself.fit(
-            U=V,
-            max_epochs=max_epochs,
-            tol=tol,
-            progress_bar=progress_bar,
-            optimizer=optimizer,
-            lossfunc=lossfunc,
-        )
+        super(MatrixNetwork, self).__init__(self.components, self.connections, name=name)
 
-        self.Uself.fit(
-            U=U,
-            max_epochs=max_epochs,
-            tol=tol,
-            progress_bar=progress_bar,
-            optimizer=optimizer,
-            lossfunc=lossfunc,
-        )
-
-        for amplification, soa in zip(S, self.soas):
-            soa.amplification.data[0] = amplification
+        if env is not None:
+            self.initialize(env)
 
         return self
 
-    @property
-    def M(self):
-        ''' Matrix represented by this matrix network '''
-        m,n = self.shape
-        return self.matmul(np.eye(n,n))
+    def fit(self, M, max_epochs=1500, tol=1e-7, progress_bar=True, learning_rate=0.1):
+        ''' Fit Matrix Network to a matrix M '''
 
-    def matmul(self, other):
-        ''' Matrix multiplication of the network with a numpy array '''
-        # we first check if the numpy array is 2D:
-        if other.ndim != 2:
-            raise ValueError('Matrix Multiplication of a Unitary Matrix Network with a numpy'
-                             'array expects a 2D array.')
-        if other.shape[1] != self.num_sources:
-            raise ValueError('Shape mismatch between Unitary Matrix Network and numpy array')
+        env = self.env
 
-        # Terminate if necessary
-        terminated = self.terminated
-        if not terminated:
-            self.terminate()
+        # Perfom checks
+        if M.shape != (self.m, self.n):
+            raise ValueError('Shape mismatch for fit.')
 
-        # Initialize with simplified environment
-        old_env = self.env.copy()
-        new_env = self.env.copy(
-            use_delays=False,
-            num_wl=1,
-            num_timesteps=1,
-            num_batches=other.shape[1],
-        )
-        self.initialize(new_env)
+        # svd
+        U, S, V = np.linalg.svd(M, full_matrices=False)
 
-        # Create Source
-        source = np.zeros((2,1,1,self.nmc,other.shape[1]))
-        source[0,0,0,:other.shape[0],:] = np.real(other)
-        source[1,0,0,:other.shape[0],:] = np.imag(other)
-        source = self.tensor(source)
+        # fit
+        self.V.fit(V, max_epochs=max_epochs, tol=tol, progress_bar=progress_bar, learning_rate=learning_rate)
+        self.U.fit(U, max_epochs=max_epochs, tol=tol, progress_bar=progress_bar, learning_rate=learning_rate)
+        for i, s in enumerate(S):
+            self.soas[i].amplification.data[0] = s
 
-        # Propagate
-        result = self(source, power=False)[:,0,0,:,:].data.cpu().numpy()
+        # initialize
+        if env is not None:
+            self.initialize(env)
 
-        # Unterminate if necessary
-        if not terminated:
-            self.unterminate()
-
-        # Initialize with old environment
-        self.initialize(old_env)
-
-        # Return
-        return result[0] + 1j*result[1]
-
-    def __matmul__(self, other):
-        ''' @ operator for python 3 '''
-        return self.matmul(other)
+        # finish
+        return self
