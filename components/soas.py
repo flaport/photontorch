@@ -34,22 +34,17 @@ class SimpleSoa(Component):
 
     num_ports = 2
 
-    def __init__(self, amplification=0.5, amplification_bounds=None, name=None):
-        ''' Mirror
+    def __init__(self, amplification=0.5, trainable=True, name=None):
+        ''' SOA
 
         Args:
-            R (float). Reflectivity of the mirror (between 0 and 1)
-            R_bounds (tuple): Bounds in which to optimize R. If None, R will not be optimized.
+            amplification (float). Reflectivity of the mirror (between 0 and 1)
+            trainable (bool): Whether the amplification is trainable
             name (str): name of this specific mirror
         '''
         Component.__init__(self, name=name)
 
-        no_bounds = amplification_bounds is None
-        self.amplification = self.bounded_parameter(
-            data=amplification,
-            bounds=amplification_bounds,
-            requires_grad=no_bounds or ((not no_bounds) and (amplification_bounds[0]!=amplification_bounds[1])),
-        )
+        self.amplification = self.parameter(amplification, requires_grad=trainable)
 
     def get_rS(self):
         ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''

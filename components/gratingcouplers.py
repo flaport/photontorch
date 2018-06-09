@@ -73,5 +73,5 @@ class GratingCoupler(Component):
     def get_iS(self):
         ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         S = self.tensor([[[self.R_in, 0],
-                                [0,    self.R]]])
+                          [0,    self.R]]])
         return torch.cat([S]*self.env.num_wl, dim=0)

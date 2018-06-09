@@ -41,31 +41,30 @@ class DirectionalCoupler(Component):
 
     num_ports = 4
 
-    def __init__(self, coupling=0.5, coupling_bounds=(0, 1), name=None):
+    def __init__(self, coupling=0.5, trainable=True, name=None):
         '''
         Directional Coupler initialization
 
         Args:
             coupling (float): squared coupling of the directional coupler (between 0 and 1)
-            coupling_bounds (tuple): Bounds in which to optimize the squared coupling.
-                If None, coupling will not be optimized.
+            trainable (bool): whether the coupling of the directional coupler is trainable
             name (str). name of this specific directional coupler
         '''
         Component.__init__(self, name=name)
 
         self.coupling = self.bounded_parameter(
             data=coupling,
-            bounds=coupling_bounds,
-            requires_grad=(coupling_bounds is not None) and (coupling_bounds[0]!=coupling_bounds[1]),
+            bounds=(0,1),
+            requires_grad=trainable,
         )
 
     def get_rS(self):
         ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
         t = torch.cat([((1-self.coupling)**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
         S = self.tensor([[[0, 1, 0, 0],
-                                [1, 0, 0, 0],
-                                [0, 0, 0, 1],
-                                [0, 0, 1, 0]]])
+                          [1, 0, 0, 0],
+                          [0, 0, 0, 1],
+                          [0, 0, 1, 0]]])
         return t*S
 
     def get_iS(self):
@@ -75,9 +74,9 @@ class DirectionalCoupler(Component):
         '''
         k = torch.cat([(self.coupling**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
         S = self.tensor([[[0, 0, 1, 0],
-                                [0, 0, 0, 1],
-                                [1, 0, 0, 0],
-                                [0, 1, 0, 0]]])
+                          [0, 0, 0, 1],
+                          [1, 0, 0, 0],
+                          [0, 1, 0, 0]]])
         return k*S
 
 
