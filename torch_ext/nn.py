@@ -368,7 +368,7 @@ class Module(_Module_):
         return self.parameter(data, dtype=dtype, cuda=cuda, requires_grad=requires_grad)
 
     def bounded_parameter(self, data, bounds=None, dtype='float',
-                              cuda=None, requires_grad=True):
+                                cuda=None, requires_grad=True):
         '''
         Create a Bounded Parameter, Parameter or Buffer from given data.
 
