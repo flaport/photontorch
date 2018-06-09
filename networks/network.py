@@ -146,8 +146,10 @@ class Network(Component):
         self.name = name
 
         # Save connections
-        if self.connections is None:
+        if connections is not None:
             self.connections = connections
+        else:
+            connections = self.connections
 
         # Check which components are actually used
         def is_int(s):
@@ -249,7 +251,7 @@ class Network(Component):
     def unterminate(self):
         return self.base
 
-    def initialize(self, env):
+    def initialize(self, env=None):
         r''' Initialize
         Initializer of the network. The initializer should be called before
         doing any simulation (forward pass through the network). It creates all the
@@ -286,6 +288,10 @@ class Network(Component):
             network is not fully connected, the initialization will not be finalized.
             (and the self.initialized flag will remain False)
         '''
+        ## get environment
+        if env is None:
+            env = self.env
+
         ## begin initialization:
         self.initialized = False
 
@@ -298,7 +304,7 @@ class Network(Component):
 
         ## Check if network if fully connected
         if not self.terminated:
-            return # Stop initialization here.
+            return self# Stop initialization here.
 
         ## delays
         # delays can be turned off for frequency calculations
