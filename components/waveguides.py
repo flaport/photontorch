@@ -28,7 +28,7 @@ class Waveguide(Connection):
     A waveguide is a Component where each of the two nodes
     introduces a delay corresponding to the length of the waveguide.
 
-    A waveguide is not trainable (for now)
+    For a waveguide, only its phase change can be trained
 
     Terms:
 
@@ -40,9 +40,8 @@ class Waveguide(Connection):
                  length=1e-6,
                  neff=2.86,
                  loss=0,
-                 length_bounds=None,
                  phase=None,
-                 phase_bounds=(0,2*np.pi),
+                 trainable=True,
                  name=None):
         ''' Waveguide
 
@@ -50,10 +49,9 @@ class Waveguide(Connection):
             length (float): Length of the waveguide in meter.
             neff = 4.0 (float). Effective index of the waveguide
             loss = 0 (float): Loss in the waveguide [dB/m]
-            length_bounds (tuple): bounds in which to optimize the length
             phase (float): if a phase is given, the phase introduced by the wavelength
                 becomes decoupled from the length. This can be useful for training purposes.
-            phase_bounds (tuple): bounds in which to optimize the phase.
+            trainable (bool): whether the phase of the waveguide is trainable
             name (str): Name of the specific waveguide
         '''
         Connection.__init__(self, name=name)
@@ -62,19 +60,14 @@ class Waveguide(Connection):
         self.loss = loss
         # as the phase is very sensitive on the length, we need double precision to
         # store the length of the waveguide:
-        self.length = self.bounded_parameter(
+        self.length = self.buffer( # Waveguide length is not trainable (for now)
             data=length,
-            bounds=length_bounds,
             dtype='double',
-            requires_grad=(length_bounds is not None) and (length_bounds[0]!=length_bounds[1]),
+            requires_grad=False,
         )
+
         if phase is not None:
-            no_bounds = phase_bounds is None
-            self.phase = self.bounded_parameter(
-                data=phase%(2*np.pi),
-                bounds=phase_bounds,
-                requires_grad=no_bounds or ((not no_bounds) and (phase_bounds[0] != phase_bounds[1])),
-            )
+            self.phase = self.parameter(data=phase%(2*np.pi), requires_grad=trainable)
         else:
             self.phase = None
 
