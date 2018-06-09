@@ -19,10 +19,10 @@ from .component import Component
 ## Simple SOA ##
 ################
 
-class SimpleSoa(Component):
-    ''' A Simple SOA is a memory-less component with one input and one output.
+class LinearSoa(Component):
+    ''' A Linear SOA is a memory-less component with one input and one output.
 
-    It amplifies a signal instantaneously with the specified amplification factor
+    It amplifies a signal instantaneously and linearly with the specified amplification factor
 
     A simple SOA has one trainable parameter: the amplification.
 

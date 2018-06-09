@@ -25,7 +25,7 @@ from .terms import Detector
 from .mirrors import Mirror
 
 # SOAs
-from .soas import SimpleSoa
+from .soas import LinearSoa
 
 # MMIs
 from .mmis import Mmi21
