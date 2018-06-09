@@ -64,7 +64,7 @@ from .components.terms import Detector
 from .components.mirrors import Mirror
 
 # SOAs
-from .components.soas import SimpleSoa
+from .components.soas import LinearSoa
 
 # MMIs
 from .components.mmis import Mmi21
