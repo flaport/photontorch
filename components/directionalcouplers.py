@@ -58,26 +58,19 @@ class DirectionalCoupler(Component):
             requires_grad=trainable,
         )
 
-    def get_rS(self):
-        ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
+    def get_S(self):
+        ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
         t = torch.cat([((1-self.coupling)**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
-        S = self.tensor([[[0, 1, 0, 0],
-                          [1, 0, 0, 0],
-                          [0, 0, 0, 1],
-                          [0, 0, 1, 0]]])
-        return t*S
-
-    def get_iS(self):
-        '''
-        Imag part of the scattering matrix
-        shape: (# num wavelengths, # num ports, # num ports)
-        '''
         k = torch.cat([(self.coupling**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
-        S = self.tensor([[[0, 0, 1, 0],
-                          [0, 0, 0, 1],
-                          [1, 0, 0, 0],
-                          [0, 1, 0, 0]]])
-        return k*S
+        rS = t*self.tensor([[[0, 1, 0, 0], # real part
+                             [1, 0, 0, 0],
+                             [0, 0, 0, 1],
+                             [0, 0, 1, 0]]])
+        iS = k*self.tensor([[[0, 0, 1, 0], # imag part
+                             [0, 0, 0, 1],
+                             [1, 0, 0, 0],
+                             [0, 1, 0, 0]]])
+        return torch.stack([rS, iS])
 
 
 #####################################
@@ -122,37 +115,39 @@ class DirectionalCouplerWithLength(Component):
         ''' Delays of the directional coupler '''
         return torch.cat((self.wg.delays, self.wg.delays))
 
-    def get_rS(self):
-        ''' real part of the scattering matrix '''
+    def get_S(self):
+        '''Scattering matrix with shape (2, # wavelengths, # ports, # ports)'''
         k = self.dc.coupling**0.5 # coupling
         t = (1-self.dc.coupling)**0.5 # Transmission
+
+        # Helper matrices
         rS_wg_t = self.wg.rS*t
         iS_wg_k = self.wg.iS*k
+        iS_wg_t = self.wg.iS*t
+        rS_wg_k = self.wg.rS*k
+
+        # Real part
         rS = self.tensor([[[0, 0, 0, 0],
-                                 [0, 0, 0, 0],
-                                 [0, 0, 0, 0],
-                                 [0, 0, 0, 0]]]*self.env.num_wl)
+                           [0, 0, 0, 0],
+                           [0, 0, 0, 0],
+                           [0, 0, 0, 0]]]*self.env.num_wl)
         rS[:,:2, :2] = rS_wg_t # Transmission from i < - > j
         rS[:,2:, 2:] = rS_wg_t # Transmission from k < - > l
         rS[:,::2, ::2] = -iS_wg_k
         rS[:,1::2, 1::2] = -iS_wg_k
-        return rS
 
-    def get_iS(self):
-        ''' imag part of the scattering matrix '''
-        k = self.dc.coupling**0.5 # coupling
-        t = (1-self.dc.coupling)**0.5 # Transmission
-        iS_wg_t = self.wg.iS*t
-        rS_wg_k = self.wg.rS*k
+        # Imag Part
         iS = self.tensor([[[0, 0, 0, 0],
-                                 [0, 0, 0, 0],
-                                 [0, 0, 0, 0],
-                                 [0, 0, 0, 0]]]*self.env.num_wl)
+                           [0, 0, 0, 0],
+                           [0, 0, 0, 0],
+                           [0, 0, 0, 0]]]*self.env.num_wl)
         iS[:,:2, :2] = iS_wg_t # Transmission from i < - > j
         iS[:,2:, 2:] = iS_wg_t # Transmission from k < - > l
         iS[:,::2, ::2] = rS_wg_k
         iS[:,1::2, 1::2] = rS_wg_k
-        return iS
+
+        # Return
+        return torch.stack([rS, iS])
 
 
 class RealisticDirectionalCoupler(Component):
@@ -210,30 +205,21 @@ class RealisticDirectionalCoupler(Component):
         self.de2_n0 = de2_n0
         self.wl0 = 1.55e-6
 
-    def get_rS(self):
-        ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
+    def get_S(self):
+        ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
         wl = self.env.wls
         dwl = wl - self.wl0
         dn = self.n0 + self.de1_n0*dwl + 0.5*self.de2_n0*dwl**2
         kappa0 = self.k0 + self.de1_k0*dwl + 0.5*self.de2_k0*dwl**2
         kappa1 = pi*dn/wl
         tau = self.tensor(np.cos(kappa0 + kappa1*self.length)).view(-1,1,1)
-        S = self.tensor([[[0, 1, 0, 0],
-                                [1, 0, 0, 0],
-                                [0, 0, 0, 1],
-                                [0, 0, 1, 0]]])
-        return tau*S
-
-    def get_iS(self):
-        ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
-        wl = self.env.wls
-        dwl = wl - self.wl0
-        dn = self.n0 + self.de1_n0*dwl + 0.5*self.de2_n0*dwl**2
-        kappa0 = self.k0 + self.de1_k0*dwl + 0.5*self.de2_k0*dwl**2
-        kappa1 = pi*dn/wl
         kappa = self.tensor(-np.sin(kappa0 + kappa1*self.length)).view(-1,1,1)
-        S = self.tensor([[[0, 0, 1, 0],
-                                [0, 0, 0, 1],
-                                [1, 0, 0, 0],
-                                [0, 1, 0, 0]]])
-        return kappa*S
+        rS = tau*self.tensor([[[0, 1, 0, 0],
+                               [1, 0, 0, 0],
+                               [0, 0, 0, 1],
+                               [0, 0, 1, 0]]])
+        iS = kappa*self.tensor([[[0, 0, 1, 0],
+                                 [0, 0, 0, 1],
+                                 [1, 0, 0, 0],
+                                 [0, 1, 0, 0]]])
+        return torch.stack([rS, iS])

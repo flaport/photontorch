@@ -76,30 +76,23 @@ class Waveguide(Connection):
         delay = self.neff*self.length/c
         return torch.cat([delay, delay]).float()
 
-    def get_rS(self):
-        ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
+    def get_S(self):
+        ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
         if self.phase is not None:
             cos_phase = self.phase.cos().double()
-        else:
-            wls = self.tensor(self.env.wls, dtype='double')
-            cos_phase = torch.cos(2*pi*self.neff*self.length/wls)
-        re = 10**(-self.loss*self.length/10)*cos_phase
-        # we can safely convert back to single precision now:
-        re = re.float()
-        S = self.tensor([[[0, 1],
-                                [1, 0]]])
-        return re.view(-1,1,1)*S
-
-    def get_iS(self):
-        ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
-        if self.phase is not None:
             sin_phase = self.phase.sin().double()
         else:
             wls = self.tensor(self.env.wls, dtype='double')
+            cos_phase = torch.cos(2*pi*self.neff*self.length/wls)
             sin_phase = torch.sin(2*pi*self.neff*self.length/wls)
+        re = 10**(-self.loss*self.length/10)*cos_phase
         ie = 10**(-self.loss*self.length/10)*sin_phase
         # we can safely convert back to single precision now:
+        re = re.float()
         ie = ie.float()
-        S = self.tensor([[[0, 1],
-                                [1, 0]]])
-        return ie.view(-1,1,1)*S
+        # calculate real part and imag part
+        rS = re.view(-1,1,1)*self.tensor([[[0, 1],
+                                           [1, 0]]])
+        iS = ie.view(-1,1,1)*self.tensor([[[0, 1],
+                                           [1, 0]]])
+        return torch.stack([rS,iS])

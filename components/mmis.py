@@ -47,28 +47,13 @@ class Mmi21(Component):
         '''
         Component.__init__(self, name=name)
 
-    def get_rS(self):
-        '''
-        Real part of the scattering matrix
-        shape: (# wavelengths, # ports, # ports)
-        '''
+    def get_S(self):
+        ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
         t = (1.0/2.0)**0.5*self.tensor(np.ones_like(self.env.wls)).view(-1,1,1)
-        S = self.tensor([[[0, 1, 1],
-                          [1, 0, 0],
-                          [1, 0, 0]]])
-        return t*S
-
-
-    def get_iS(self):
-        '''
-        Imag part of the scattering matrix
-        shape: (# wavelengths, # ports, # ports)
-        '''
-        t = (1.0/2.0**0.5)*self.tensor(np.zeros_like(self.env.wls)).view(-1,1,1)
-        S = self.tensor([[[0, 0, 0],
-                          [0, 0, 0],
-                          [0, 0, 0]]])
-        return t*S
+        S = t*self.tensor([[[0, 1, 1],
+                            [1, 0, 0],
+                            [1, 0, 0]]])
+        return torch.stack([S, torch.zeros_like(S)])
 
 
 #############
@@ -100,31 +85,14 @@ class Mmi33(Component):
         '''
         Component.__init__(self, name=name)
 
-    def get_rS(self):
-        '''
-        Real part of the scattering matrix
-        shape: (# wavelengths, # ports, # ports)
+    def get_S(self):
+        ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports)
         '''
         t = (1.0/3.0**0.5)*self.tensor(np.ones_like(self.env.wls)).view(-1,1,1)
-        S = self.tensor([[[0, 0, 0, 1, 1, 1],
-                          [0, 0, 0, 1, 1, 1],
-                          [0, 0, 0, 1, 1, 1],
-                          [1, 1, 1, 0, 0, 0],
-                          [1, 1, 1, 0, 0, 0],
-                          [1, 1, 1, 0, 0, 0]]])
-        return t*S
-
-
-    def get_iS(self):
-        '''
-        Imag part of the scattering matrix
-        shape: (# wavelengths, # ports, # ports)
-        '''
-        t = (1.0/3.0**0.5)*self.tensor(np.zeros_like(self.env.wls)).view(-1,1,1)
-        S = self.tensor([[[0, 0, 0, 0, 0, 0],
-                          [0, 0, 0, 0, 0, 0],
-                          [0, 0, 0, 0, 0, 0],
-                          [0, 0, 0, 0, 0, 0],
-                          [0, 0, 0, 0, 0, 0],
-                          [0, 0, 0, 0, 0, 0]]])
-        return t*S
+        S = t*self.tensor([[[0, 0, 0, 1, 1, 1],
+                            [0, 0, 0, 1, 1, 1],
+                            [0, 0, 0, 1, 1, 1],
+                            [1, 1, 1, 0, 0, 0],
+                            [1, 1, 1, 0, 0, 0],
+                            [1, 1, 1, 0, 0, 0]]])
+        return torch.stack([S, torch.zeros_like(S)])
