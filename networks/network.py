@@ -151,18 +151,9 @@ class Network(Component):
         else:
             connections = self.connections
 
-        # Check which components are actually used
-        def is_int(s):
-            try:
-                int(s)
-                return True
-            except ValueError:
-                return False
-        used_components = [conn.split(':') for conn in self.connections]
-        # here we would like to use an ordered set, but this does not exist.
-        # therefore, we use an OrderedDict, for which we don't care about
-        # the values. [all for python 2 compatibility...]
-        used_components = OrderedDict([(comp,None) for tup in used_components for comp in tup if not is_int(comp)])
+
+        # Get the components that were used in the connections:
+        used_components = self.get_used_components()
 
         # Save components
         if self.components is not None and components is None:
@@ -340,8 +331,8 @@ class Network(Component):
         ## S-matrix subsets
 
         # MC subsets of scattering matrix:
-        rSmcmc = self.rS[:,mc,:][:,:,mc]
-        iSmcmc = self.iS[:,mc,:][:,:,mc]
+        rSmcmc = self.S[0,:,mc,:][:,:,mc]
+        iSmcmc = self.S[1,:,mc,:][:,:,mc]
 
         # MC subset of Connection matrix
         Cmcmc = self.C[mc,:][:,mc]
@@ -353,8 +344,8 @@ class Network(Component):
             # Only do the following steps if there is at least one ml node:
 
             # ML subsets of scattering matrix:
-            rSmlml = self.rS[:,ml,:][:,:,ml]
-            iSmlml = self.iS[:,ml,:][:,:,ml]
+            rSmlml = self.S[0,:,ml,:][:,:,ml]
+            iSmlml = self.S[1,:,ml,:][:,:,ml]
 
             # ML subsets of connection matrix:
             Cmcml = self.C[mc,:][:,ml]
@@ -501,6 +492,20 @@ class Network(Component):
 
         return detected
 
+    def get_used_components(self):
+        # Check which components are actually used
+        def is_int(s):
+            try:
+                int(s)
+                return True
+            except ValueError:
+                return False
+        used_components = [conn.split(':') for conn in self.connections]
+        # here we would like to use an ordered set, but this does not exist.
+        # therefore, we use an OrderedDict, for which we don't care about
+        # the values. [all for python 2 compatibility...]
+        used_components = OrderedDict([(comp,None) for tup in used_components for comp in tup if not is_int(comp)])
+        return list(used_components.keys())
 
     def get_delays(self):
         ''' get all the delays in the network '''
@@ -514,15 +519,14 @@ class Network(Component):
         ''' get the locations of the sources in the network '''
         return torch.cat([comp.sources_at for comp in self.components.values()])[self.order]
 
-    def get_rS(self):
-        ''' Combined real part of the S-matrix of all the components in the network '''
-        return batch_block_diag(*(comp.rS for comp in self.components.values()))[:,self.order,:][:,:,self.order]
-
-    def get_iS(self):
-        ''' Combined imaginary part of the S-matrix of all the components in the network '''
-        return batch_block_diag(*(comp.iS for comp in self.components.values()))[:,self.order,:][:,:,self.order]
+    def get_S(self):
+        ''' Combined S-matrix of all the components in the network '''
+        rS = batch_block_diag(*(comp.S[0] for comp in self.components.values()))[:,self.order,:][:,:,self.order]
+        iS = batch_block_diag(*(comp.S[1] for comp in self.components.values()))[:,self.order,:][:,:,self.order]
+        return torch.stack([rS,iS])
 
     def get_order(self):
+        ''' Yields reordering indices for the S matrix '''
         start_idxs = list(np.cumsum([0]+[comp.num_ports for comp in self.components.values()])[:-1])
         start_idxs = OrderedDict(zip(self.components.keys(), start_idxs))
         free_idxs = [comp.free_idxs for comp in self.components.values()]

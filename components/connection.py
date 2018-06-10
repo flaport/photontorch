@@ -16,6 +16,9 @@ level Network.
 ## Imports ##
 #############
 
+## Torch
+import torch
+
 ## Relative
 from .component import Component
 
@@ -39,10 +42,8 @@ class Connection(Component):
 
     num_ports = 2
 
-    def get_rS(self):
-        ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
-        return self.tensor([[[0, 1], [1, 0]]]*self.env.num_wl)
-
-    def get_iS(self):
-        ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
-        return self.tensor([[[0, 0], [0, 0]]]*self.env.num_wl)
+    def get_S(self):
+        ''' scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
+        rS = self.tensor([[[0, 1], [1, 0]]]*self.env.num_wl) # real part
+        iS = self.tensor([[[0, 0], [0, 0]]]*self.env.num_wl) # imaginary part
+        return torch.stack([rS, iS])

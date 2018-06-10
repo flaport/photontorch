@@ -32,12 +32,9 @@ class Term(Component):
 
     num_ports = 1
 
-    def get_rS(self):
-        ''' Real part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
-        return self.tensor([[[0]]]*self.env.num_wl, 'float')
-    def get_iS(self):
-        ''' Imag part of the scattering matrix with shape: (# wavelengths, # ports, # ports) '''
-        return self.tensor([[[0]]]*self.env.num_wl, 'float')
+    def get_S(self):
+        ''' Scattering matrix with shape: (# wavelengths, # ports, # ports) '''
+        return self.zeros((2,self.env.num_wl,self.num_ports,self.num_ports))
 
 ############
 ## Source ##

@@ -87,8 +87,7 @@ class Component(Module):
             raise ValueError('Sources and Detectors cannot be combined in the same node.')
 
         self.delays = self.get_delays()
-        self.rS = self.get_rS()
-        self.iS = self.get_iS()
+        self.S = self.get_S()
 
     @property
     def env(self):
@@ -98,29 +97,27 @@ class Component(Module):
         '''
         return self._env
 
-    def get_rS(self):
-        ''' Real Part of the Scattering matrix of the component.
+    def get_S(self):
+        ''' Scattering matrix of the component
 
         Returns:
-            torch.FloatTensor with shape (# wavelengths, # ports, # ports)
+            torch.FloatTensor with shape (2, # wavelengths, # ports, # ports)
+
+        Note:
+            S[0] is the real part, S[1] is the imaginary part.
         '''
+
         raise NotImplementedError('The real part of the scattering matrix '
-                                  'of %s does not exist'%self.name)
-
-    def get_iS(self):
-        ''' Imaginary Part of the Scattering matrix of the component.
-
-        Returns:
-            torch.FloatTensor with shape (# wavelengths, # ports, # ports)
-        '''
-        raise NotImplementedError('The imaginary part of the scattering matrix '
                                   'of %s does not exist'%self.name)
 
     def get_C(self):
         ''' Connection matrix of the component.
 
         Returns:
-            torch.FloatTensor of only ones and zeros with shape (# num ports, # num ports).
+            torch.FloatTensor of only ones and zeros
+                * with shape (# ports, # ports).
+                * or with shape (2, # ports # ports) in the case of a complex valued
+                  connection matrix
         '''
         return self.tensor(np.zeros((self.num_ports, self.num_ports)), 'float')
 
