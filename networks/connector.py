@@ -75,7 +75,7 @@ class Connector(object):
             return
         self.s = s
         self.components = components
-    
+
     def copy(self):
         return Connector(self.s, [comp.copy() for comp in self.components])
 
