@@ -177,7 +177,8 @@ class Network(Component):
         Component.__init__(self, name=self.name)
 
         ## Check if network is fully connected
-        self.terminated = ((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).all()
+        C = (self.C.detach() > 0).sum(0)
+        self.terminated = ((C.sum(0) > 0) | (C.sum(1) > 0)).all()
 
         # Add all the possible sources to this network:
         if self.terminated:
@@ -274,10 +275,11 @@ class Network(Component):
             ```
 
         Note:
-            During initialization, it will be checked if the network is fully connected,
-            i.e. self.C.sum(0) > 0 everywhere and self.C.sum(1) > 0 everywhere. If the
-            network is not fully connected, the initialization will not be finalized.
-            (and the self.initialized flag will remain False)
+            During initialization, it will be checked if the network is fully connected.
+            If the network is not fully connected, the initialization will not be finalized.
+            (and the self.initialized flag will remain False). This is to speed up
+            the initialization of nested networks, where only the top level needs to be
+            fully initialized.
         '''
         ## get environment
         if env is None:
@@ -335,11 +337,12 @@ class Network(Component):
         iSmcmc = self.S[1,:,mc,:][:,:,mc]
 
         # MC subset of Connection matrix
-        Cmcmc = self.C[mc,:][:,mc]
+        rCmcmc = self.C[0,mc,:][:,mc]
+        iCmcmc = self.C[1,mc,:][:,mc]
 
         if self.nml == 0:
-            rC = torch.stack([Cmcmc]*self.env.num_wl, dim=0)
-            iC = torch.zeros_like(rC)
+            rC = torch.stack([rCmcmc]*self.env.num_wl, dim=0)
+            iC = torch.stack([iCmcmc]*self.env.num_wl, dim=0)
         else:
             # Only do the following steps if there is at least one ml node:
 
@@ -348,9 +351,12 @@ class Network(Component):
             iSmlml = self.S[1,:,ml,:][:,:,ml]
 
             # ML subsets of connection matrix:
-            Cmcml = self.C[mc,:][:,ml]
-            Cmlmc = self.C[ml,:][:,mc]
-            Cmlml = self.C[ml,:][:,ml]
+            rCmcml = self.C[0,mc,:][:,ml]
+            rCmlmc = self.C[0,ml,:][:,mc]
+            rCmlml = self.C[0,ml,:][:,ml]
+            iCmcml = self.C[1,mc,:][:,ml]
+            iCmlmc = self.C[1,ml,:][:,mc]
+            iCmlml = self.C[1,ml,:][:,ml]
 
             ## Helper function bmm
             def bmm(C, S):
@@ -358,39 +364,38 @@ class Network(Component):
                 return torch.matmul(S.permute(0,2,1),C.t()).permute(0,2,1)
 
             ## reduced connection matrix
-            # C = Cmcml@Smlml@inv(P)@Cmlmc + Cmcmc (we do this in 3 steps)
+            # C = Cmcml@Smlml@inv(P)@Cmlmc + Cmcmc
             # (with P a helper matrix defined below)
+            # We do this in 6 steps:
 
-            # 1. x = Cmcml@Smlml
-            rx, ix = bmm(Cmcml, rSmlml), bmm(Cmcml, iSmlml)
-
-            # 2. Calculation of x@inv(P) := x@(X + i*Y)
-            # with inv(P) = (X + iY)
-
-            # P = I - Cmlml@Smlml
+            # 1. Calculation of the helper matrix P = I - Cmlml@Smlml
             rP = torch.stack([self.tensor(np.eye(self.nml), 'float')]*self.env.num_wl, dim=0)
-            # iP will be defined below
+            rP = rP - bmm(rCmlml, rSmlml) + bmm(iCmlml, iSmlml)
+            iP = -bmm(rCmlml, iSmlml) + bmm(iCmlml, rSmlml)
 
+            # 2. Calculation of inv(P) = X + Y
             # note that real(inv(P)) != inv(real(P)) in most cases!
             # for a matrix P = rP + i*iP, with rP invertible it is easy to check that
             # the inverse is given by inv(P) = X + i*Y, with
             # X = inv(rP + iP@inv(rP)@iP)
             # Y = -X@iP@inv(rP)
-            if Cmlml.sum() == 0:
-                X = rP
-                rx, ix = (rx).bmm(X), (ix).bmm(X)
-            else:
-                rP = rP - bmm(Cmlml, rSmlml)
-                iP = -bmm(Cmlml, iSmlml)
+            inv_rP = torch.stack([torch.inverse(rp) for rp in rP], dim=0)
+            X = torch.stack([torch.inverse(rp + (ip).mm(inv_rp).mm(ip)) for rp, ip, inv_rp in zip(rP, iP, inv_rP)], dim=0)
+            Y = -(X).bmm(iP).bmm(inv_rP)
 
-                inv_rP = torch.stack([torch.inverse(rp) for rp in rP], dim=0)
-                X = torch.stack([torch.inverse(rp + (ip).mm(inv_rp).mm(ip)) for rp, ip, inv_rp in zip(rP, iP, inv_rP)], dim=0)
-                Y = -(X).bmm(iP).bmm(inv_rP)
+            # 3. calculation of x = Cmcml@Smlml
+            rx, ix = bmm(rCmcml, rSmlml) - bmm(iCmcml,iSmlml), bmm(rCmcml, iSmlml) + bmm(iCmcml, rSmlml)
 
-                rx, ix = (rx).bmm(X) - (ix).bmm(Y), (rx).bmm(Y) + (ix).bmm(X)
+            # 4. Calculation of x@inv(P) := x@(X + i*Y)
+            rx, ix = (rx).bmm(X) - (ix).bmm(Y), (rx).bmm(Y) + (ix).bmm(X)
 
-            # 3. C = x@Cmlmc + Cmcmc
-            rC, iC = torch.matmul(rx, Cmlmc) + Cmcmc[None], torch.matmul(ix, Cmlmc)
+            # 5. C = x@Cmlmc
+            rC, iC = (torch.matmul(rx, rCmlmc) - torch.matmul(ix, iCmlmc),
+                      torch.matmul(ix, rCmlmc) + torch.matmul(rx, iCmlmc))
+
+            # 6. C = x + Cmcmc
+            rC = rC + rCmcmc[None]
+            iC = iC + iCmcmc[None]
 
         ## Save the reduced matrices
         self._delays = delays[mc]
@@ -571,7 +576,9 @@ class Network(Component):
             To create the connection matrix, the connection string is parsed.
         '''
 
-        C = block_diag(*(comp.C for comp in self.components.values()))
+        rC = block_diag(*(comp.C[0] for comp in self.components.values()))
+        iC = block_diag(*(comp.C[1] for comp in self.components.values()))
+        C = torch.stack([rC,iC])
 
         start_idxs = list(np.cumsum([0]+[comp.num_ports for comp in self.components.values()])[:-1])
         start_idxs = OrderedDict(zip(self.components.keys(), start_idxs))
@@ -599,6 +606,6 @@ class Network(Component):
         for conn in self.connections:
             i, j = parse_connection(conn)
             if i is not None:
-                C[i,j] = C[j,i] = 1.0
+                C[0,i,j] = C[0,j,i] = 1.0
 
-        return C[self.order,:][:,self.order]
+        return C[:,self.order,:][:,:,self.order]

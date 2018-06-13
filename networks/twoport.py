@@ -33,7 +33,7 @@ from ..components.terms import Source, Detector
 class TwoPortNetwork(Network):
     ''' This class is used to define a network based on only two-port components. '''
 
-    def __init__(self, twoportcomponents, conn_matrix, sources_at=None, detectors_at=None, delays=None, bidirectional=True, name=None):
+    def __init__(self, twoportcomponents, conn_matrix, sources_at=None, detectors_at=None, delays=None, name=None):
         '''
         Args:
             twoportcomponents (array|list): A list of components with just two ports
@@ -42,7 +42,6 @@ class TwoPortNetwork(Network):
             sources_at (array|list[bool]): A list of locations of the sources
             detectors_at (array|list[bool]): A list of locations of the detectors
             delays (array|list[float]): Overrides the delays of the twoportcomponents.
-            bidirectional: If connections are reciprocal or not
 
         Note:
             * This network tries to emulate the behavior of the ConnMatrixNetwork of caphe.
@@ -52,9 +51,8 @@ class TwoPortNetwork(Network):
         torch.nn.Module.__init__(self)
 
         self.is_cuda = False
-        self.bidirectional = bidirectional
 
-        self.connections = self.tensor(conn_matrix)
+        self.connections = conn_matrix
         self.components = OrderedDict()
         for i, comp in enumerate(twoportcomponents):
             name = comp.__class__.__name__.lower() + str(i)
@@ -126,20 +124,20 @@ class TwoPortNetwork(Network):
 
     def get_C(self):
         n = 2*self.connections.shape[0]
-        C = self.tensor(np.zeros((self.num_ports,self.num_ports)))
-        C[1:n:2,:n:2] = self.connections.t()
-        if self.bidirectional:
-            C[:n:2,1:n:2] = self.connections
+
+        rC = self.tensor(np.real(self.connections))
+        iC = self.tensor(np.imag(self.connections))
+
+        C = self.tensor(np.zeros((2, self.num_ports,self.num_ports)))
+
+        C[0,1:n:2,0:n:2] = rC.t()
+        C[1,1:n:2,0:n:2] = iC.t()
+        C[0,0:n:2,1:n:2] = rC
+        C[1,0:n:2,1:n:2] = iC
 
         for j, (i,term) in enumerate(self.terms.items()):
-            if isinstance(term, Detector):
-                C[n+j,i] = 1
-                if self.bidirectional:
-                    C[i,n+j] = 1
-            elif isinstance(term, Source):
-                C[i, n+j] = 1
-                if self.bidirectional:
-                    C[n+j,i] = 1
+            if isinstance(term, (Source, Detector)):
+                C[0,n+j,i] = C[0,i,n+j] = 1
 
         return C
 

@@ -115,11 +115,12 @@ class Component(Module):
 
         Returns:
             torch.FloatTensor of only ones and zeros
-                * with shape (# ports, # ports).
-                * or with shape (2, # ports # ports) in the case of a complex valued
-                  connection matrix
+                * with shape (2, # ports, # ports).
+
+        Note:
+            C[0] is the real part, S[0] is the imaginary part
         '''
-        return self.tensor(np.zeros((self.num_ports, self.num_ports)), 'float')
+        return self.tensor(np.zeros((2, self.num_ports, self.num_ports)), 'float')
 
     def get_delays(self):
         ''' Delays introduced by the component.
@@ -147,7 +148,8 @@ class Component(Module):
 
     def get_free_idxs(self):
         ''' Free indices to make connections to '''
-        return self.tensor(where(((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).ne(1)))
+        C = self.C.sum(0)
+        return self.tensor(where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1)))
 
     def __repr__(self):
         ''' String Representation of the component '''
