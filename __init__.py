@@ -92,16 +92,12 @@ from .networks.network import Network
 from .networks.matrix import MatrixNetwork
 from .networks.matrix import UnitaryMatrixNetwork
 
-# Array Network
-from .networks.array import ArrayNetwork
-
 # Ring Networks
 from .networks.rings import AllPass
 from .networks.rings import AddDrop
-from .networks.rings import RingNetwork
 
-# Directional Coupler Networks
-from .networks.directionalcouplers import DirectionalCouplerNetwork
+# Two Port Networks
+from .networks.twoport import TwoPortNetwork
 
 
 ## Environment
