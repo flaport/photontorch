@@ -68,16 +68,12 @@ from .network import Network
 from .matrix import MatrixNetwork
 from .matrix import UnitaryMatrixNetwork
 
-# Array Network
-from .array import ArrayNetwork
-
 # Ring Networks
 from .rings import AllPass
 from .rings import AddDrop
-from .rings import RingNetwork
 
-# Directional Coupler Networks
-from .directionalcouplers import DirectionalCouplerNetwork
+# Two Port Networks
+from .twoport import TwoPortNetwork
 
 
 ## Modify docstring for documentation:
