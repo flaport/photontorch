@@ -33,7 +33,6 @@ class Source(object):
                         'batches' or 'b'
         '''
         array = np.array(array, 'complex64')
-        shape = array.shape
         keys = {'time':'t','t':'t','wavelengths':'w','w':'w','sources':'s','s':'s','batches':'b','b':'b'}
         if axes is None:
             axes = {
@@ -101,11 +100,14 @@ class ConstantSource(Source):
         if array.ndim > 2:
             raise ValueError('Amplitude should be max 2D')
 
+        a1 = ['b']
+        if array.ndim == 1 and array.shape[0] == self.nw.num_sources:
+            a1 = ['s']
+
         axes = {
             0:[],
-            1:['b'],
+            1:a1,
             2:['s','b'],
         }[array.ndim]
 
         Source.__init__(self, array, axes=axes)
-

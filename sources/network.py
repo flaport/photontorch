@@ -1,10 +1,12 @@
 '''
-## Source Injection in Network
+## Network Sources
+
 By calling the `add_sources` function in the __init__ of a network, all source classes
 will be available as attributes to this network. This Feature is used by all the
 Network classes. This way, it is possible to create a new Source with the reference to
 the Network that created it, without needing to explicitly provide the network in the
 __init__ call of the source.
+
 '''
 
 #############
