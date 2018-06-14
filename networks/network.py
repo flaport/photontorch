@@ -91,6 +91,7 @@ from .connector import Connector
 from ..components.component import Component
 from ..components.terms import Term
 from ..components.terms import Source
+from ..sources.sources import Source as InputSource
 from ..components.terms import Detector
 from ..torch_ext.autograd import block_diag
 from ..torch_ext.autograd import batch_block_diag
@@ -120,7 +121,7 @@ class Network(Component):
     from .plot import plot
 
     # for adding the different source classes to the network
-    from ..sources.add import add_sources
+    from ..sources.network import add_sources
 
     def __init__(self, components=None, connections=None, name=None):
         ''' Network initialization
@@ -437,7 +438,7 @@ class Network(Component):
         return rbuffer, ibuffer
 
     @require_initialization
-    def forward(self, source, power=True):
+    def forward(self, source=1.0, power=True):
         '''
         Forward pass of the network.
 
@@ -454,6 +455,18 @@ class Network(Component):
             (# time, # wavelengths, # detectors, # batches) if power==True
             (2 = (real|imag), # time, # wavelengths, # detectors, # batches) if power==False
         '''
+
+        if not (torch.is_tensor(source) or isinstance(source, InputSource)):
+            # try to get the source into a version that photontorch understands
+            source = np.asarray(source)
+            if source.ndim == 0:
+                source = self.ConstantSource(source)
+            elif source.shape[0] == self.env.num_timesteps:
+                source = self.Source(source)
+            elif source.ndim < 2 or (source.ndim==2 and source.shape[0] == self.num_sources):
+                source = self.ConstantSource(source)
+            else:
+                source = self.Source(source)
 
         num_batches = source.shape[-1]
 
