@@ -148,7 +148,7 @@ class Component(Module):
 
     def get_free_idxs(self):
         ''' Free indices to make connections to '''
-        C = self.C.sum(0)
+        C = (abs(self.C)**2).sum(0)
         return self.tensor(where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1)))
 
     def __repr__(self):
