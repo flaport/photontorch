@@ -28,7 +28,9 @@ class Waveguide(Connection):
     A waveguide is a Component where each of the two nodes
     introduces a delay corresponding to the length of the waveguide.
 
-    For a waveguide, only its phase change can be trained
+    For a waveguide, only its phase change can be trained. If phase==None then
+    the phase will be derived from the length of the waveguide and will thus be
+    untrainable (phase==None overrules the trainable flag).
 
     Terms:
 
@@ -38,8 +40,9 @@ class Waveguide(Connection):
 
     def __init__(self,
                  length=1e-6,
-                 neff=2.86,
                  loss=0,
+                 neff=2.86,
+                 ng=None,
                  phase=None,
                  trainable=True,
                  name=None):
@@ -47,24 +50,23 @@ class Waveguide(Connection):
 
         Args:
             length (float): Length of the waveguide in meter.
-            neff = 4.0 (float). Effective index of the waveguide
             loss = 0 (float): Loss in the waveguide [dB/m]
+            neff = 2.86 (float): Effective index of the waveguide
+            ng = None (float): Group index of the waveguide (equals neff if None)
             phase (float): if a phase is given, the phase introduced by the wavelength
                 becomes decoupled from the length. This can be useful for training purposes.
+                if phase is None, the waveguide is untrainable by definition. This
+                overrules the trainable flag.
             trainable (bool): whether the phase of the waveguide is trainable
             name (str): Name of the specific waveguide
         '''
         Connection.__init__(self, name=name)
         # Handle inputs
+        self.loss = float(loss)
         self.neff = float(neff)
-        self.loss = loss
-        # as the phase is very sensitive on the length, we need double precision to
-        # store the length of the waveguide:
-        self.length = self.buffer( # Waveguide length is not trainable (for now)
-            data=length,
-            dtype='double',
-            requires_grad=False,
-        )
+        self.ng = self.neff if ng is None else float(ng)
+        self.length = float(length)
+        self.trainable=trainable
 
         if phase is not None:
             self.phase = self.parameter(data=phase%(2*np.pi), requires_grad=trainable)
@@ -73,8 +75,8 @@ class Waveguide(Connection):
 
     def get_delays(self):
         ''' The delay per node is given by the propagation time in the waveguide '''
-        delay = self.neff*self.length/c
-        return torch.cat([delay, delay]).float()
+        delay = self.ng*self.length/c
+        return self.tensor([delay, delay], 'float')
 
     def get_S(self):
         ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
