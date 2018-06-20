@@ -306,10 +306,6 @@ class Network(Component):
         delays_in_seconds = self.delays * float(self.env.use_delays)
         # resulting delays in terms of the simulation timestep:
         delays = (delays_in_seconds/self.env.dt + 0.5).long()
-        # Check if simulation timestep is too big:
-        if (delays[delays_in_seconds.data > 0] < 10).any(): # This bound is rather arbitrary...
-            warnings.warn('Simulation timestep might be too large, resulting '
-                          'in too short delays. Try using a smaller timestep')
 
 
         ## locations of memory-containing and memory-less nodes:
@@ -319,6 +315,14 @@ class Network(Component):
         mc = where(mc)
         self.nmc = len(mc)
         self.nml = len(ml)
+
+        if self.nmc == 0:
+            return self # break of initialization; network is probably part of a bigger network
+
+        # Check if simulation timestep is too big:
+        if (delays[delays_in_seconds.data > 0] < 10).any(): # This bound is rather arbitrary...
+            warnings.warn('Simulation timestep might be too large, resulting '
+                          'in too short delays. Try using a smaller timestep')
 
         ## Source and detector locations
         sources_at = where(self.sources_at[mc])
@@ -372,7 +376,7 @@ class Network(Component):
             # 1. Calculation of the helper matrix P = I - Cmlml@Smlml
             rP = torch.stack([self.tensor(np.eye(self.nml), 'float')]*self.env.num_wl, dim=0)
             rP = rP - bmm(rCmlml, rSmlml) + bmm(iCmlml, iSmlml)
-            iP = -bmm(rCmlml, iSmlml) + bmm(iCmlml, rSmlml)
+            iP = -bmm(rCmlml, iSmlml) - bmm(iCmlml, rSmlml)
 
             # 2. Calculation of inv(P) = X + Y
             # note that real(inv(P)) != inv(real(P)) in most cases!
