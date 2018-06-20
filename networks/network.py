@@ -569,8 +569,9 @@ class Network(Component):
 
         order = []
         for j in range(len(order_dict)):
-            i = order_dict[j]
-            order.append(i)
+            i = order_dict.get(j, None)
+            if i is not None:
+                order.append(i)
 
         for i in range(self.num_ports):
             if i not in order_dict.values():
