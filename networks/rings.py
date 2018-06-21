@@ -22,6 +22,7 @@ from ..components.terms import Term, Detector, Source
 from ..components.waveguides import Waveguide
 from ..components.directionalcouplers import DirectionalCoupler
 from ..components.connection import Connection
+from ..torch_ext.nn import Buffer, Parameter
 from ..torch_ext import block_diag, batch_block_diag
 
 
@@ -162,7 +163,7 @@ class RingAtom(Network):
 
 class RingMolecule(Network):
     ''' A Ring Molecule is a network of rings.'''
-    def __init__(self, map, rings, coupling=None, type='square', name=None):
+    def __init__(self, map, rings, coupling=None, type='square', trainable=True, copy_rings=False, name=None):
         ''' ring Molecule __init__
 
         Args:
@@ -178,11 +179,16 @@ class RingMolecule(Network):
                 as keys signifies the coupling between those ring types.
                 e.g. coupling = {'aa':0.5, 'ab':0.4, 'bb':0.2}
             type: The lattice type of the map. For now, only square lattices are supported
+            trainable (bool): If the couplings in the RingMolecule are trainable
+            copy_rings (bool): If the rings are copied, then the phase of each ring can be
+                trained seperately. Obviously, this uses more RAM.
             name: name of the ring molecule.
         '''
         num_segments = {'square':4}[type]
         self.type = type
+
         rings={k:RingAtom(wg, num_segments=num_segments) for k, wg in rings.items()}
+
         if '.' in rings:
             raise ValueError('The "." character is reserved for empty spaces in the network')
         if '@' in rings:
@@ -203,7 +209,10 @@ class RingMolecule(Network):
                 ring = rings.get(self.map[i,j], None)
                 if ring is not None:
                     idx += ring.num_ports
-                    ring = copy(ring) # shallow copy
+                    if copy_rings:
+                        ring = ring.copy() # deep copy
+                    else:
+                        ring = copy(ring) # shallow copy
                     ring.name = 'ring_%i_%i'%(i,j)
                     self.components[ring.name] = ring
                     self.compmap[i,j] = ring
@@ -216,13 +225,25 @@ class RingMolecule(Network):
             standard_coupling = coupling.pop('standard', 0.5)
 
         self.standard_coupling = standard_coupling
-        self.couplings = coupling
+
+        self.trainable = trainable
+        parameter = Parameter if self.trainable else Buffer
+        self.couplings = {k:parameter(torch.tensor(v)) for k,v in coupling.items()}
 
         super(RingMolecule, self).__init__(
             components=self.components,
             connections=None,
             name=name,
         )
+
+        for k, v in self.couplings.items():
+            setattr(self, 'coupling_%s'%k, v)
+
+
+    def initialize(self, env=None):
+        if self.trainable:
+            self.C = self.get_C()
+        super(RingMolecule, self).initialize(env)
 
     def get_coupling(self, type1, type2):
         return self.couplings.get(type1+type2,
@@ -284,7 +305,6 @@ class RingMolecule(Network):
                         C[0,idx1+1,idx1+2]=C[0,idx1+2,idx1+1]=t
                         C[1,idx0+5,idx1+1]=C[1,idx1+1,idx0+5]=k
                         C[1,idx0+6,idx1+2]=C[1,idx1+2,idx0+6]=k
-
 
         if self.type == 'hexagonal':
             raise NotImplementedError
