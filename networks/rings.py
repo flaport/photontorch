@@ -126,3 +126,167 @@ class AddDrop(Network):
             self.connections[-1] = 'dc2:2:3'
 
         super(AddDrop, self).__init__(name=name)
+
+
+####################
+## Ring Molecules ##
+####################
+
+class RingAtom(Network):
+    ''' A Ring Atom is a part of a ring Molecule and should not be used seperately '''
+    def __init__(self, wg, num_segments=4, name=None):
+        self.num_segments=num_segments
+        self.num_ports=2*num_segments
+        segment=Waveguide(
+            length=wg.length/num_segments,
+            loss=wg.loss,
+            neff=wg.neff,
+            ng=wg.ng,
+            phase=None if wg.phase is None else wg.phase.detach().cpu().numpy()/num_segments,
+            trainable=wg.trainable,
+            name='segment',
+        )
+        components = OrderedDict([('segment%i'%i,segment) for i in range(num_segments)])
+        connections = []
+        for i in range(num_segments):
+            connections += ['segment%i:1:segment%i:0'%(i, (i+1)%num_segments)]
+
+        super(RingAtom, self).__init__(
+            components=components,
+            connections=connections,
+            name=name,
+        )
+
+class RingMolecule(Network):
+    ''' A Ring Molecule is a network of rings.'''
+    def __init__(self, map, rings, coupling=None, type='square', name=None):
+        ''' ring Molecule __init__
+
+        Args:
+            map: a string map of the rings, [e.g. '@oOx@']. This map can contain multiple
+                lines. Each character of the map corresponds to a different kind of ring.
+                Special characters are '.' [signifying an empty space in the map] and
+                '@' [signifying an outward connection in the map].
+            rings: a dictionary containing the different ring types. The keys should be
+                the characters used in the map, and the values should be waveguides.
+                e.g. rings = {'a': Waveguide(...), 'b': Waveguide(...)}
+            coupling: The coupling between the different rings. A single value will default
+                to same coupling everywhere, while a dictionary with two-character strings
+                as keys signifies the coupling between those ring types.
+                e.g. coupling = {'aa':0.5, 'ab':0.4, 'bb':0.2}
+            type: The lattice type of the map. For now, only square lattices are supported
+            name: name of the ring molecule.
+        '''
+        num_segments = {'square':4}[type]
+        self.type = type
+        rings={k:RingAtom(wg, num_segments=num_segments) for k, wg in rings.items()}
+        if '.' in rings:
+            raise ValueError('The "." character is reserved for empty spaces in the network')
+        if '@' in rings:
+            raise ValueError('The "@" character is reserved for an input/output in the network')
+
+        self.map = np.array([list(line.strip()) for line in map.strip().splitlines()], str)
+        self.m, self.n = m,n = self.map.shape
+
+        self.compmap = np.zeros((m,n), object)
+        self.compmap.fill(None)
+
+        self.idxmap = np.zeros((m,n), int)
+
+        idx = 0
+        self.components = OrderedDict()
+        for i in range(m):
+            for j in range(n):
+                ring = rings.get(self.map[i,j], None)
+                if ring is not None:
+                    idx += ring.num_ports
+                    ring = copy(ring) # shallow copy
+                    ring.name = 'ring_%i_%i'%(i,j)
+                    self.components[ring.name] = ring
+                    self.compmap[i,j] = ring
+                    self.idxmap[i,j] = idx - ring.num_ports
+
+        if not isinstance(coupling, dict):
+            standard_coupling=coupling if coupling is not None else 0.5
+            coupling={}
+        else:
+            standard_coupling = coupling.pop('standard', 0.5)
+
+        self.standard_coupling = standard_coupling
+        self.couplings = coupling
+
+        super(RingMolecule, self).__init__(
+            components=self.components,
+            connections=None,
+            name=name,
+        )
+
+    def get_coupling(self, type1, type2):
+        return self.couplings.get(type1+type2,
+                                  self.couplings.get(type2+type1,
+                                                     self.standard_coupling))
+
+    def get_used_components(self):
+        return self.components.keys()
+
+    def get_order(self):
+        return slice(None)
+
+    def get_C(self):
+        rC = block_diag(*(comp.C[0] for comp in self.components.values()))
+        iC = block_diag(*(comp.C[1] for comp in self.components.values()))
+        C = torch.stack([rC,iC])
+
+        if self.type == 'square':
+            for i in range(self.m):
+                for j in range(self.n-1):
+                    r0 = self.compmap[i,j]
+                    r1 = self.compmap[i,j+1]
+                    c0 = self.map[i,j]
+                    c1 = self.map[i,j+1]
+                    idx0 = self.idxmap[i,j]
+                    idx1 = self.idxmap[i,j+1]
+                    if c0 == '@' and r1 is not None:
+                        C[0,idx1+0,idx1+7]=C[0,idx1+7,idx1+0]=0
+                    elif r0 is not None and c1 == '@':
+                        C[0,idx0+3,idx0+4]=C[0,idx0+4,idx0+3]=0
+                    elif r0 is not None and r1 is not None:
+                        coupling = self.get_coupling(self.map[i,j], self.map[i,j+1])
+                        transmission = 1-coupling
+                        k = coupling**0.5
+                        t = transmission**0.5
+                        C[0,idx0+3,idx0+4]=C[0,idx0+4,idx0+3]=t
+                        C[0,idx1+0,idx1+7]=C[0,idx1+7,idx1+0]=t
+                        C[1,idx0+3,idx1+7]=C[1,idx1+7,idx0+3]=k
+                        C[1,idx0+4,idx1+0]=C[1,idx1+0,idx0+4]=k
+
+            for i in range(self.m-1):
+                for j in range(self.n):
+                    r0 = self.compmap[i,j]
+                    r1 = self.compmap[i+1,j]
+                    c0 = self.map[i,j]
+                    c1 = self.map[i+1,j]
+                    idx0 = self.idxmap[i,j]
+                    idx1 = self.idxmap[i+1,j]
+                    if c0 == '@' and r1 is not None:
+                        C[0,idx1+1,idx1+2]=C[0,idx1+2,idx1+1]=0
+                    elif r0 is not None and c1 == '@':
+                        C[0,idx0+5,idx0+6]=C[0,idx0+6,idx0+5]=0
+                    if r0 is not None and r1 is not None:
+                        coupling = self.get_coupling(self.map[i,j], self.map[i+1,j])
+                        transmission = 1-coupling
+                        k = coupling**0.5
+                        t = transmission**0.5
+                        C[0,idx0+5,idx0+6]=C[0,idx0+6,idx0+5]=t
+                        C[0,idx1+1,idx1+2]=C[0,idx1+2,idx1+1]=t
+                        C[1,idx0+5,idx1+1]=C[1,idx1+1,idx0+5]=k
+                        C[1,idx0+6,idx1+2]=C[1,idx1+2,idx0+6]=k
+
+
+        if self.type == 'hexagonal':
+            raise NotImplementedError
+
+        return C
+
+
+

@@ -95,6 +95,7 @@ from .networks.matrix import UnitaryMatrixNetwork
 # Ring Networks
 from .networks.rings import AllPass
 from .networks.rings import AddDrop
+from .networks.rings import RingMolecule
 
 # Two Port Networks
 from .networks.twoport import TwoPortNetwork
