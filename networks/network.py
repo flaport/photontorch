@@ -143,6 +143,9 @@ class Network(Component):
             the order of the components is determined by the order of the connections
         '''
 
+        if isinstance(components, Connector) and connections is None:
+            components, connections = components.parse()
+
         # Save name of component
         self.name = name
 

@@ -4,6 +4,10 @@
 ## Imports ##
 #############
 
+## Standard Library
+from copy import copy
+from collections import OrderedDict
+
 ## Torch
 import torch
 
@@ -18,8 +22,7 @@ from ..components.terms import Term, Detector, Source
 from ..components.waveguides import Waveguide
 from ..components.directionalcouplers import DirectionalCoupler
 from ..components.connection import Connection
-
-from ..torch_ext.nn import Buffer
+from ..torch_ext import block_diag, batch_block_diag
 
 
 #####################
