@@ -42,9 +42,10 @@ class Waveguide(Connection):
                  length=1e-6,
                  loss=0,
                  neff=2.86,
+                 wl0=1.55e-6,
                  ng=None,
-                 phase=None,
-                 trainable=True,
+                 phase=0,
+                 trainable=False,
                  name=None):
         ''' Waveguide
 
@@ -52,11 +53,11 @@ class Waveguide(Connection):
             length (float): Length of the waveguide in meter.
             loss = 0 (float): Loss in the waveguide [dB/m]
             neff = 2.86 (float): Effective index of the waveguide
+            wl0 = 1.55e-6 (float): the center wavelength for which neff is defined.
             ng = None (float): Group index of the waveguide (equals neff if None)
-            phase (float): if a phase is given, the phase introduced by the wavelength
-                becomes decoupled from the length. This can be useful for training purposes.
-                if phase is None, the waveguide is untrainable by definition. This
-                overrules the trainable flag.
+            phase (float): additional phase correction added to the phase introduced
+                by the length of the waveguide. Adding this can be useful for training
+                purposes.
             trainable (bool): whether the phase of the waveguide is trainable
             name (str): Name of the specific waveguide
         '''
@@ -64,14 +65,12 @@ class Waveguide(Connection):
         # Handle inputs
         self.loss = float(loss)
         self.neff = float(neff)
+        self.wl0 = float(wl0)
         self.ng = self.neff if ng is None else float(ng)
         self.length = float(length)
         self.trainable=trainable
 
-        if phase is not None:
-            self.phase = self.parameter(data=phase%(2*np.pi), requires_grad=trainable)
-        else:
-            self.phase = None
+        self.phase = self.parameter(data=phase%(2*np.pi), dtype='double', requires_grad=trainable)
 
     def get_delays(self):
         ''' The delay per node is given by the propagation time in the waveguide '''
@@ -80,21 +79,28 @@ class Waveguide(Connection):
 
     def get_S(self):
         ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
-        if self.phase is not None:
-            cos_phase = self.phase.cos().double()
-            sin_phase = self.phase.sin().double()
-        else:
-            wls = self.tensor(self.env.wls, dtype='double')
-            cos_phase = torch.cos(2*pi*self.neff*self.length/wls)
-            sin_phase = torch.sin(2*pi*self.neff*self.length/wls)
-        re = 10**(-self.loss*self.length/10)*cos_phase
-        ie = 10**(-self.loss*self.length/10)*sin_phase
+
+        wls = self.tensor(self.env.wls, dtype='double')
+
+        # neff depends on the wavelength:
+        neff = self.neff - (wls-self.wl0)*(self.ng-self.neff)/self.wl0
+        phase = 2*pi*neff*self.length/wls + self.phase
+        cos_phase = torch.cos(phase)
+        sin_phase = torch.sin(phase)
+
+        # calculate loss
+        loss = 10**(-self.loss*self.length/20) # 20 because loss works on power
+        re = loss*cos_phase
+        ie = loss*sin_phase
+
         # we can safely convert back to single precision now:
         re = re.float()
         ie = ie.float()
+
         # calculate real part and imag part
         rS = re.view(-1,1,1)*self.tensor([[[0, 1],
                                            [1, 0]]])
         iS = ie.view(-1,1,1)*self.tensor([[[0, 1],
                                            [1, 0]]])
+
         return torch.stack([rS,iS])
