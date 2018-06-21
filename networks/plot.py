@@ -58,7 +58,7 @@ def plot(network, detected, **kwargs):
     # Handle y
     y = detected
     if torch.is_tensor(y):
-        y = y.detach()
+        y = y.detach().cpu()
     y = np.squeeze(np.array(y, 'float32'))
 
     # Handle x
