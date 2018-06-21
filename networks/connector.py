@@ -5,6 +5,13 @@ The connector module provides the Connector class, a helper class to connect Com
 together into a Network.
 '''
 
+#############
+## Imports ##
+#############
+
+import numpy as np
+from collections import OrderedDict
+
 ###############
 ## Connector ##
 ###############
@@ -113,3 +120,50 @@ class Connector(object):
         for s, c in zip(self.s.split(','), self.components):
             ret += [repr(c) + '_' + s]
         return '*'.join(ret)
+
+    def parse(self):
+        s = self.s.split(',')
+        S = OrderedDict()
+        components = OrderedDict()
+        for _s, comp in zip(s,self.components):
+            i = 0
+            name = comp.name + ' '
+            while name.strip() in components:
+                k = 1 if i == 0 else int(np.log10(float(i))) + 1
+                i += 1
+                name = name[:-k] + str(i)
+            if i == 0:
+                name = name[:-1]
+            components[name] = comp
+            S[name] = _s
+
+        connections = []
+        skip_idxs = [[] for _ in range(len(S))]
+        p = -1
+        for k, (name, s) in enumerate(S.items()):
+            for i, c in enumerate(s):
+                if i not in skip_idxs[k]:
+                    connection = name + ':' + str(i) + ':'
+
+                    # search for self-connections:
+                    j = i+1 + s[i+1:].find(c)
+                    if j != i:
+                        connection = connection + name + ':' + str(j)
+                        skip_idxs[k].append(j)
+
+                    # search for connections with other components
+                    for k2, (name2, s2) in enumerate(list(S.items())[k+1:], k+1):
+                        j = s2.find(c)
+                        if j != -1:
+                            connection = connection + name2 + ':' + str(j)
+                            skip_idxs[k2].append(j)
+
+                    # only if no connection was made -> output port:
+                    if connection[-1] == ':':
+                        p += 1
+                        connection = connection + str(p)
+
+                    # add connection to connection list
+                    connections.append(connection)
+
+        return components, connections
