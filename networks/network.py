@@ -208,15 +208,6 @@ class Network(Component):
         for name, comp in self.components.items():
             setattr(self, name, comp)
 
-    def copy(self):
-        ''' create a (deep) copy of the network '''
-        components = [comp.copy() for comp in self.components.values()]
-        new = self.__class__(self.s, *components, name=self.name)
-        if self.initialized:
-            new.initialize(self.env.copy())
-        return new
-
-
     def terminate(self, term=None, name=None):
         '''
         Terminate open conections with the term of your choice
