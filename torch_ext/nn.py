@@ -82,7 +82,10 @@ class BoundedParameter(_Module_):
         self._datavar = None # To store the variable if no bounds are specified
         self.bounds = bounds # Store the bounds
         if self.bounds is None: # If no bounds are specified, save the data directly into a Parameter
-            self._datavar = Parameter(data=data, requires_grad=requires_grad)
+            if requires_grad:
+                self._datavar = Parameter(data=data, requires_grad=True)
+            else:
+                self._datavar = Buffer(data=data, requires_grad=False)
         elif self.bounds[0] == self.bounds[1]: # If the bounds are the same, no training can occur.
             self._datavar = Buffer(data=data, requires_grad=False)
         else: # If the bounds are valid, we normalize the data between 0 and 1 and calculate its
@@ -91,7 +94,10 @@ class BoundedParameter(_Module_):
                 raise ValueError('BoundedParameters data is not compatible with bounds')
             scaled_data = (data - bounds[0])/(bounds[1]-bounds[0])
             weights = -torch.log(1/scaled_data-1) # inverse sigmoid
-            self.weights = Parameter(data=weights, requires_grad=requires_grad)
+            if requires_grad:
+                self.weights = Parameter(data=weights, requires_grad=True)
+            else:
+                self.weights = Buffer(data=weights, requires_grad=False)
 
     def __repr__(self):
         ''' String representation of a bounded parameter '''
@@ -239,7 +245,7 @@ class Buffer(torch.Tensor):
         For the automatic registration of the Buffer to work, you need to use the torch_ext
         subclass Module of torch.nn.Module.
     '''
-    def __new__(cls, data=None, requires_grad=True):
+    def __new__(cls, data=None, requires_grad=False):
         if data is None:
             data = torch.Tensor()
         return torch.Tensor._make_subclass(cls, data, requires_grad)
@@ -388,18 +394,6 @@ class Module(_Module_):
         )
         return data
 
-    def fix(self):
-        ''' Make all parameters of the module untrainable '''
-        def fix(module):
-            ''' helper function '''
-            for k,v in module._modules.items():
-                module._modules[k] = fix(v)
-            for k in module._parameters.keys():
-                data = module._parameters.pop(k).data
-                module.register_buffer(k, Buffer(data))
-            return module
-        return fix(self)
-
     def copy(self):
         return copy.deepcopy(self)
 
@@ -411,9 +405,9 @@ class Module(_Module_):
         '''
         new = super(Module, self).cuda(device=device)
         for k, v in self._parameters.items():
-            self._parameters[k] = Parameter(v.cuda(device=device).data)
+            self._parameters[k] = Parameter(v.cuda(device=device).data.detach())
         for k, v in self._buffers.items():
-            self._buffers[k] = Buffer(v.cuda(device=device).data)
+            self._buffers[k] = Buffer(v.cuda(device=device).data.detach())
         for k, v in self._modules.items():
             self._modules[k] = v.cuda(device=device)
         new.is_cuda = True
@@ -423,9 +417,9 @@ class Module(_Module_):
         ''' Transform the Module to live on the CPU '''
         new = super(Module, self).cpu()
         for k, v in self._parameters.items():
-            self._parameters[k] = Parameter(v.cpu().data)
+            self._parameters[k] = Parameter(v.cpu().data.detach())
         for k, v in self._buffers.items():
-            self._buffers[k] = Buffer(v.cpu().data)
+            self._buffers[k] = Buffer(v.cpu().data.detach())
         for k, v in self._modules.items():
             self._modules[k] = v.cpu()
         new.is_cuda = False
