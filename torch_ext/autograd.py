@@ -17,6 +17,7 @@ The classes defined below are called inside these functions and should not be us
 #############
 
 ## Torch
+import torch
 from torch.autograd import Function
 
 ## Other
@@ -201,3 +202,70 @@ class BatchBlockDiag(Function):
             output = grad_output[:, i:j, i:j]
             outputs.append(output)
         return tuple(outputs)
+
+
+###################
+## Linear Filter ##
+###################
+
+def lfilter(b, a, signal):
+    ''' A Pytorch implementation of Scipy's Linear Filter '''
+
+    ## Preprocessing
+
+    # check and process signal
+    if signal.dtype != torch.float32:
+        raise ValueError('The signal should be of dtype `torch.float32`')
+
+    signal_shape = signal.shape # save original shape
+    signal = signal.view(signal.shape[0], -1).t() # reshape into 2D tensor
+    signal = signal[:, None, :] # should have shape (# batch, # in channels = 1, # time)
+
+    # check and process b
+    b = torch.tensor(b, dtype=torch.float32, device=signal.device)
+    if len(b.shape) != 1:
+        raise ValueError('Filter parameter b should be a 1D array')
+    b = b[None, None, :] # make b 3D
+
+    # check and process a
+    a = torch.tensor(a, dtype=torch.float32, device=signal.device)
+    if len(a.shape) != 1:
+        raise ValueError('Filter parameter a should be a 1D array')
+
+    # check shapes
+    if b.shape[-1] != a.shape[0]:
+        raise ValueError('a and b should have the same length')
+
+
+    ## create convolution layer
+
+    conv = torch.nn.Conv1d(
+        in_channels=1,
+        out_channels=1,
+        kernel_size=b.shape[-1],
+        bias=False,
+    )
+    # we hack the convolution layer to make the weights untrainable
+    del conv._parameters['bias']
+    del conv._parameters['weight']
+    # and replace the weight by b [save it as a buffer to make it untrainable]
+    conv.bias = None
+    conv._buffers['weight'] = b
+
+
+    ## Calculate filtered signal.
+    y = torch.cat([torch.zeros_like(signal[:,:,:(b.shape[-1]-1)]), signal], -1) # prepend (len(b)-1 zeros to the signal)
+    y = conv(y) # convolve with b
+    y = y[:,0,:].t() # back to shape (# time, # batch)
+
+
+    # I would love to have the following implemented more efficiently:
+    N = len(a)
+    for n in range(N, len(y), 1):
+        for i in range(1, N, 1):
+            y[n] = y[n] - a[i]*y[n-i] # cannot be done inplace to preserve autograd.
+
+
+    ## Reshape in original shape:
+
+    return y.view(*signal_shape)

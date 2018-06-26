@@ -28,6 +28,7 @@ neural network. This enables the use of native PyTorch optimizers to optimize th
 #### Required
 * [`pytorch>=4.0`](http://pytorch.org/): `conda install pytorch -c pytorch`
 * [`numpy`](http://www.numpy.org/): `conda install numpy`
+* [`scipy`](http://www.scipy.org/): `conda install scipy`
 * [`tqdm`](https://pypi.python.org/pypi/tqdm): `conda install tqdm` [for progress bars]
 * [`matplotlib`](https://matplotlib.org/): `conda install matplotlib` [for visualization]
 

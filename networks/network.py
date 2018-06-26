@@ -436,7 +436,7 @@ class Network(Component):
         return rbuffer, ibuffer
 
     @require_initialization
-    def forward(self, source=1.0, power=True):
+    def forward(self, source=1.0, power=True, detector=None):
         '''
         Forward pass of the network.
 
@@ -447,6 +447,7 @@ class Network(Component):
                 indexed.
             power=True (bool): Wether to return a real-valued power or the
                 complex-valued field.
+            detector=None (Detector): Pass an extra detector instance to detect the fields (or power)
 
         Returns:
             detected (torch.Floattensor): a tensor with shape
@@ -505,6 +506,9 @@ class Network(Component):
             # update buffer
             rbuffer = torch.cat((rx[None], rbuffer[0:-1]), dim=0)
             ibuffer = torch.cat((ix[None], ibuffer[0:-1]), dim=0)
+
+        if detector is not None:
+            detected = detector(detected)
 
         return detected
 
