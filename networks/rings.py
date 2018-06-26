@@ -187,7 +187,7 @@ class RingMolecule(Network):
         num_segments = {'square':4}[type]
         self.type = type
 
-        rings={k:RingAtom(wg, num_segments=num_segments) for k, wg in rings.items()}
+        rings=OrderedDict((k,RingAtom(wg, num_segments=num_segments)) for k, wg in rings.items())
 
         if '.' in rings:
             raise ValueError('The "." character is reserved for empty spaces in the network')

@@ -32,7 +32,7 @@ class Photodetector(torch.nn.Module):
                  bitrate,
                  bandwidth=25e9,
                  responsivity=1,
-                 dt=1./160.e9,
+                 dt=1./160e9,
                  dark_current=0.1e-9,
                  load_resistance=1e6,
                  filter_order=4,

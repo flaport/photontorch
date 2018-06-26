@@ -96,6 +96,7 @@ from ..components.terms import Detector
 from ..torch_ext.autograd import block_diag
 from ..torch_ext.autograd import batch_block_diag
 from ..torch_ext.tensor import where
+from ..torch_ext.nn import Buffer
 
 
 #############
@@ -219,14 +220,12 @@ class Network(Component):
         if term is None:
             term = Term()
         if isinstance(term , Term):
-            term = {term.name+'_%i'%i:term.copy() for i in range(n)}
+            term = OrderedDict((term.name+'_%i'%i,term.copy()) for i in range(n))
         if isinstance(term, (list, tuple)):
-            term = {t.name:t for t in term}
+            term = OrderedDict((t.name,t) for t in term)
         if self.is_cuda:
-            term = {name:t.cuda() for name, t in term.items()}
-        components = {
-            self.name:self,
-        }
+            term = OrderedDict((name,t.cuda()) for name, t in term.items())
+        components = OrderedDict([(self.name,self)])
         components.update(term)
         connections = [name+':0:'+self.name+':%i'%i for i, name in enumerate(term)]
         if name is None:
@@ -237,6 +236,23 @@ class Network(Component):
 
     def unterminate(self):
         return self.base
+
+    def freeze(self):
+        return FrozenNetwork(self)
+
+    def cuda(self, device=None):
+        ''' move the parameters and buffers of the network to the gpu '''
+        nw = super(Network, self).cuda(device=device)
+        if nw._env is not None:
+            nw.initialize(nw.env)
+        return nw
+
+    def cpu(self):
+        ''' move the parameters and buffers of the network to the cpu '''
+        nw = super(Network, self).cpu()
+        if nw._env is not None:
+            nw.initialize(nw.env)
+        return nw
 
     def initialize(self, env=None):
         r''' Initialize
@@ -581,7 +597,6 @@ class Network(Component):
 
         return order
 
-
     def get_C(self):
         ''' Combined Connection matrix of all the components in the network
 
@@ -625,3 +640,32 @@ class Network(Component):
                 C[0,i,j] = C[0,j,i] = 1.0
 
         return C[:,self.order,:][:,:,self.order]
+
+
+class FrozenNetwork(Network):
+    def __init__(self, nw):
+        torch.nn.Module.__init__(self)
+        self.name = nw.name
+        self._env = nw._env
+        self.nmc = nw.nmc
+        self.is_cuda = nw.is_cuda
+        self.num_detectors = nw.num_detectors
+        self.num_sources = nw.num_sources
+        self._rC = Buffer(nw._rC.detach())
+        self._iC = Buffer(nw._iC.detach())
+        self._rS = Buffer(nw._rS.detach())
+        self._iS = Buffer(nw._iS.detach())
+        self._delays = Buffer(nw._delays).detach()
+        self.buffermask = Buffer(nw.buffermask.detach())
+        self.initialized = True
+        self.add_sources()
+
+    def initialize(self, env=None):
+        if env is not None:
+            self._env = env
+        return self
+
+    def forward(self, source=1.0, power=True, detector=None):
+        with torch.no_grad():
+            detected = super(FrozenNetwork, self).forward(source=source, power=power, detector=detector)
+        return detected
