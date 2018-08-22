@@ -49,10 +49,11 @@ class Mmi21(Component):
 
     def get_S(self):
         ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
-        t = (1.0/2.0)**0.5*self.tensor(np.ones_like(self.env.wls)).view(-1,1,1)
-        S = t*self.tensor([[[0, 1, 1],
-                            [1, 0, 0],
-                            [1, 0, 0]]])
+        t = (1.0/2.0)**0.5*torch.tensor(np.ones_like(self.env.wls),
+                                        device=self.device).view(-1,1,1)
+        S = t*torch.tensor([[[0.0, 1.0, 1.0],
+                             [1.0, 0.0, 0.0],
+                             [1.0, 0.0, 0.0]]], device=self.device)
         return torch.stack([S, torch.zeros_like(S)])
 
 
@@ -88,11 +89,14 @@ class Mmi33(Component):
     def get_S(self):
         ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports)
         '''
-        t = (1.0/3.0**0.5)*self.tensor(np.ones_like(self.env.wls)).view(-1,1,1)
-        S = t*self.tensor([[[0, 0, 0, 1, 1, 1],
-                            [0, 0, 0, 1, 1, 1],
-                            [0, 0, 0, 1, 1, 1],
-                            [1, 1, 1, 0, 0, 0],
-                            [1, 1, 1, 0, 0, 0],
-                            [1, 1, 1, 0, 0, 0]]])
+        t = (1.0/3.0**0.5)*torch.tensor(np.ones_like(self.env.wls),
+                                        device=self.device).view(-1,1,1)
+        S = t*torch.tensor([[[0, 0, 0, 1, 1, 1],
+                             [0, 0, 0, 1, 1, 1],
+                             [0, 0, 0, 1, 1, 1],
+                             [1, 1, 1, 0, 0, 0],
+                             [1, 1, 1, 0, 0, 0],
+                             [1, 1, 1, 0, 0, 0]]],
+                           device=self.device,
+                           dtype=torch.get_default_dtype())
         return torch.stack([S, torch.zeros_like(S)])

@@ -18,13 +18,11 @@ The classes defined below are called inside these functions and should not be us
 
 ## Torch
 import torch
+from torch.autograd import * # we add to torch.autograd
 from torch.autograd import Function
 
 ## Other
 import numpy as np
-
-## Relative
-from .tensor import zeros
 
 
 ####################
@@ -81,7 +79,7 @@ class BlockDiag(Function):
         # Get start and end indices of blocks in matrix
         ctx.idxs = list(zip(idxs[:-1], idxs[1:]))
         # Get type of new matrix and create empty new matrix with total_size as shape
-        M = zeros((total_size, total_size), type=inputs[0].type())
+        M = torch.zeros((total_size, total_size), dtype=inputs[0].dtype, device=inputs[0].device)
         # Fill Blocks
         for (i, j), matrix in zip(ctx.idxs, inputs):
             M[i:j, i:j] = matrix
@@ -172,7 +170,7 @@ class BatchBlockDiag(Function):
         # Get start and end indices of blocks in matrix
         ctx.idxs = list(zip(idxs[:-1], idxs[1:]))
         # Get type of new matrix and create empty new matrix with total_size as shape
-        M = zeros((batch_size, total_size, total_size), type=inputs[0].type())
+        M = torch.zeros((batch_size, total_size, total_size), dtype=inputs[0].dtype, device=inputs[0].device)
         # Fill Blocks
         for (i, j), matrix in zip(ctx.idxs, inputs):
             M[:, i:j, i:j] = matrix

@@ -279,7 +279,7 @@ class UnitaryMatrixNetwork(Network):
             source = np.zeros((2,1,1,self.nmc,vector.shape[1]))
             source[0,0,0,:vector.shape[0],:] = np.real(vector)
             source[1,0,0,:vector.shape[0],:] = np.imag(vector)
-            source = self.tensor(source)
+            source = torch.tensor(source, device=self.device)
             return source
 
         # Create source and target
@@ -350,7 +350,9 @@ class UnitaryMatrixNetwork(Network):
 ####################
 
 class MatrixNetwork(Network):
-    ''' A general Matrix Network
+    ''' NOT FINISHED
+
+        A general Matrix Network
 
         Every Matrix $M$ can be decomposed by the singular value decomposition as
         follows:
@@ -417,7 +419,7 @@ class MatrixNetwork(Network):
 
         # connections
         connections = []
-        connections += ['U:%i:%i'%(i, i) for i in range(n)]
+        connections += ['V:%i:%i'%(i, i) for i in range(n)]
         connections += ['U:%i:%i'%(m+i,i) for i in range(m)]
         connections += ['V:%i:soa%i:0'%(n+i, i) for i in range(m)]
         connections += ['U:%i:soa%i:1'%(i, i) for i in range(m)]
@@ -468,7 +470,7 @@ class MatrixNetwork(Network):
         if not self.terminated:
             return self # do nothing
 
-        connections += ['U:%i:%i'%(i, i) for i in range(n)]
+        connections += ['V:%i:%i'%(i, i) for i in range(n)]
         connections += ['U:%i:%i'%(m+i,i) for i in range(m)]
 
         self.connections[:self.m+self.n] = connections

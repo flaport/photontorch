@@ -237,9 +237,6 @@ class Network(Component):
     def unterminate(self):
         return self.base
 
-    def freeze(self):
-        return FrozenNetwork(self)
-
     def cuda(self, device=None):
         ''' move the parameters and buffers of the network to the gpu '''
         nw = super(Network, self).cuda(device=device)
@@ -384,7 +381,7 @@ class Network(Component):
             # We do this in 6 steps:
 
             # 1. Calculation of the helper matrix P = I - Cmlml@Smlml
-            rP = torch.stack([self.tensor(np.eye(self.nml), 'float')]*self.env.num_wl, dim=0)
+            rP = torch.stack([torch.eye(self.nml, device=self.device)]*self.env.num_wl, dim=0)
             rP = rP - bmm(rCmlml, rSmlml) + bmm(iCmlml, iSmlml)
             iP = -bmm(rCmlml, iSmlml) - bmm(iCmlml, rSmlml)
 
@@ -420,7 +417,7 @@ class Network(Component):
         self._iC = iC
 
         # Create buffermask (# time, # wavelengths = 1, # mc nodes, # batches = 1)
-        self.buffermask = self.zeros((int(self._delays.max())+1, 1, self.nmc, 1))
+        self.buffermask = torch.zeros((int(self._delays.max())+1, 1, self.nmc, 1), device=self.device)
         self.buffermask[self._delays,:,range(self.nmc),:] = 1.0
 
         self.initialized = True
@@ -447,7 +444,7 @@ class Network(Component):
         Note:
             obviously, this is a different buffer than Model buffers
         '''
-        rbuffer = self.zeros((int(self._delays.max())+1, self.env.num_wl, self.nmc, num_batches))
+        rbuffer = torch.zeros((int(self._delays.max())+1, self.env.num_wl, self.nmc, num_batches), device=self.device)
         ibuffer = rbuffer.clone()
         return rbuffer, ibuffer
 
@@ -486,11 +483,11 @@ class Network(Component):
         num_batches = source.shape[-1]
 
         if power:
-            detected = self.tensor(self.zeros((self.env.num_timesteps, self.env.num_wl, self.num_detectors, num_batches)))
+            detected = torch.zeros((self.env.num_timesteps, self.env.num_wl, self.num_detectors, num_batches), device=self.device)
             def update_detected():
                 detected[i] = (torch.pow(rx, 2) + torch.pow(ix, 2))[:,-self.num_detectors:]
         else:
-            detected = self.tensor(self.zeros((2, self.env.num_timesteps, self.env.num_wl, self.num_detectors, num_batches)))
+            detected = torch.zeros((2, self.env.num_timesteps, self.env.num_wl, self.num_detectors, num_batches), device=self.device)
             def update_detected():
                 detected[0,i] = rx[:,-self.num_detectors:]
                 detected[1,i] = ix[:,-self.num_detectors:]

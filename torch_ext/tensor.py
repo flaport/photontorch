@@ -12,27 +12,10 @@ Some non-differentiable, but useful functions that act on (or create) torch tens
 ## Torch
 import torch
 
-## Relative
-from .types import TORCH_TYPES
-
 
 ###############
 ## Functions ##
 ###############
-
-def zeros(shape, type='float', cuda=False):
-    ''' Create an empty torch tensor filled with zeros.
-
-    Args:
-        shape (tuple): shape of the new tensor
-        dtype (str): type of the new tensor
-        cuda (bool): if the new tensor should be cuda or not.
-    '''
-    Tensor = TORCH_TYPES[type]
-    tensor = Tensor(*shape).zero_()
-    if cuda:
-        return tensor.cuda()
-    return tensor
 
 def where(bytetensor):
     ''' Get indices of places where bytetensor > 0.

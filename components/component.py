@@ -19,15 +19,16 @@ Each Component is generally defined by several key properties:
 ## Imports ##
 #############
 
-# Standard library
+## Standard library
 from copy import copy, deepcopy
 
-## Other
-import numpy as np
+## Torch
+import torch
 
 ## Relative
 from ..torch_ext import where
 from ..torch_ext.nn import Module
+from ..torch_ext.nn import Buffer
 
 
 ###############
@@ -56,10 +57,10 @@ class Component(Module):
 
         # set attributes
         self._env = None
-        self.C = self.buffer(self.get_C())
-        self.free_idxs = self.buffer(self.get_free_idxs())
-        self.sources_at = self.buffer(self.get_sources_at())
-        self.detectors_at = self.buffer(self.get_detectors_at())
+        self.C = Buffer(self.get_C())
+        self.free_idxs = Buffer(self.get_free_idxs())
+        self.sources_at = Buffer(self.get_sources_at())
+        self.detectors_at = Buffer(self.get_detectors_at())
 
     def initialize(self, env):
         ''' Simulation initialization for the component.
@@ -101,7 +102,7 @@ class Component(Module):
         ''' Scattering matrix of the component
 
         Returns:
-            torch.FloatTensor with shape (2, # wavelengths, # ports, # ports)
+            torch tensor with shape (2, # wavelengths, # ports, # ports) and dtype float32
 
         Note:
             S[0] is the real part, S[1] is the imaginary part.
@@ -114,42 +115,53 @@ class Component(Module):
         ''' Connection matrix of the component.
 
         Returns:
-            torch.FloatTensor of only ones and zeros
-                * with shape (2, # ports, # ports).
+            torch tensor with shape (2, # ports, # ports) and dtype float32
 
         Note:
             C[0] is the real part, S[0] is the imaginary part
         '''
-        return self.tensor(np.zeros((2, self.num_ports, self.num_ports)), 'float')
+        return torch.zeros((2, self.num_ports, self.num_ports), device=self.device)
 
     def get_delays(self):
         ''' Delays introduced by the component.
 
         Returns:
-            torch.FloatTensor with the delays in each node of the component. Shape: (# num ports, )
+            torch tensor with the delays in each node of the component.
+                shape: (# ports, )
+                dtype: float32
         '''
-        return self.tensor(np.zeros(self.num_ports), 'float')
+        return torch.zeros(self.num_ports, device=self.device)
 
     def get_sources_at(self):
         ''' The locations of the sources in the component.
 
         Returns:
-            torch.ByteTensor containing the locations of the sources in the component. shape: (# num ports, )
+            torch tensor containing the locations of the sources in the component.
+                shape: (# ports, )
+                dtype: uint8 [byte]
         '''
-        return self.tensor(np.zeros(self.num_ports), 'byte')
+        return torch.zeros(self.num_ports, device=self.device, dtype=torch.uint8)
 
     def get_detectors_at(self):
         ''' The locations of the detectors in the component.
 
         Returns:
-            torch.ByteTensor containing the locations of the detectors in the component. shape: (# num ports, )
+            torch tensor containing the locations of the detectors in the component.
+                shape: (# ports, )
+                dtype: uint8 [byte]
         '''
-        return self.tensor(np.zeros(self.num_ports), 'byte')
+        return torch.zeros(self.num_ports, device=self.device, dtype=torch.uint8)
 
     def get_free_idxs(self):
-        ''' Free indices to make connections to '''
+        ''' Free indices to make connections to
+
+        Returns:
+            torch tensor containing the free indices in the components connection matrix
+                shape: (# ports, )
+                dtype: int64 [long]
+        '''
         C = (abs(self.C)**2).sum(0)
-        return self.tensor(where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1)))
+        return torch.tensor(where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1)), device=self.device)
 
     def __repr__(self):
         ''' String Representation of the component '''

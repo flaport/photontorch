@@ -13,6 +13,9 @@ detecting (Detector)
 ## Imports ##
 #############
 
+## Torch
+import torch
+
 ## Relative
 from .component import Component
 
@@ -34,7 +37,7 @@ class Term(Component):
 
     def get_S(self):
         ''' Scattering matrix with shape: (# wavelengths, # ports, # ports) '''
-        return self.zeros((2,self.env.num_wl,self.num_ports,self.num_ports))
+        return torch.zeros((2,self.env.num_wl,self.num_ports,self.num_ports), device=self.device)
 
 ############
 ## Source ##
@@ -47,7 +50,7 @@ class Source(Term):
         --0
     '''
     def get_sources_at(self):
-        return self.tensor([1], 'byte')
+        return torch.ones(1, dtype=torch.uint8, device=self.device)
 
 
 ##############
@@ -61,4 +64,4 @@ class Detector(Term):
         --0
     '''
     def get_detectors_at(self):
-        return self.tensor([1], 'byte')
+        return torch.ones(1, dtype=torch.uint8, device=self.device)

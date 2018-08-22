@@ -18,6 +18,7 @@ import numpy as np
 ## Relative
 from .connection import Connection
 from ..constants import pi, c
+from ..torch_ext.nn import Parameter, Buffer
 
 ###############
 ## Waveguide ##
@@ -70,17 +71,18 @@ class Waveguide(Connection):
         self.length = float(length)
         self.trainable=trainable
 
-        self.phase = self.parameter(data=phase%(2*np.pi), dtype='double', requires_grad=trainable)
+        parameter = Parameter if trainable else Buffer
+        self.phase = parameter(torch.tensor(data=float(phase%(2*np.pi)), dtype=torch.float64))
 
     def get_delays(self):
         ''' The delay per node is given by the propagation time in the waveguide '''
         delay = self.ng*self.length/c
-        return self.tensor([delay, delay], 'float')
+        return delay*torch.ones(2, device=self.device)
 
     def get_S(self):
         ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
 
-        wls = self.tensor(self.env.wls, dtype='double')
+        wls = torch.tensor(self.env.wls, dtype=torch.float64, device=self.device)
 
         # neff depends on the wavelength:
         neff = self.neff - (wls-self.wl0)*(self.ng-self.neff)/self.wl0
@@ -98,9 +100,9 @@ class Waveguide(Connection):
         ie = ie.float()
 
         # calculate real part and imag part
-        rS = re.view(-1,1,1)*self.tensor([[[0, 1],
-                                           [1, 0]]])
-        iS = ie.view(-1,1,1)*self.tensor([[[0, 1],
-                                           [1, 0]]])
+        rS = re.view(-1,1,1)*torch.tensor([[[0.0, 1.0],
+                                            [1.0, 0.0]]], device=self.device)
+        iS = ie.view(-1,1,1)*torch.tensor([[[0.0, 1.0],
+                                            [1.0, 0.0]]], device=self.device)
 
         return torch.stack([rS,iS])

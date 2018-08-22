@@ -24,6 +24,7 @@ import numpy as np
 # Relative
 from .network import Network
 from ..components.terms import Source, Detector
+from ..torch_ext.nn import Buffer
 
 ######################
 ## Two Port Network ##
@@ -50,7 +51,7 @@ class TwoPortNetwork(Network):
         '''
         torch.nn.Module.__init__(self)
 
-        self.is_cuda = False
+        self.device = torch.device('cpu')
 
         self.connections = conn_matrix
         self.components = OrderedDict()
@@ -79,11 +80,11 @@ class TwoPortNetwork(Network):
 
         self.num_ports = 2*len(twoportcomponents) + len(self.terms)
 
-        self.sources_at = self.buffer(np.zeros(self.num_ports)).byte()
-        self.sources_at[-len(self.terms):] = self.tensor(sources_at).byte()
+        self.sources_at = Buffer(torch.zeros(self.num_ports, dtype=torch.uint8, device=self.device))
+        self.sources_at[-len(self.terms):] = torch.tensor(sources_at)
 
-        self.detectors_at = self.buffer(np.zeros(self.num_ports)).byte()
-        self.detectors_at[-len(self.terms):] = self.tensor(detectors_at).byte()
+        self.detectors_at = Buffer(torch.zeros(self.num_ports, dtype=torch.uint8, device=self.device))
+        self.detectors_at[-len(self.terms):] = torch.tensor(detectors_at)
 
         if delays is None:
             self.delays = torch.cat([comp.get_delays() for comp in self.components.values()])
@@ -97,7 +98,7 @@ class TwoPortNetwork(Network):
 
         self._env = None
         self.order = self.get_order()
-        self.C = self.buffer(self.get_C())
+        self.C = Buffer(self.get_C())
         self.terminated = True
         self.initialized=False
 
@@ -125,10 +126,10 @@ class TwoPortNetwork(Network):
     def get_C(self):
         n = 2*self.connections.shape[0]
 
-        rC = self.tensor(np.real(self.connections))
-        iC = self.tensor(np.imag(self.connections))
+        rC = torch.tensor(np.real(self.connections), device=self.device, dtype=torch.get_default_dtype())
+        iC = torch.tensor(np.imag(self.connections), device=self.device, dtype=torch.get_default_dtype())
 
-        C = self.tensor(np.zeros((2, self.num_ports,self.num_ports)))
+        C = torch.zeros((2, self.num_ports,self.num_ports), device=self.device)
 
         C[0,1:n:2,0:n:2] = rC.t()
         C[1,1:n:2,0:n:2] = iC.t()
@@ -140,4 +141,3 @@ class TwoPortNetwork(Network):
                 C[0,n+j,i] = C[0,i,n+j] = 1
 
         return C
-

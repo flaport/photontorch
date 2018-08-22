@@ -29,15 +29,12 @@ import copy
 
 ## Torch
 import torch
+from torch.nn import * # we add to torch.nn
 from torch.nn import Parameter
 from torch.nn import Module as _Module_
 
 ## Other
 import numpy as np
-
-## Relative
-from .types import NUMPY_TYPES
-from .types import TORCH_TYPES
 
 
 ############
@@ -97,113 +94,6 @@ class Module(_Module_):
             self.register_buffer(attr, value)
         else:
             super(Module, self).__setattr__(attr, value)
-
-    def zeros(self, shape, dtype='float', cuda=None):
-        '''
-        Create an empty torch tensor filled with zeros.
-
-        Args:
-            shape (tuple): shape of the new tensor
-            dtype (str): type of the new tensor
-            cuda (bool): if the new tensor should be cuda or not.
-                None defaults to self.is_cuda
-        '''
-        Tensor = TORCH_TYPES[dtype]
-        tensor = Tensor(*shape).zero_()
-        if cuda is None:
-            cuda = self.is_cuda
-        if cuda:
-            return tensor.cuda()
-        return tensor
-
-    def ones(self, shape, dtype='float', cuda=None):
-        '''
-        Create an empty torch tensor filled with ones.
-
-        Args:
-            shape (tuple): shape of the new tensor
-            dtype (str): type of the new tensor
-            cuda (bool): if the new tensor should be cuda or not.
-                None defaults to self.is_cuda
-        '''
-        return self.zeros(shape, dtype=dtype, cuda=cuda) + 1
-
-    def tensor(self, data, dtype='float', cuda=None, requires_grad=False):
-        '''
-        Create a torch tensor from given data.
-
-        Args:
-            data (torch.Tensor | np.ndarray | list): data to convert to a tensor
-            dtype (str): type of the new tensor
-            cuda (bool): if the new tensor should be cuda or not.
-                None defaults to self.is_cuda
-            requires_grad (bool): if the new tensor should be trainable or not
-        '''
-        dtype = NUMPY_TYPES.get(dtype, dtype)
-        if not isinstance(data, torch.Tensor):
-            data = np.asarray(data, dtype=dtype)
-            if data.ndim == 0: # pytorch cannot handle 0-D data.
-                data = data[None] # make 1D
-            data = torch.from_numpy(data) # create torch tensor from numpy
-        if cuda is None:
-            cuda = self.is_cuda
-        if cuda:
-            return data.cuda()
-        return data
-
-    def parameter(self, data, dtype='float', cuda=None, requires_grad=True):
-        '''
-        Create a torch Parameter or Buffer from given data.
-
-        Args:
-            data (torch.Tensor | np.ndarray | list): data to convert to a parameter
-            dtype (str): type of the new Parameter
-            cuda (bool): if the new tensor should be cuda or not.
-                None defaults to self.is_cuda
-            requires_grad (bool): if the new parameter should be trainable or not
-        Note:
-            if requires_grad=False, a Buffer will be created in stead of a parameter.
-        '''
-        data = self.tensor(data, dtype=dtype, cuda=cuda)
-        if not requires_grad: # if no optimization required, register data as Buffer
-            return Buffer(data=data, requires_grad=False)
-        return Parameter(data, requires_grad=True)
-
-    def buffer(self, data, dtype='float', cuda=None, requires_grad=False):
-        '''
-        Create a torch Parameter or Buffer from given data.
-
-        Args:
-            data (torch.Tensor | np.ndarray | list): data to convert to a parameter
-            dtype (str): type of the new Parameter
-            cuda (bool): if the new tensor should be cuda or not.
-                None defaults to self.is_cuda
-            requires_grad (bool): if the new parameter should be trainable or not
-        Note:
-            if requires_grad=False, a Buffer will be created in stead of a parameter.
-        '''
-        return self.parameter(data, dtype=dtype, cuda=cuda, requires_grad=requires_grad)
-
-    def bounded_parameter(self, data, bounds=None, dtype='float',
-                                cuda=None, requires_grad=True):
-        '''
-        Create a Bounded Parameter, Parameter or Buffer from given data.
-
-        Args:
-            data (torch.Tensor | np.ndarray | list): data to convert to a parameter
-            bounds=None (tuple): bounds in which to optimize the parameter
-            dtype (str): type of the new Parameter
-            cuda (bool): if the new tensor should be cuda or not.
-                None defaults to self.is_cuda
-        '''
-        if bounds is None:
-            return self.parameter(data, dtype=dtype, cuda=cuda, requires_grad=requires_grad)
-        data = BoundedParameter(
-            self.tensor(data, dtype=dtype, cuda=cuda),
-            bounds=bounds,
-            requires_grad=requires_grad
-        )
-        return data
 
     def copy(self):
         return copy.deepcopy(self)
@@ -275,7 +165,7 @@ class BoundedParameter(Module):
         super(BoundedParameter, self).__init__()
         if not torch.is_tensor(data):
             raise RuntimeError('paramter data has to be a tensor, but got %s'%type(data).__name__)
-
+        self.device = data.device
         self._datavar = None # To store the variable if no bounds are specified
         self.bounds = bounds # Store the bounds
         if self.bounds is None: # If no bounds are specified, save the data directly into a Parameter

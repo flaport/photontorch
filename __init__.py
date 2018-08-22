@@ -50,7 +50,6 @@ from . import environment
 from . import networks
 from . import sources
 from . import torch_ext
-from . import tests
 
 
 ## Components
@@ -122,10 +121,7 @@ from .torch_ext.autograd import block_diag
 from .torch_ext.autograd import batch_block_diag
 
 # neural networks
-from .torch_ext.nn import Module
-from .torch_ext.nn import Parameter
-from .torch_ext.nn import BoundedParameter
+from .torch_ext import nn
 
 # tensor
-from .torch_ext.tensor import zeros
 from .torch_ext.tensor import where

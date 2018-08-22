@@ -37,12 +37,8 @@ from .autograd import block_diag
 from .autograd import batch_block_diag
 
 
-## custom neural network functions
-from .nn import Module
-from .nn import Buffer
-from .nn import BoundedParameter
-
+## custom neural network functions [not imported]
+# torch_ext.nn
 
 ## Custom Tensor Functions
-from .tensor import zeros
 from .tensor import where
