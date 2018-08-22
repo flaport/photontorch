@@ -17,6 +17,11 @@ Each [Component](component.Component) is generally defined by several key proper
 
 
 ## Components
+
+# Component
+from .component import Component
+
+# Terms
 from .terms import Term
 from .terms import Source
 from .terms import Detector

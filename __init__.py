@@ -55,6 +55,9 @@ from . import tests
 
 ## Components
 
+# Component
+from .components.component import Component
+
 # Terms
 from .components.terms import Term
 from .components.terms import Source
