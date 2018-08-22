@@ -25,12 +25,13 @@ neural network. This enables the use of native PyTorch optimizers to optimize th
 * ~~Batched simulations / training~~
 
 ## Dependencies
-#### Required
-* [`pytorch>=4.0`](http://pytorch.org/): `conda install pytorch -c pytorch`
-* [`numpy`](http://www.numpy.org/): `conda install numpy`
-* [`scipy`](http://www.scipy.org/): `conda install scipy`
-* [`tqdm`](https://pypi.python.org/pypi/tqdm): `conda install tqdm` [for progress bars]
-* [`matplotlib`](https://matplotlib.org/): `conda install matplotlib` [for visualization]
+* Python 2.7 (linux only), 3.6 or 3.7: from [Anaconda](http://www.anaconda.com/download/) [recommended]
+* [`pytorch>=0.4.0`](http://pytorch.org/): `conda install pytorch -c pytorch` [linear algebra with backpropagation]
+* [`numpy`](http://www.numpy.org/): `conda install numpy` [linear algebra]
+* [`scipy`](http://www.scipy.org/): `conda install scipy` [basic signal processing]
+* [`pytest`](http://docs.pytest.org/): `conda install pytest` [testing]
+* [`tqdm`](http://pypi.python.org/pypi/tqdm): `conda install tqdm` [progress bars]
+* [`matplotlib`](http://matplotlib.org/): `conda install matplotlib` [visualization]
 
 ## Documentation
 You can generate the documentation by typing [only with python 3]
