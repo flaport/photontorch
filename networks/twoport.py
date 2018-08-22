@@ -90,7 +90,7 @@ class TwoPortNetwork(Network):
         if delays is None:
             self.delays = torch.cat([comp.get_delays() for comp in self.components.values()])
         else:
-            self.delays = np.stack([delays, delays]).T.flatten()
+            self.delays = np.stack([delays, delays], axis=-1).flatten()
 
 
         self.add_sources()

@@ -20,7 +20,7 @@ class Source(object):
         ''' Source initialization
 
             Args:
-                array (np.array): the source data
+                array (numpy array): the source data
                 axes (list[str]) = named axis order of the array.
                     defaults:
                         array.ndim == 1 -> axes=['time']
@@ -33,7 +33,7 @@ class Source(object):
                         'sources' or 's'
                         'batches' or 'b'
         '''
-        array = np.array(array, 'complex64')
+        array = np.asarray(array, 'complex64')
         keys = {'time':'t','t':'t','wavelengths':'w','w':'w',
                 'sources':'s','s':'s','batches':'b','b':'b'}
         if axes is None:
@@ -93,7 +93,7 @@ class ConstantSource(Source):
         ''' ConstantSource initialization
 
             Args:
-                amplitude (float | np.array): the source data.
+                amplitude (float | numpy array): the source data.
                     if amplitude.ndim == 1 -> different amplitude for each batch is specified
                         with same amplitude at each of the sources. -> size = [batch_dim]
                     if amplitude.ndim == 2 -> different amplitude for each batch is specified
