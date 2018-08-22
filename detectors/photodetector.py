@@ -11,6 +11,7 @@ import torch
 from scipy.signal import butter
 
 # Relative
+from ..torch_ext.nn import Module
 from ..torch_ext.autograd import lfilter
 
 ###############
@@ -99,18 +100,6 @@ class Photodetector(torch.nn.Module):
     def b(self, value):
         del self.conv._buffers['weight']
         self.conv.register_buffer('weight', value)
-
-    def cuda(self):
-        self.is_cuda = True
-        self.a = self.a.cuda()
-        self.conv = self.conv.cuda()
-        return self
-
-    def cpu(self):
-        self.is_cuda = False
-        self.a = self.a.cpu()
-        self.conv = self.conv.cpu()
-        return self
 
     def forward(self, signal):
         # we will perform a convolution, however, the convolution layer needs the signal
