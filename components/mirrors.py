@@ -18,6 +18,7 @@ import torch
 
 ## Relative
 from .component import Component
+from ..torch_ext.nn import BoundedParameter
 
 
 ############
@@ -47,8 +48,8 @@ class Mirror(Component):
         '''
         Component.__init__(self, name=name)
 
-        self.R = self.bounded_parameter(
-            data=R,
+        self.R = BoundedParameter(
+            data=torch.tensor(R, device=self.device),
             bounds=(0,1),
             requires_grad=trainable,
         )
@@ -57,8 +58,8 @@ class Mirror(Component):
         ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
         r = torch.cat([(self.R**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
         t = torch.cat([((1-self.R)**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
-        rS = r*self.tensor([[[1, 0],
-                             [0, 1]]])
-        iS = t*self.tensor([[[0, 1],
-                             [1, 0]]])
+        rS = r*torch.tensor([[[1.0, 0.0],
+                              [0.0, 1.0]]], device=self.device)
+        iS = t*torch.tensor([[[0.0, 1.0],
+                              [1.0, 0.0]]], device=self.device)
         return torch.stack([rS, iS])

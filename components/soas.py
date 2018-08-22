@@ -13,6 +13,7 @@ import torch
 
 ## Relative
 from .component import Component
+from ..torch_ext.nn import Parameter, Buffer
 
 
 ################
@@ -44,11 +45,12 @@ class LinearSoa(Component):
         '''
         Component.__init__(self, name=name)
 
-        self.amplification = self.parameter(amplification, requires_grad=trainable)
+        parameter = Parameter if trainable else Buffer
+        self.amplification = parameter(torch.tensor(float(amplification), device=self.device))
 
     def get_S(self):
         ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
-        a = torch.cat([(1*self.amplification).view(1,1,1)]*self.env.num_wl, dim=0)
-        S = a*self.tensor([[[0, 1],
-                            [1, 0]]])
-        return torch.stack([a, torch.zeros_like(a)])
+        a = torch.cat([(1.0*self.amplification).view(1,1,1)]*self.env.num_wl, dim=0)
+        S = a*torch.tensor([[[0.0, 1.0],
+                             [1.0, 0.0]]], device=self.device)
+        return torch.stack([S, torch.zeros_like(S)])

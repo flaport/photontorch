@@ -44,6 +44,6 @@ class Connection(Component):
 
     def get_S(self):
         ''' scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
-        rS = self.tensor([[[0, 1], [1, 0]]]*self.env.num_wl) # real part
-        iS = self.tensor([[[0, 0], [0, 0]]]*self.env.num_wl) # imaginary part
+        rS = torch.tensor([[[0, 1], [1, 0]]]*self.env.num_wl, device=self.device) # real part
+        iS = torch.tensor([[[0, 0], [0, 0]]]*self.env.num_wl, device=self.device) # imaginary part
         return torch.stack([rS, iS])

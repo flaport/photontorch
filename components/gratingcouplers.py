@@ -65,11 +65,11 @@ class GratingCoupler(Component):
     def get_S(self):
         ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
         sigma = fwhm2sigma*self.BW
-        loss = np.sqrt(self.Tmax*np.exp(-(self.wl0-self.env.wls)**2/(2*sigma**2)))
-        rS = np.array([[[0, 1],
-                        [1, 0]]])
-        rS = self.tensor(loss[:,None,None]*rS)
-        iS = self.tensor([[[self.R_in, 0],
-                           [0,    self.R]]])
+        wls = torch.tensor(self.env.wls, device=self.device, dtype=torch.get_default_dtype())[:,None,None]
+        loss = torch.sqrt(self.Tmax*torch.exp(-(self.wl0-wls)**2/(2*sigma**2)))
+        rS = loss*torch.tensor([[[0.0, 1.0],
+                                 [1.0, 0.0]]], device=self.device)
+        iS = torch.tensor([[[self.R_in, 0],
+                            [0,    self.R]]], device=self.device)
         iS = torch.cat([iS]*self.env.num_wl, dim=0)
         return torch.stack([rS,iS])

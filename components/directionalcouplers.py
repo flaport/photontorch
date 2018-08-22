@@ -18,6 +18,7 @@ import numpy as np
 ## Relative
 from .component import Component
 from ..constants import pi
+from ..torch_ext.nn import BoundedParameter
 
 
 #########################
@@ -52,8 +53,8 @@ class DirectionalCoupler(Component):
         '''
         Component.__init__(self, name=name)
 
-        self.coupling = self.bounded_parameter(
-            data=coupling,
+        self.coupling = BoundedParameter(
+            data=torch.tensor(coupling, device=self.device),
             bounds=(0,1),
             requires_grad=trainable,
         )
@@ -62,14 +63,18 @@ class DirectionalCoupler(Component):
         ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
         t = torch.cat([((1-self.coupling)**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
         k = torch.cat([(self.coupling**0.5).view(1,1,1)]*self.env.num_wl, dim=0)
-        rS = t*self.tensor([[[0, 1, 0, 0], # real part
-                             [1, 0, 0, 0],
-                             [0, 0, 0, 1],
-                             [0, 0, 1, 0]]])
-        iS = k*self.tensor([[[0, 0, 1, 0], # imag part
-                             [0, 0, 0, 1],
-                             [1, 0, 0, 0],
-                             [0, 1, 0, 0]]])
+        rS = t*torch.tensor([[[0, 1, 0, 0], # real part
+                              [1, 0, 0, 0],
+                              [0, 0, 0, 1],
+                              [0, 0, 1, 0]]],
+                            device=self.device,
+                            dtype=torch.get_default_dtype()) # usually float32
+        iS = k*torch.tensor([[[0, 0, 1, 0], # imag part
+                              [0, 0, 0, 1],
+                              [1, 0, 0, 0],
+                              [0, 1, 0, 0]]],
+                            device=self.device,
+                            dtype=torch.get_default_dtype()) # usually float32
         return torch.stack([rS, iS])
 
 
@@ -127,20 +132,25 @@ class DirectionalCouplerWithLength(Component):
         rS_wg_k = self.wg.rS*k
 
         # Real part
-        rS = self.tensor([[[0, 0, 0, 0],
-                           [0, 0, 0, 0],
-                           [0, 0, 0, 0],
-                           [0, 0, 0, 0]]]*self.env.num_wl)
+        rS = torch.tensor([[[0, 0, 0, 0],
+                            [0, 0, 0, 0],
+                            [0, 0, 0, 0],
+                            [0, 0, 0, 0]]]*self.env.num_wl,
+                          device=self.device,
+                          dtype=torch.get_default_dtype())
         rS[:,:2, :2] = rS_wg_t # Transmission from i < - > j
         rS[:,2:, 2:] = rS_wg_t # Transmission from k < - > l
         rS[:,::2, ::2] = -iS_wg_k
         rS[:,1::2, 1::2] = -iS_wg_k
 
         # Imag Part
-        iS = self.tensor([[[0, 0, 0, 0],
-                           [0, 0, 0, 0],
-                           [0, 0, 0, 0],
-                           [0, 0, 0, 0]]]*self.env.num_wl)
+        iS = torch.tensor([[[0, 0, 0, 0],
+                            [0, 0, 0, 0],
+                            [0, 0, 0, 0],
+                            [0, 0, 0, 0]]]*self.env.num_wl,
+                          device=self.device,
+                          dtype=torch.get_default_dtype())
+
         iS[:,:2, :2] = iS_wg_t # Transmission from i < - > j
         iS[:,2:, 2:] = iS_wg_t # Transmission from k < - > l
         iS[:,::2, ::2] = rS_wg_k
@@ -212,14 +222,18 @@ class RealisticDirectionalCoupler(Component):
         dn = self.n0 + self.de1_n0*dwl + 0.5*self.de2_n0*dwl**2
         kappa0 = self.k0 + self.de1_k0*dwl + 0.5*self.de2_k0*dwl**2
         kappa1 = pi*dn/wl
-        tau = self.tensor(np.cos(kappa0 + kappa1*self.length)).view(-1,1,1)
-        kappa = self.tensor(-np.sin(kappa0 + kappa1*self.length)).view(-1,1,1)
-        rS = tau*self.tensor([[[0, 1, 0, 0],
-                               [1, 0, 0, 0],
-                               [0, 0, 0, 1],
-                               [0, 0, 1, 0]]])
-        iS = kappa*self.tensor([[[0, 0, 1, 0],
-                                 [0, 0, 0, 1],
-                                 [1, 0, 0, 0],
-                                 [0, 1, 0, 0]]])
+        tau = torch.tensor(np.cos(kappa0 + kappa1*self.length), device=self.device).view(-1,1,1)
+        kappa = torch.tensor(-np.sin(kappa0 + kappa1*self.length), device=self.device).view(-1,1,1)
+        rS = tau*torch.tensor([[[0, 1, 0, 0],
+                                [1, 0, 0, 0],
+                                [0, 0, 0, 1],
+                                [0, 0, 1, 0]]],
+                              device=self.device,
+                              dtype=torch.get_default_dtype())
+        iS = kappa*torch.tensor([[[0, 0, 1, 0],
+                                  [0, 0, 0, 1],
+                                  [1, 0, 0, 0],
+                                  [0, 1, 0, 0]]],
+                                device=self.device,
+                                dype=torch.get_default_dtype())
         return torch.stack([rS, iS])
