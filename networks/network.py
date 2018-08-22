@@ -62,7 +62,8 @@ exist, and thus we can write for the real and imaginary part of \(P^{-1}\):
 
 ```math
 \begin{align}
-{\rm real}(P^{-1}) &= \left({\rm real}(P) + {\rm imag}(P)\cdot {\rm real}(P)^{-1} \cdot {\rm imag}(P)\right)^{-1}\\
+{\rm real}(P^{-1}) &= \left({\rm real}(P) + {\rm imag}(P)\cdot {\rm real}(P)^{-1}
+\cdot {\rm imag}(P)\right)^{-1}\\
 {\rm real}(P^{-1}) &= -{\rm real}(P^{-1})\cdot {\rm imag}(P) \cdot {\rm real}(P)^{-1}
 \end{align}
 ```
@@ -90,13 +91,10 @@ import numpy as np
 from .connector import Connector
 from ..components.component import Component
 from ..components.terms import Term
-from ..components.terms import Source
 from ..sources.sources import Source as InputSource
-from ..components.terms import Detector
 from ..torch_ext.autograd import block_diag
 from ..torch_ext.autograd import batch_block_diag
 from ..torch_ext.tensor import where
-from ..torch_ext.nn import Buffer
 
 
 #############
@@ -133,7 +131,8 @@ class Network(Component):
                 values (Component): component
             connections (list[str]): a list containing the connections of the network.
                 the connection string can have two formats:
-                    1. "comp1:port1:comp2:port2": signifying a connection between ports (always reflexive)
+                    1. "comp1:port1:comp2:port2": signifying a connection between ports
+                       (always reflexive)
                     2. "comp:port:output_port": signifying a connection to an output port index
             name (str): name of the network
 
@@ -235,6 +234,7 @@ class Network(Component):
         return nw
 
     def unterminate(self):
+        ''' remove termination of network '''
         return self.base
 
     def cuda(self, device=None):
@@ -392,11 +392,13 @@ class Network(Component):
             # X = inv(rP + iP@inv(rP)@iP)
             # Y = -X@iP@inv(rP)
             inv_rP = torch.stack([torch.inverse(rp) for rp in rP], dim=0)
-            X = torch.stack([torch.inverse(rp + (ip).mm(inv_rp).mm(ip)) for rp, ip, inv_rp in zip(rP, iP, inv_rP)], dim=0)
+            X = torch.stack([torch.inverse(rp + (ip).mm(inv_rp).mm(ip))
+                             for rp, ip, inv_rp in zip(rP, iP, inv_rP)], dim=0)
             Y = -(X).bmm(iP).bmm(inv_rP)
 
             # 3. calculation of x = Cmcml@Smlml
-            rx, ix = bmm(rCmcml, rSmlml) - bmm(iCmcml,iSmlml), bmm(rCmcml, iSmlml) + bmm(iCmcml, rSmlml)
+            rx, ix = (bmm(rCmcml, rSmlml) - bmm(iCmcml,iSmlml),
+                      bmm(rCmcml, iSmlml) + bmm(iCmcml, rSmlml))
 
             # 4. Calculation of x@inv(P) := x@(X + i*Y)
             rx, ix = (rx).bmm(X) - (ix).bmm(Y), (rx).bmm(Y) + (ix).bmm(X)
@@ -417,7 +419,8 @@ class Network(Component):
         self._iC = iC
 
         # Create buffermask (# time, # wavelengths = 1, # mc nodes, # batches = 1)
-        self.buffermask = torch.zeros((int(self._delays.max())+1, 1, self.nmc, 1), device=self.device)
+        self.buffermask = torch.zeros((int(self._delays.max())+1, 1, self.nmc, 1),
+                                      device=self.device)
         self.buffermask[self._delays,:,range(self.nmc),:] = 1.0
 
         self.initialized = True
@@ -444,7 +447,8 @@ class Network(Component):
         Note:
             obviously, this is a different buffer than Model buffers
         '''
-        rbuffer = torch.zeros((int(self._delays.max())+1, self.env.num_wl, self.nmc, num_batches), device=self.device)
+        rbuffer = torch.zeros((int(self._delays.max())+1, self.env.num_wl, self.nmc, num_batches),
+                              device=self.device)
         ibuffer = rbuffer.clone()
         return rbuffer, ibuffer
 
@@ -460,7 +464,8 @@ class Network(Component):
                 indexed.
             power=True (bool): Wether to return a real-valued power or the
                 complex-valued field.
-            detector=None (Detector): Pass an extra detector instance to detect the fields (or power)
+            detector=None (Detector): Pass an extra detector instance to detect the fields
+                                      (or power)
 
         Returns:
             detected (torch.Floattensor): a tensor with shape
@@ -483,12 +488,21 @@ class Network(Component):
         num_batches = source.shape[-1]
 
         if power:
-            detected = torch.zeros((self.env.num_timesteps, self.env.num_wl, self.num_detectors, num_batches), device=self.device)
-            def update_detected():
+            detected = torch.zeros((self.env.num_timesteps,
+                                    self.env.num_wl,
+                                    self.num_detectors,
+                                    num_batches),
+                                   device=self.device)
+            def update_detected(i):
                 detected[i] = (torch.pow(rx, 2) + torch.pow(ix, 2))[:,-self.num_detectors:]
         else:
-            detected = torch.zeros((2, self.env.num_timesteps, self.env.num_wl, self.num_detectors, num_batches), device=self.device)
-            def update_detected():
+            detected = torch.zeros((2,
+                                    self.env.num_timesteps,
+                                    self.env.num_wl,
+                                    self.num_detectors,
+                                    num_batches),
+                                   device=self.device)
+            def update_detected(i):
                 detected[0,i] = rx[:,-self.num_detectors:]
                 detected[1,i] = ix[:,-self.num_detectors:]
 
@@ -508,13 +522,15 @@ class Network(Component):
 
             # connect memory-less components
             # rx and ix need to be calculated at the same time because of dependencies on each other
-            rx, ix = (self._rC).bmm(rx) - (self._iC).bmm(ix), (self._rC).bmm(ix) + (self._iC).bmm(rx)
+            rx, ix = ((self._rC).bmm(rx) - (self._iC).bmm(ix),
+                      (self._rC).bmm(ix) + (self._iC).bmm(rx))
 
-            update_detected()
+            update_detected(i)
 
             # connect memory-containing components
             # rx and ix need to be calculated at the same time because of dependencies on each other
-            rx, ix = (self._rS).bmm(rx) - (self._iS).bmm(ix), (self._rS).bmm(ix) + (self._iS).bmm(rx)
+            rx, ix = ((self._rS).bmm(rx) - (self._iS).bmm(ix),
+                      (self._rS).bmm(ix) + (self._iS).bmm(rx))
 
             # update buffer
             rbuffer = torch.cat((rx[None], rbuffer[0:-1]), dim=0)
@@ -526,7 +542,7 @@ class Network(Component):
         return detected
 
     def get_used_components(self):
-        # Check which components are actually used
+        ''' Check which components are actually used '''
         def is_int(s):
             try:
                 int(s)
@@ -537,7 +553,8 @@ class Network(Component):
         # here we would like to use an ordered set, but this does not exist.
         # therefore, we use an OrderedDict, for which we don't care about
         # the values. [all for python 2 compatibility...]
-        used_components = OrderedDict([(comp,None) for tup in used_components for comp in tup if not is_int(comp)])
+        used_components = OrderedDict([(comp,None) for tup in used_components
+                                       for comp in tup if not is_int(comp)])
         return list(used_components.keys())
 
     def get_delays(self):
@@ -554,8 +571,13 @@ class Network(Component):
 
     def get_S(self):
         ''' Combined S-matrix of all the components in the network '''
-        rS = batch_block_diag(*(comp.S[0] for comp in self.components.values()))[:,self.order,:][:,:,self.order]
-        iS = batch_block_diag(*(comp.S[1] for comp in self.components.values()))[:,self.order,:][:,:,self.order]
+        rS = batch_block_diag(
+            *(comp.S[0] for comp in self.components.values())
+        )[:,self.order,:][:,:,self.order]
+
+        iS = batch_block_diag(
+            *(comp.S[1] for comp in self.components.values())
+        )[:,self.order,:][:,:,self.order]
         return torch.stack([rS,iS])
 
     def get_order(self):

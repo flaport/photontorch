@@ -74,16 +74,17 @@ class Connector(object):
             s = [s]
         if isinstance(s, (tuple, list)):
             s = ''.join(i if isinstance(i, str) else chr(i) for i in s)
-        if len(s) > 0  and s[0] == ',':
+        if s  and s[0] == ',':
             self.__init__(s[1:], components)
             return
-        if len(s) > 0 and s[-1] == ',':
+        if s and s[-1] == ',':
             self.__init__(s[:-1], components)
             return
         self.s = s
         self.components = components
 
     def copy(self):
+        ''' Create a copy of the connector '''
         return Connector(self.s, [comp.copy() for comp in self.components])
 
     @property
@@ -122,6 +123,7 @@ class Connector(object):
         return '*'.join(ret)
 
     def parse(self):
+        ''' Parse connection string to create connections between components '''
         s = self.s.split(',')
         S = OrderedDict()
         components = OrderedDict()

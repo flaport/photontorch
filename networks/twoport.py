@@ -34,7 +34,8 @@ from ..torch_ext.nn import Buffer
 class TwoPortNetwork(Network):
     ''' This class is used to define a network based on only two-port components. '''
 
-    def __init__(self, twoportcomponents, conn_matrix, sources_at=None, detectors_at=None, delays=None, name=None):
+    def __init__(self, twoportcomponents, conn_matrix, sources_at=None,
+                 detectors_at=None, delays=None, name=None):
         '''
         Args:
             twoportcomponents (array|list): A list of components with just two ports

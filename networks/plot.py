@@ -1,3 +1,5 @@
+''' Special Network Plotting Function '''
+
 #############
 ## Imports ##
 #############
@@ -75,7 +77,7 @@ def plot(network, detected, **kwargs):
     # Handle prefixes
     f = (int(np.log10(max(x))+0.5)//3)*3-3
     prefix = {12:'T', 9:'G', 6:'M', 3:'k', 0:'', -3:'m',
-                -6:r'$\mu$', -9:'n', -12:'p', -15:'f'}[f]
+              -6:r'$\mu$', -9:'n', -12:'p', -15:'f'}[f]
     x = x*10**(-f)
 
     # Handle labels
@@ -99,7 +101,7 @@ def plot(network, detected, **kwargs):
             return plotfunc(x, y, labels, **kwargs)
         elif y.ndim == 3:
             y = y.reshape(0,2,1)
-            labels = ['%i | %s'%(i, det) for i in range(y.shape[1] for det in detectors)]
+            labels = ['%i | %s'%(i, det) for i in range(y.shape[1]) for det in detectors]
             return plotfunc(x, y.reshape(network.env.num_wl, -1), labels, **kwargs)
         else:
             raise ValueError('When plotting in wavelength mode, the max dim of y should be < 4')
