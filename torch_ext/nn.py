@@ -59,6 +59,48 @@ class Buffer(torch.Tensor):
         return 'Buffer containing:\n' + super(Buffer, self).__repr__()
 
 
+#######################
+## Bounded Parameter ##
+#######################
+
+class BoundedParameter(torch.nn.Parameter):
+    def __new__(cls, data=None, bounds=None, requires_grad=True):
+        if data is None:
+            data = torch.Tensor()
+        if bounds is None:
+            bounds = (0,1)
+        # check bounds
+        try:
+            a, b = bounds
+        except ValueError:
+            raise ValueError('bounds should be a tuple with length 2')
+        if b<a:
+            raise ValueError('bounds should be a tuple with length 2 and with bounds[1] > bounds[2]')
+        if (data < a).any() or (data>b).any():
+            raise ValueError('some of your data is outside the specified bounds: [%i, %i]'%(a,b))
+        new = torch.Tensor._make_subclass(cls, cls._inverse_sigmoid(data.data, (a,b)), requires_grad)
+        new.bounds = (float(a), float(b))
+        return new
+
+    @staticmethod
+    def _sigmoid(weights, bounds):
+        a, b = bounds
+        scaled_data = torch.sigmoid(weights)
+        data = (b - a)*scaled_data + a
+        return data
+
+    @staticmethod
+    def _inverse_sigmoid(data, bounds):
+        a, b = bounds
+        scaled_data = (data - a)/(b - a)
+        weights = -torch.log(1/scaled_data - 1)
+        return weights
+
+    def __repr__(self):
+        tensor_repr = torch.Tensor.__repr__(self._sigmoid(self.data, self.bounds))
+        return 'BoundedParameter in [%.2f, %.2f] representing:\n'%self.bounds+tensor_repr
+
+
 ######################
 ## Module Extension ##
 ######################
@@ -89,6 +131,11 @@ class Module(_Module_):
         # Check for buffers and if the value is a buffer, register it.
         if isinstance(value, Buffer):
             self.register_buffer(attr, value)
+        if isinstance(value, BoundedParameter):
+            _attr = '_'+attr
+            self.register_parameter(_attr, value)
+            value_property = property(lambda self: self._parameters[_attr]._sigmoid(self._parameters[_attr], self._parameters[_attr].bounds))
+            self.__class__ = type('ModuleWithBoundedParameter', (self.__class__,), {attr:value_property}) # subclass on the fly
         else:
             super(Module, self).__setattr__(attr, value)
 
@@ -123,177 +170,3 @@ class Module(_Module_):
         elif isinstance(device, int):
             device = 'cuda:%i'%device
         return self.to(device=device)
-
-
-
-#######################
-## Bounded Parameter ##
-#######################
-
-class BoundedParameter(Module):
-    ''' Bounded Parameter.
-
-        A bounded parameter acts like a `torch.nn.Parameter` that is bounded between a
-        certain range. Under the hood it is actually a `torch.nn.Module` for which certain
-        common operations with normal variables (such as addition, multiplication, ...)
-        are defined. This way it can act as a Parameter (with the only difference that
-        it will be registerd in the ._modules dictionary of a model in stead of the
-        ._parameters dictionary.)
-
-        The parameter is bounded by specifying a set of `weights`, which are the inverse
-        sigmoid of the parameter (min-max normalized between its bounds).
-        This way, taking the sigmoid of the weights will always yield a bounded parameter.
-
-    '''
-
-    def __init__(self, data, bounds=None, requires_grad=True):
-        ''' Bounded Parameter
-
-        Args:
-            data (torch.Tensor): data to construct the Bounded Parameter for
-            bounds (tuple): the bounds of the Bounded Parameter
-                (note that bounds[0] < bounds[1] is expected)
-            requires_grad=True (bool): wether the Bounded Parameter needs optimization.
-
-        Note:
-            If no bounds are specified, the Bounded Parameter will act just like a normal
-            Parameter or Buffer (depending if requires_grad is True or False)
-
-        '''
-        super(BoundedParameter, self).__init__()
-        if not torch.is_tensor(data):
-            raise RuntimeError('paramter data has to be a tensor, but got %s'%type(data).__name__)
-        self.device = data.device
-        self._datavar = None # To store the variable if no bounds are specified
-        self.bounds = bounds # Store the bounds
-        # If no bounds are specified, save the data directly into a Parameter
-        if self.bounds is None:
-            if requires_grad:
-                self._datavar = Parameter(data=data, requires_grad=True)
-            else:
-                self._datavar = Buffer(data=data, requires_grad=False)
-        elif self.bounds[0] == self.bounds[1]: # If the bounds are the same, no training can occur.
-            self._datavar = Buffer(data=data, requires_grad=False)
-        else: # If the bounds are valid, we normalize the data between 0 and 1 and calculate its
-              # weights by taking the inverse sigmoid
-            if ((data < bounds[0]) | (data > bounds[1])).any():
-                raise ValueError('BoundedParameters data is not compatible with bounds')
-            scaled_data = (data - bounds[0])/(bounds[1]-bounds[0])
-            weights = -torch.log(1/scaled_data-1) # inverse sigmoid
-            if requires_grad:
-                self.weights = Parameter(data=weights, requires_grad=True)
-            else:
-                self.weights = Buffer(data=weights, requires_grad=False)
-
-    def __repr__(self):
-        ''' String representation of a bounded parameter '''
-        if self.bounds is not None:
-            b0 = '0' if self.bounds[0] == 0 else '%.2f'%self.bounds[0] if abs(self.bounds[0]) > 0.01 else '%.2e'%self.bounds[1]
-            b1 = '0' if self.bounds[1] == 0 else '%.2f'%self.bounds[1] if abs(self.bounds[1]) > 0.01 else '%.2e'%self.bounds[1]
-            bounds = '('+b0+','+b1+')'
-            name = 'BoundedParameter with bounds '+bounds+':\n'
-        else:
-            name = 'BoundedParameter with no bounds:\n'
-        return name + self.data.__repr__()
-
-    def copy(self):
-        ''' deep copy of the bounded parameter '''
-        new = self.__class__(
-            data = self.data.clone(),
-            bounds = (self.bounds[0], self.bounds[1]),
-            requires_grad = self.requires_grad,
-        )
-        return new
-
-    @property
-    def datavar(self):
-        '''@property
-
-        The tensor the bounded Parameter is trying to emulate
-
-        Returns:
-            torch.autograd.tensor
-        '''
-        if self._datavar is not None: # this happens when no bounds were specified
-            return self._datavar
-        else: # this happens when bounds were specified
-            # Convert the weights to the requested variable
-            scaled_data = torch.sigmoid(self.weights)
-            data = (self.bounds[1]-self.bounds[0])*scaled_data + self.bounds[0]
-            return data
-
-    @property
-    def data(self):
-        '''@property
-
-        The data contained by the Bounded Parameter
-
-        Returns:
-            torch.Tensor
-        '''
-        return self.datavar.data
-
-    @data.setter
-    def data(self, value):
-        '''@property setter
-
-        Set the tensor data of the Bounded Parameter
-
-        Setting the data of the bounded parameter should work just like setting the data
-        of a normal parameter
-
-        Args:
-            value (torch.Tensor): the data to set the Bounded Parameter to.
-        '''
-        if self._datavar is not None:
-            self._datavar.data = value # this happens when no bounds were specified
-        else: # this happens when bounds were specified
-            # convert the data to the weights by first normalizing and then taking the
-            # inverse sigmoid
-            scaled_data = (value - self.bounds[0])/(self.bounds[1]-self.bounds[0])
-            self.weights.data = -torch.log(1/scaled_data-1)
-    def cos(self):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return self.datavar.cos()
-    def sin(self):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return self.datavar.sin()
-    def __add__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return self.datavar + other
-    def __radd__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return other + self.datavar
-    def __sub__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return self.datavar - other
-    def __rsub__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return other - self.datavar
-    def __mul__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return self.datavar*other
-    def __rmul__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return other*self.datavar
-    def __div__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return self.datavar/other
-    def __rdiv__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return other/self.datavar
-    def __truediv__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return self.datavar/other
-    def __rtruediv__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return other/self.datavar
-    def __floordiv__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return self.datavar//other
-    def __rfloordiv__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal parameter '''
-        return other//self.datavar
-    def __pow__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
-        return self.datavar**other
