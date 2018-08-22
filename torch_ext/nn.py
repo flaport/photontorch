@@ -89,7 +89,7 @@ class Module(_Module_):
     def __init__(self):
         ''' Module Initialization '''
         super(Module, self).__init__()
-        self.is_cuda = False # keep track if the module is cuda or not.
+        self.device = torch.device(type='cpu')
 
     def __setattr__(self, attr, value):
         # Check for buffers and if the value is a buffer, register it.
@@ -208,33 +208,34 @@ class Module(_Module_):
     def copy(self):
         return copy.deepcopy(self)
 
+    @property
+    def is_cuda(self):
+        return False if self.device.type == 'cpu' else True
+
+    def to(self, *args, **kwargs):
+        new = super(Module, self).to(*args, **kwargs)
+        for k, v in self._modules.items():
+            self._modules[k] = v.to(*args, **kwargs)
+        device, dtype, non_blocking = torch._C._nn._parse_to(*args, **kwargs)
+        new.device = device
+        return new
+
+    def cpu(self):
+        ''' Transform the Module to live on the CPU '''
+        return self.to(device='cpu')
+
     def cuda(self, device=None):
         ''' Transform the Module to live on the GPU
 
         Args:
             device (int): index of the GPU device.
         '''
-        new = super(Module, self).cuda(device=device)
-        for k, v in self._parameters.items():
-            self._parameters[k] = Parameter(v.cuda(device=device).data.detach())
-        for k, v in self._buffers.items():
-            self._buffers[k] = Buffer(v.cuda(device=device).data.detach())
-        for k, v in self._modules.items():
-            self._modules[k] = v.cuda(device=device)
-        new.is_cuda = True
-        return new
+        if device is None:
+            device = 'cuda:0'
+        elif isinstance(device, int):
+            device = 'cuda:%i'%device
+        return self.to(device=device)
 
-    def cpu(self):
-        ''' Transform the Module to live on the CPU '''
-        new = super(Module, self).cpu()
-        for k, v in self._parameters.items():
-            self._parameters[k] = Parameter(v.cpu().data.detach())
-        for k, v in self._buffers.items():
-            self._buffers[k] = Buffer(v.cpu().data.detach())
-        for k, v in self._modules.items():
-            self._modules[k] = v.cpu()
-        new.is_cuda = False
-        return new
 
 
 #######################
