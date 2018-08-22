@@ -17,6 +17,7 @@ import numpy as np
 
 ## Relative
 from .component import Component
+from .waveguides import Waveguide
 from ..constants import pi
 from ..torch_ext.nn import BoundedParameter
 
@@ -100,13 +101,17 @@ class DirectionalCouplerWithLength(Component):
 
     num_ports = 4
 
-    def __init__(self, dc, wg, name=None):
+    def __init__(self, dc=None, wg=None, name=None):
         ''' Directional Coupler
 
         Args:
             dc : DirectionalCoupler instance without length
             wg : yields the full length and the resulting delays of the directional coupler
         '''
+        if dc is None:
+            dc = DirectionalCoupler()
+        if wg is None:
+            wg = Waveguide()
         Component.__init__(self, name=name)
         self.wg = wg
         self.dc = dc

@@ -90,6 +90,8 @@ class Component(Module):
         self.delays = self.get_delays()
         self.S = self.get_S()
 
+        return self
+
     @property
     def env(self):
         '''@property

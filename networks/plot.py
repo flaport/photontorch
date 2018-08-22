@@ -24,7 +24,7 @@ def plot(network, detected, **kwargs):
     ''' Plot detected power versus time or wavelength
 
     Args:
-        detected (np.array): detected power. Allowed shapes:
+        detected (numpy array | torch tensor): detected power. Allowed shapes:
             * (#timesteps,)
             * (#timesteps, #detectors)
             * (#timesteps, #detectors, #batches)
