@@ -17,13 +17,11 @@ import numpy as np
 ## Relative
 from .network import Network
 
-from ..environment.environment import Environment
-from ..components.terms import Term, Detector, Source
+from ..components.terms import Detector, Source
 from ..components.waveguides import Waveguide
 from ..components.directionalcouplers import DirectionalCoupler
-from ..components.connection import Connection
 from ..torch_ext.nn import Buffer, Parameter
-from ..torch_ext import block_diag, batch_block_diag
+from ..torch_ext import block_diag
 
 
 #####################
@@ -163,7 +161,8 @@ class RingAtom(Network):
 
 class RingMolecule(Network):
     ''' A Ring Molecule is a network of rings.'''
-    def __init__(self, map, rings, coupling=None, type='square', trainable=True, copy_rings=False, name=None):
+    def __init__(self, map, rings, coupling=None, type='square',
+                 trainable=True, copy_rings=False, name=None):
         ''' ring Molecule __init__
 
         Args:
@@ -246,6 +245,7 @@ class RingMolecule(Network):
         super(RingMolecule, self).initialize(env)
 
     def get_coupling(self, type1, type2):
+        ''' get couplings between the rings '''
         return self.couplings.get(type1+type2,
                                   self.couplings.get(type2+type1,
                                                      self.standard_coupling))

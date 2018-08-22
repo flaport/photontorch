@@ -193,4 +193,3 @@ class Environment(object):
     def __str__(self):
         ''' String Representation of the environment '''
         return repr(self)
-

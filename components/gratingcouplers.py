@@ -13,9 +13,6 @@ coupling light from a fiber onto the chip.
 ## Torch
 import torch
 
-## Other
-import numpy as np
-
 ## Relative
 from .component import Component
 from ..constants import fwhm2sigma
@@ -65,7 +62,9 @@ class GratingCoupler(Component):
     def get_S(self):
         ''' Scattering matrix with shape: (2, # wavelengths, # ports, # ports) '''
         sigma = fwhm2sigma*self.BW
-        wls = torch.tensor(self.env.wls, device=self.device, dtype=torch.get_default_dtype())[:,None,None]
+        wls = torch.tensor(self.env.wls[:,None,None],
+                           device=self.device,
+                           dtype=torch.get_default_dtype())
         loss = torch.sqrt(self.Tmax*torch.exp(-(self.wl0-wls)**2/(2*sigma**2)))
         rS = loss*torch.tensor([[[0.0, 1.0],
                                  [1.0, 0.0]]], device=self.device)

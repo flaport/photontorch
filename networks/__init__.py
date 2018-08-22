@@ -65,7 +65,6 @@ from . import network
 from .network import Network
 
 # Matrix Networks
-from .matrix import MatrixNetwork
 from .matrix import UnitaryMatrixNetwork
 
 # Ring Networks

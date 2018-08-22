@@ -12,7 +12,6 @@ from scipy.signal import butter
 
 # Relative
 from ..torch_ext.nn import Module
-from ..torch_ext.autograd import lfilter
 
 ###############
 ## Constants ##
@@ -27,7 +26,7 @@ T = 300 #[K] room temperature
 ## PhotoDetector ##
 ###################
 
-class Photodetector(torch.nn.Module):
+class Photodetector(Module):
     ''' Realistic Photodector Model. '''
     def __init__(self,
                  bitrate,
@@ -95,9 +94,11 @@ class Photodetector(torch.nn.Module):
     # for easy access of the b parameter
     @property
     def b(self):
+        ''' get b-parameter for lowpass filtering '''
         return self.conv.weight
     @b.setter
     def b(self, value):
+        ''' set b-parameter for lowpass filtering '''
         del self.conv._buffers['weight']
         self.conv.register_buffer('weight', value)
 
@@ -117,9 +118,11 @@ class Photodetector(torch.nn.Module):
         # Add random noise
         initial_random_state = torch.random.get_rng_state()
         torch.random.manual_seed(self.seed)
-        noise_sd = torch.sqrt(2*q*self.bitrate*(torch.mean(self.responsivity*signal, 0) + self.dark_current)
+        noise_sd = torch.sqrt(2*q*self.bitrate*(torch.mean(self.responsivity*signal, 0)
+                                                + self.dark_current)
                               + 4*k*T*self.bitrate/self.load_resistance)
-        signal = noise_sd*torch.randn(*signal.shape, device=signal.device) + self.responsivity*signal
+        signal = (noise_sd*torch.randn(*signal.shape, device=signal.device)
+                  + self.responsivity*signal)
         torch.random.set_rng_state(initial_random_state)
 
         # convolve with b [first part of linear filtering]

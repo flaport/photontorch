@@ -170,7 +170,8 @@ class BatchBlockDiag(Function):
         # Get start and end indices of blocks in matrix
         ctx.idxs = list(zip(idxs[:-1], idxs[1:]))
         # Get type of new matrix and create empty new matrix with total_size as shape
-        M = torch.zeros((batch_size, total_size, total_size), dtype=inputs[0].dtype, device=inputs[0].device)
+        M = torch.zeros((batch_size, total_size, total_size),
+                        dtype=inputs[0].dtype, device=inputs[0].device)
         # Fill Blocks
         for (i, j), matrix in zip(ctx.idxs, inputs):
             M[:, i:j, i:j] = matrix
@@ -252,7 +253,8 @@ def lfilter(b, a, signal):
 
 
     ## Calculate filtered signal.
-    y = torch.cat([torch.zeros_like(signal[:,:,:(b.shape[-1]-1)]), signal], -1) # prepend (len(b)-1 zeros to the signal)
+    # prepend (len(b)-1 zeros to the signal)
+    y = torch.cat([torch.zeros_like(signal[:,:,:(b.shape[-1]-1)]), signal], -1)
     y = conv(y) # convolve with b
     y = y[:,0,:].t() # back to shape (# time, # batch)
 

@@ -33,9 +33,6 @@ from torch.nn import * # we add to torch.nn
 from torch.nn import Parameter
 from torch.nn import Module as _Module_
 
-## Other
-import numpy as np
-
 
 ############
 ## Buffer ##
@@ -96,18 +93,19 @@ class Module(_Module_):
             super(Module, self).__setattr__(attr, value)
 
     def copy(self):
+        ''' Make a deep copy of the module '''
         return copy.deepcopy(self)
 
     @property
     def is_cuda(self):
+        ''' check if the model parameters live on the GPU '''
         return False if self.device.type == 'cpu' else True
 
     def to(self, *args, **kwargs):
         new = super(Module, self).to(*args, **kwargs)
         for k, v in self._modules.items():
             self._modules[k] = v.to(*args, **kwargs)
-        device, dtype, non_blocking = torch._C._nn._parse_to(*args, **kwargs)
-        new.device = device
+        new.device, _, _ = torch._C._nn._parse_to(*args, **kwargs)
         return new
 
     def cpu(self):
@@ -168,7 +166,8 @@ class BoundedParameter(Module):
         self.device = data.device
         self._datavar = None # To store the variable if no bounds are specified
         self.bounds = bounds # Store the bounds
-        if self.bounds is None: # If no bounds are specified, save the data directly into a Parameter
+        # If no bounds are specified, save the data directly into a Parameter
+        if self.bounds is None:
             if requires_grad:
                 self._datavar = Parameter(data=data, requires_grad=True)
             else:
@@ -280,7 +279,7 @@ class BoundedParameter(Module):
     def __div__(self, other):
         ''' custom function that makes the bounded parameter act just like a normal Parameter '''
         return self.datavar/other
-    def __div__(self, other):
+    def __rdiv__(self, other):
         ''' custom function that makes the bounded parameter act just like a normal Parameter '''
         return other/self.datavar
     def __truediv__(self, other):
@@ -292,8 +291,8 @@ class BoundedParameter(Module):
     def __floordiv__(self, other):
         ''' custom function that makes the bounded parameter act just like a normal Parameter '''
         return self.datavar//other
-    def __floordiv__(self, other):
-        ''' custom function that makes the bounded parameter act just like a normal Parameter '''
+    def __rfloordiv__(self, other):
+        ''' custom function that makes the bounded parameter act just like a normal parameter '''
         return other//self.datavar
     def __pow__(self, other):
         ''' custom function that makes the bounded parameter act just like a normal Parameter '''

@@ -14,6 +14,7 @@ import numpy as np
 ############
 
 class Source(object):
+    ''' Photontorch Source '''
     nw = None
     def __init__(self, array, axes=None):
         ''' Source initialization
@@ -33,7 +34,8 @@ class Source(object):
                         'batches' or 'b'
         '''
         array = np.array(array, 'complex64')
-        keys = {'time':'t','t':'t','wavelengths':'w','w':'w','sources':'s','s':'s','batches':'b','b':'b'}
+        keys = {'time':'t','t':'t','wavelengths':'w','w':'w',
+                'sources':'s','s':'s','batches':'b','b':'b'}
         if axes is None:
             axes = {
                 0:[],
@@ -77,6 +79,7 @@ class Source(object):
 
     @property
     def shape(self):
+        ''' get shape of tensor this source is trying to emulate '''
         return (2, self.nw.env.num_timesteps, self.nw.env.num_wl, self.nw.nmc, self.nb)
 
     def __getitem__(self, key):
@@ -85,6 +88,7 @@ class Source(object):
 
 
 class ConstantSource(Source):
+    ''' Photontorch Constant Source '''
     def __init__(self, amplitude=1.0):
         ''' ConstantSource initialization
 

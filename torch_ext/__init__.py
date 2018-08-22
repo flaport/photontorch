@@ -21,9 +21,9 @@ parameters of the model that do not require gradients.
 `torch.nn.Parameter` that is bounded between a certain range. Under the hood it is
 actually a `torch.nn.Module`, but for all intents and purposes it can be considered
 to act like a `torch.nn.Parameter`.
-  * `[Module](nn.Module)`: Extends `torch.nn.Module`, with some extra features (such as automatically)
-registering a `[Buffer](.nn.Buffer)` in its `._buffers` attribute, modified `.cuda()` calls and some
-extra functionalities.
+  * `[Module](nn.Module)`: Extends `torch.nn.Module`, with some extra features, such as
+automatically registering a `[Buffer](.nn.Buffer)` in its `._buffers` attribute, modified
+`.cuda()` calls and some extra functionalities.
 
 ## [Tensor](tensor) functions
 Some non-differentiable, but useful functions that act on (or create) torch tensors.

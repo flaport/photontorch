@@ -91,7 +91,6 @@ from .components.directionalcouplers import DirectionalCouplerWithLength
 from .networks.network import Network
 
 # Matrix Network
-from .networks.matrix import MatrixNetwork
 from .networks.matrix import UnitaryMatrixNetwork
 
 # Ring Networks
