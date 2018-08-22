@@ -640,32 +640,3 @@ class Network(Component):
                 C[0,i,j] = C[0,j,i] = 1.0
 
         return C[:,self.order,:][:,:,self.order]
-
-
-class FrozenNetwork(Network):
-    def __init__(self, nw):
-        torch.nn.Module.__init__(self)
-        self.name = nw.name
-        self._env = nw._env
-        self.nmc = nw.nmc
-        self.is_cuda = nw.is_cuda
-        self.num_detectors = nw.num_detectors
-        self.num_sources = nw.num_sources
-        self._rC = Buffer(nw._rC.detach())
-        self._iC = Buffer(nw._iC.detach())
-        self._rS = Buffer(nw._rS.detach())
-        self._iS = Buffer(nw._iS.detach())
-        self._delays = Buffer(nw._delays).detach()
-        self.buffermask = Buffer(nw.buffermask.detach())
-        self.initialized = True
-        self.add_sources()
-
-    def initialize(self, env=None):
-        if env is not None:
-            self._env = env
-        return self
-
-    def forward(self, source=1.0, power=True, detector=None):
-        with torch.no_grad():
-            detected = super(FrozenNetwork, self).forward(source=source, power=power, detector=detector)
-        return detected
