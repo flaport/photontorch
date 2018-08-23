@@ -1,5 +1,5 @@
 '''
-# PhotonTorch Simulation Environment
+# Simulation Environment
 
 The simulation environment module contains a single class: Environment
 

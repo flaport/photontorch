@@ -3,19 +3,18 @@
 
 The Neural Network Extensions Consist out of three main objects:
 
-  * `BoundedParameter`: A bounded parameter acts like a
-`torch.nn.Parameter` that is bounded between a certain range. Under the hood it is
-actually a `torch.nn.Module`, but for all intents and purposes it can be considered
-to act like a `torch.nn.Parameter`.
-
   * `Buffer`: A special kind of tensor that automatically will
 be added to the `._buffers` attribute of the Module. Buffers are typically used as
-parameters of the model that do not require gradients or optimization, but that are
-indispensible for the definition of your object.
+parameters of the model that do not require gradients.
 
-  * `Module`: Extends `torch.nn.Module`, with some extra features (such as automatically)
-registering a `Buffer` in its `._buffers` attribute, modified `.cuda()` calls and some
-extra functionalities.
+  * `Module`: Extends `torch.nn.Module`, with some extra features, such as
+automatically registering a `[Buffer](.nn.Buffer)` in its `._buffers` attribute, modified
+`.cuda()` calls and some extra functionalities.
+
+  * `BoundedParameter`: A bounded parameter is a special kind of
+`torch.nn.Parameter` that is bounded between a certain range. Under the hood it registers
+an unbounded weight in our torch_ext.nn.Module and a class property calculating the
+desired parameter on the fly when it is asked by performing a scaled sigmoid on the weight.
 
 '''
 

@@ -1,12 +1,16 @@
+[comment]: # (This is and automatically generated readme file)
+[comment]: # (To edit this file, edit the docstring in the __init__.py file)
+[comment]: # (And run the documentation: python -m photontorch.documentation)
+
 # Sources
 
 A collection of sources that can be created by a Network.
 
 ## Implemented so far:
 
-  * ConstantSource
-  * TimeSource
-  * BitSource
+  * [ConstantSource](sources.ConstantSource)
+  * [TimeSource](sources.TimeSource)
+  * [BitSource](sources.BitSource)
 
 
 ## Note about the way to create sources:
