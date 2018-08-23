@@ -58,30 +58,37 @@ class Environment(object):
         '''
 
         # wavelength
-        wls = kwargs.pop('wls',None)
-        self.wl = kwargs.pop('wl', 1.55e-6)
-        if wls is not None:
-            self.wls = np.array(wls)
+        wl = kwargs.pop('wl', None)
+        dwl = kwargs.pop('dwl', None)
+        num_wl = int(kwargs.pop('num_wl', 1))
+        wl_start = float(kwargs.pop('wl_start', 1.5e-6))
+        wl_end = float(kwargs.pop('wl_end', 1.6e-6))
+        if wl is None and dwl is None and num_wl==1:
+            wls = np.array([0.5*(wl_start+wl_end)])
+        elif wl is None and dwl is None and num_wl>1:
+            wls = np.array(wl_start, wl_end, num_wl, endpoint=True)
+        elif wl is None and num_wl==1:
+            wls = np.arange(wl_start, wl_end, float(dwl))
+        elif dwl is None and num_wl==1:
+            wls = np.array([float(wl)])
+        wls = np.asarray(kwargs.pop('wls', wls), dtype=np.float64)
+        if wls.ndim == 0: wls = wls[None]
+        self.wls = wls
 
         # time data:
-        dt = kwargs.pop('dt', 1e-14)
-        num_timesteps = kwargs.pop('num_timesteps', None)
-        t_start = kwargs.pop('t_start', 0)
-        t_end = kwargs.pop('t_end', 1e-12)
-
-        self._dt = dt # dt has to be stored seperatly for the extreme case of len(t) < 1
-        t = kwargs.pop('t', None)
-        if t is not None:
-            self.t = np.array(t)
-            self._dt = t[1] - t[0]
-        elif num_timesteps is None:
-            self.t = np.arange(t_start, t_end, dt)
+        dt = kwargs.pop('dt', None)
+        num_timesteps = int(kwargs.pop('num_timesteps', 1))
+        t_start = float(kwargs.pop('t_start', 0))
+        t_end = float(kwargs.pop('t_end', 1e-12 if dt is None else num_timesteps*dt))
+        dt = float(t_end - t_start if dt is None else dt)
+        if num_timesteps == 1:
+            self.t = np.array([dt])
         else:
-            self.t = np.arange(t_start, num_timesteps*dt, dt)
+            self.t = np.asarray(kwargs.pop('t', np.arange(t_start, t_end, dt)))
 
         # use delays
         # (set to False to speed up frequency calculations with constant source)
-        self.use_delays = kwargs.pop('use_delays', True)
+        self.use_delays = bool(kwargs.pop('use_delays', not kwargs.pop('no_delays', False)))
 
         # use CUDA or not
         self.cuda = kwargs.pop('cuda', None)
@@ -94,7 +101,14 @@ class Environment(object):
 
         # other keyword arguments are added to the attributes like so:
         for k, v in kwargs.items():
-            self.__dict__[k] = v
+            setattr(self, k, v)
+
+    def copy(self, **kwargs):
+        ''' Create a (deep) copy of the environment object '''
+        new = deepcopy(self)
+        for kw, val in kwargs.items():
+            setattr(new, kw, val)
+        return new
 
     @property
     def c(self):
@@ -111,6 +125,37 @@ class Environment(object):
         self.wls = np.array([value])
 
     @property
+    def dwl(self):
+        ''' Wavelength step of the simulation '''
+        if self.num_wl > 1:
+            return self.wls[1] - self.wls[0]
+    @dwl.setter
+    def dwl(self, value):
+        ''' Wavelength step of the simulation '''
+        if self.num_wl > 1:
+            self.wls = np.arange(self.wls[0], self.wls[-1] - 0.5*value, value)
+
+    @property
+    def wl_start(self):
+        ''' Wavelength start of the simulation '''
+        return self.wls[0]
+    @wl_start.setter
+    def wl_start(self, value):
+        ''' Wavelength start of the simulation '''
+        self.wls = self.wls[self.wls > value]
+        self.wls -= (self.wls[0] - value)
+
+    @property
+    def wl_end(self):
+        ''' Wavelength end of the simulation '''
+        return self.wls[-1]
+    @wl_end.setter
+    def wl_end(self, value):
+        ''' Wavelength end of the simulation '''
+        self.wls = self.wls[self.wls<value]
+        self.wls += (value - self.wls[-1])
+
+    @property
     def num_wl(self):
         ''' Number of wavelengths in the simulation '''
         return self.wls.shape[0]
@@ -123,13 +168,14 @@ class Environment(object):
             self.wls = np.linspace(self.wls[0], self.wls[-1], value, endpoint=True)
 
     @property
-    def num_timesteps(self):
-        ''' Number of timesteps in the simulation '''
-        return self.t.shape[0]
-    @num_timesteps.setter
-    def num_timesteps(self, value):
-        ''' Number of timesteps in the simulation '''
-        self.t = np.arange(self.t_start, value*self.dt-0.5*self.dt, self.dt)
+    def t(self):
+        ''' Time range of the simulation '''
+        return self._t
+    @t.setter
+    def t(self, value):
+        ''' Time range of the simulatino '''
+        self._t = np.asarray(value)
+        self._dt = self._t[0] if self._t.shape[0] == 1 else self._t[1]-self._t[0]
 
     @property
     def dt(self):
@@ -159,37 +205,53 @@ class Environment(object):
         ''' End time of the simulation '''
         self.t = np.arange(self.t_start, value, self.dt)
 
-    def copy(self, **kwargs):
-        ''' Create a (deep) copy of the environment object '''
-        new = deepcopy(self)
-        for kw, val in kwargs.items():
-            setattr(new, kw, val)
-        if 'dt' in kwargs:
-            new.dt = kwargs['dt']
-        return new
+    @property
+    def num_timesteps(self):
+        ''' Number of timesteps in the simulation '''
+        return self.t.shape[0]
+    @num_timesteps.setter
+    def num_timesteps(self, value):
+        ''' Number of timesteps in the simulation '''
+        self.t = np.arange(self.t_start, value*self.dt-0.5*self.dt, self.dt)
+
+    @property
+    def no_delays(self):
+        ''' To use delays during simulation or not '''
+        return not self.use_delays
+    @no_delays.setter
+    def no_delays(self, value):
+        ''' To use delays during simulation or not '''
+        self.use_delays = bool(not value)
+
+    def __to_str_dict(self):
+        ''' Dictionary representation of the environment '''
+        env = OrderedDict()
+        env['name'] = repr(self.name)
+        if self.use_delays:
+            env['t_start'] = '%.2e'%self.t_start if self.t_start > self.dt else '0'
+            env['t_end'] = '%.2e'%self.t_end
+            env['dt'] = '%.2e'%self.dt
+        if self.num_wl > 1:
+            env['wl_start'] = '%.3e'%self.wls[0]
+            env['wl_end'] = '%.3e'%self.wls[-1]
+            env['num_wl'] = repr(self.num_wl)
+        else:
+            env['wl'] = '%.3e'%self.wl
+        env.update({k:repr(v) for k, v in self.__dict__.items() if k[0] != '_'})
+        del env['wls']
+        return env
 
     def __repr__(self):
         ''' String Representation of the environment '''
-        env = OrderedDict()
-        _env = deepcopy(self.__dict__)
-        env['name'] = _env.pop('name',None)
-        env['dt'] = '%.2e'%_env.pop('_dt', None)
-        env['t_start'] = '%.2e'%self.t_start if self.t_start != 0 else 0
-        env['t_end'] = '%.2e'%self.t_end if self.t_end != 0 else 0
-        del _env['t']
-        wls = _env.pop('wls', None)
-        if wls is not None and len(wls) == 1:
-            env['wl'] = '%.2e'%wls[0]
-        else:
-            env['wls'] = wls
-        env.update(_env)
+        dic = self.__to_str_dict()
+        return 'Environment('+', '.join('='.join([k, v]) for k, v in dic.items())+')'
 
-        s =     'Simulation Environment:\n'
-        s = s + '-----------------------\n'
-        for k, v in env.items():
-            s = s + '%s : %s\n'%(str(k), str(v))
-        return s
 
     def __str__(self):
         ''' String Representation of the environment '''
-        return repr(self)
+        dic = self.__to_str_dict()
+        s =     'Simulation Environment:\n'
+        s = s + '-----------------------\n'
+        for k, v in dic.items():
+            s = s + '%s = %s\n'%(str(k), str(v))
+        return s
