@@ -36,7 +36,6 @@ class Photodetector(Module):
                  dark_current=0.1e-9,
                  load_resistance=1e6,
                  filter_order=4,
-                 cuda=False,
                  seed=0):
         ''' Photodector __init__
         Args:
@@ -86,11 +85,6 @@ class Photodetector(Module):
         self.conv.bias = None
         self.conv.register_buffer('weight', b)
 
-        # if the photodetector gets created with cuda=True, transform the
-        # buffers to cuda.
-        if cuda:
-            self.cuda()
-
     # for easy access of the b parameter
     @property
     def b(self):
@@ -99,7 +93,6 @@ class Photodetector(Module):
     @b.setter
     def b(self, value):
         ''' set b-parameter for lowpass filtering '''
-        del self.conv._buffers['weight']
         self.conv.register_buffer('weight', value)
 
     def forward(self, signal):
