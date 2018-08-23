@@ -108,18 +108,15 @@ class DirectionalCouplerWithLength(Component):
             dc : DirectionalCoupler instance without length
             wg : yields the full length and the resulting delays of the directional coupler
         '''
-        if dc is None:
-            dc = DirectionalCoupler()
-        if wg is None:
-            wg = Waveguide()
         Component.__init__(self, name=name)
-        self.wg = wg
-        self.dc = dc
+        self.wg = wg if wg is not None else Waveguide()
+        self.dc = dc if dc is not None else DirectionalCoupler()
 
     def initialize(self, env):
         self.wg.initialize(env)
         self.dc.initialize(env)
         Component.initialize(self, env)
+        return self
 
     def get_delays(self):
         ''' Delays of the directional coupler '''
@@ -131,10 +128,10 @@ class DirectionalCouplerWithLength(Component):
         t = (1-self.dc.coupling)**0.5 # Transmission
 
         # Helper matrices
-        rS_wg_t = self.wg.rS*t
-        iS_wg_k = self.wg.iS*k
-        iS_wg_t = self.wg.iS*t
-        rS_wg_k = self.wg.rS*k
+        rS_wg_t = self.wg.S[0]*t
+        iS_wg_k = self.wg.S[1]*k
+        iS_wg_t = self.wg.S[1]*t
+        rS_wg_k = self.wg.S[0]*k
 
         # Real part
         rS = torch.tensor([[[0, 0, 0, 0],
@@ -229,16 +226,16 @@ class RealisticDirectionalCoupler(Component):
         kappa1 = pi*dn/wl
         tau = torch.tensor(np.cos(kappa0 + kappa1*self.length), device=self.device).view(-1,1,1)
         kappa = torch.tensor(-np.sin(kappa0 + kappa1*self.length), device=self.device).view(-1,1,1)
-        rS = tau*torch.tensor([[[0, 1, 0, 0],
+        rS = (tau*torch.tensor([[[0, 1, 0, 0],
                                 [1, 0, 0, 0],
                                 [0, 0, 0, 1],
                                 [0, 0, 1, 0]]],
                               device=self.device,
-                              dtype=torch.get_default_dtype())
-        iS = kappa*torch.tensor([[[0, 0, 1, 0],
+                              dtype=torch.float64)).to(torch.get_default_dtype())
+        iS = (kappa*torch.tensor([[[0, 0, 1, 0],
                                   [0, 0, 0, 1],
                                   [1, 0, 0, 0],
                                   [0, 1, 0, 0]]],
                                 device=self.device,
-                                dype=torch.get_default_dtype())
+                                dtype=torch.float64)).to(torch.get_default_dtype())
         return torch.stack([rS, iS])
