@@ -188,15 +188,3 @@ class Component(Module):
         '''
         from ..networks.connector import Connector
         return Connector(key, [self])
-
-    def __deepcopy__(self, memo):
-        ''' Create a copy of the component '''
-        new = copy(self)
-        if new.env is not None:
-            del new.rS
-            del new.iS
-            del new.delays
-        new = deepcopy(super(Component, new), memo)
-        if new.env is not None:
-            new.initialize(new.env)
-        return new

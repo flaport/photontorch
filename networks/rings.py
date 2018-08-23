@@ -5,7 +5,7 @@
 #############
 
 ## Standard Library
-from copy import copy
+from copy import copy, deepcopy
 from collections import OrderedDict
 
 ## Torch
@@ -209,9 +209,9 @@ class RingMolecule(Network):
                 if ring is not None:
                     idx += ring.num_ports
                     if copy_rings:
-                        ring = ring.copy() # deep copy
+                        ring = deepcopy(ring) # deep copy: different parameters, different name
                     else:
-                        ring = copy(ring) # shallow copy
+                        ring = copy(ring) # shallow copy: same parameters, different name
                     ring.name = 'ring_%i_%i'%(i,j)
                     self.components[ring.name] = ring
                     self.compmap[i,j] = ring

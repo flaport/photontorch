@@ -118,8 +118,6 @@ class Module(_Module_):
     (this is different from the default PyTorch behavior, where just Parameters are
     converted to cuda.)
 
-    .copy() creates a deep copy of the module
-
     '''
 
     def __init__(self):
@@ -138,10 +136,6 @@ class Module(_Module_):
             self.__class__ = type('ModuleWithBoundedParameter', (self.__class__,), {attr:value_property}) # subclass on the fly
         else:
             super(Module, self).__setattr__(attr, value)
-
-    def copy(self):
-        ''' Make a deep copy of the module '''
-        return copy.deepcopy(self)
 
     @property
     def is_cuda(self):

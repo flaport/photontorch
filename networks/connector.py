@@ -83,10 +83,6 @@ class Connector(object):
         self.s = s
         self.components = components
 
-    def copy(self):
-        ''' Create a copy of the connector '''
-        return Connector(self.s, [comp.copy() for comp in self.components])
-
     @property
     def idxs(self):
         ''' Get free indices of the connector object '''

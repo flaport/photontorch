@@ -11,6 +11,7 @@ Directional coupler networks that act like a matrix multiplication.
 
 # Standard Library
 from collections import OrderedDict
+from copy import deepcopy
 
 # Torch
 import torch
@@ -188,7 +189,7 @@ class UnitaryMatrixNetwork(Network):
             for i in range(self.m):
                 term['d%i'%i] = Detector(name='d%i'%i)
         if isinstance(term , Term):
-            term = OrderedDict([(term.name+'_%i'%i,term.copy()) for i in range(self.m+self.n)])
+            term = OrderedDict([(term.name+'_%i'%i,deepcopy(term)) for i in range(self.m+self.n)])
         if isinstance(term, (list, tuple)):
             term = OrderedDict([(t.name,t) for t in term])
         if self.is_cuda:
