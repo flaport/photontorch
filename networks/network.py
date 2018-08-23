@@ -78,7 +78,7 @@ This equation is valid, even if \({\rm imag}(P)^{-1}\) does not exist.
 # Standard library
 import warnings
 import functools
-from copy import copy
+from copy import copy, deepcopy
 from collections import OrderedDict
 
 ## Torch
@@ -167,7 +167,7 @@ class Network(Component):
 
         self.components = OrderedDict()
         for name in used_components:
-            comp = copy(components[name]) # shallow copy
+            comp = copy(components[name]) # shallow copy to allow for different name but same params
             comp.name = name
             self.components[name] = comp
 
@@ -219,7 +219,7 @@ class Network(Component):
         if term is None:
             term = Term()
         if isinstance(term , Term):
-            term = OrderedDict((term.name+'_%i'%i,term.copy()) for i in range(n))
+            term = OrderedDict((term.name+'_%i'%i,deepcopy(term)) for i in range(n))
         if isinstance(term, (list, tuple)):
             term = OrderedDict((t.name,t) for t in term)
         if self.is_cuda:
