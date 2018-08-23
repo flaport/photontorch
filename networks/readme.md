@@ -1,17 +1,26 @@
+[comment]: # (This is and automatically generated readme file)
+[comment]: # (To edit this file, edit the docstring in the __init__.py file)
+[comment]: # (And run the documentation: python -m photontorch.documentation)
+
 # PhotonTorch Networks
 
 The Network is the core of Photontorch. This is where everything comes together.
 
 ## Creation of a network
 
-There are three accepted forms to create a network:
+There are two accepted forms to create a network:
 
-### First option:
+### First option (for small networks):
 ```
-    nw = Network(string, *components)
+    nw = Network(comp_1[s_1]*comp_2[s_2]*...*comp_n[s_n])
 ```
-s is a string specifying how the components are connected. It follows
-the einstein summation convention.
+Network initialization with a product of indexed components (connectors), where the
+string indices follow the einstein summation convention.
+
+#### Example
+```
+        nw = Network(wg1['ij']*dc['jklm']*wg2['mn'])
+```
 
 #### Example:
 ```
@@ -22,24 +31,44 @@ The connection is made where equal indices occur:
     last port of wg1 is connected to first port of dc
     last port of dc is connected to first port of wg2.
 
-### Second option
+### Second option (for bigger networks):
 ```
     nw = Network(
-        (comp_1, s_1),
-        (comp_2, s_2),
-        ...
-        (comp_n, s_n),
+        components={
+            'name1':comp1,
+            'name2':comp2,
+            ...
+            'nameN':compN,
+        },
+        connections=[
+            'name1:0:compN:1,
+            'comp2:5:comp1:3,
+            ...
+            'comp1:2:comp2:2,
+        ]
     )
 ```
-Network initialization with a list of tuples of length two, each consisting of
-a component and its connection string. The connection strings also follow the
-einstein summation convention.
+Where each network is defined by a dictionary containing all the components and a list
+of component connections, where each connection entry hase the form
+```
+    'first_component_name:first_component_port_index:second_component_name:second_component_port_index'
+```
 
 #### Example
 ```
-        nw = Network(
-            (wg1, 'ij'),
-            (dc, 'jklm'),
-            (wg3, 'mn')
-        )
+    allpass = Network(
+        components={
+            wg_in = pt.Waveguide(),
+            wg_out= pt.Waveguide(),
+            wg_ring=pt.Waveguide(),
+            dc=pt.DirectionalCoupler(),
+        },
+        connections=[
+            'wg_in:1:dc:0',
+            'dc:1:wg_out:0',
+            'dc:2:wg_ring:0',
+            'wg_ring:1:dc:3',
+        ]
+    )
 ```
+

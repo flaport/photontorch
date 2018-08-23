@@ -8,22 +8,24 @@ the box.
 Below you can find a short summary:
 
 ## [Autograd](autograd) Extensions
-  * `pinv`: a differentiable implementation of the pseudo inverse of a matrix
   * `block_diag`: a differentiable implementation of a block diagonal matrix
   * `batch_block_diag`: a differentiable implementation of a block diagonal matrix
 performed over a batch of matrices.
+  * `lfilter`: a differentiable equivalent of scipy's lfilter
 
 ## [Neural Network](nn) Extensions
   * `[Buffer](nn.Buffer)`: A special kind of tensor that automatically will
 be added to the `._buffers` attribute of the Module. Buffers are typically used as
 parameters of the model that do not require gradients.
-  * `[BoundedParameter](nn.BoundedParameter)`: A bounded parameter acts like a
-`torch.nn.Parameter` that is bounded between a certain range. Under the hood it is
-actually a `torch.nn.Module`, but for all intents and purposes it can be considered
-to act like a `torch.nn.Parameter`.
+
   * `[Module](nn.Module)`: Extends `torch.nn.Module`, with some extra features, such as
 automatically registering a `[Buffer](.nn.Buffer)` in its `._buffers` attribute, modified
 `.cuda()` calls and some extra functionalities.
+
+  * `[BoundedParameter](nn.BoundedParameter)`: A bounded parameter is a special kind of
+`torch.nn.Parameter` that is bounded between a certain range. Under the hood it registers
+an unbounded weight in our torch_ext.nn.Module and a class property calculating the
+desired parameter on the fly when it is asked by performing a scaled sigmoid on the weight.
 
 ## [Tensor](tensor) functions
 Some non-differentiable, but useful functions that act on (or create) torch tensors.
