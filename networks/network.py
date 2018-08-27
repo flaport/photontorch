@@ -216,6 +216,8 @@ class Network(Component):
             if dict: specify as many name:terms as free indices in the network
         '''
         n = len(self.free_idxs)
+        if n == 0:
+            raise IndexError('no free ports for termination')
         if term is None:
             term = Term()
         if isinstance(term , Term):
@@ -303,10 +305,6 @@ class Network(Component):
         ## Initialize network
         super(Network, self).initialize(env)
 
-        ## Check if network if fully connected
-        if not self.terminated:
-            return self# Stop initialization here.
-
         ## delays
         # delays can be turned off for frequency calculations
         # with constant input sources
@@ -323,13 +321,13 @@ class Network(Component):
         self.nmc = len(mc)
         self.nml = len(ml)
 
-        if self.nmc == 0:
-            return self # break of initialization; network is probably part of a bigger network
+        if not self.terminated or self.nmc == 0:
+            return self # break off initialization; network is probably part of a bigger network
 
         # Check if simulation timestep is too big:
         if (delays[delays_in_seconds.data > 0] < 10).any(): # This bound is rather arbitrary...
             warnings.warn('Simulation timestep might be too large, resulting '
-                          'in too short delays. Try using a smaller timestep')
+                          'in too short delays. Try using a smaller timestep', RuntimeWarning)
 
         ## Source and detector locations
         sources_at = where(self.sources_at[mc])
@@ -435,7 +433,7 @@ class Network(Component):
         @functools.wraps(func)
         def wrapped(self, *args, **kwargs):
             if not self.initialized:
-                raise ValueError('Network not fully initialized. Is the network fully terminated?')
+                raise RuntimeError('Network not fully initialized. Is the network fully terminated?')
             return func(self, *args, **kwargs)
         return wrapped
 
@@ -592,8 +590,6 @@ class Network(Component):
             if len(conn_list) == 4:
                 return None, None
             comp, i, j = conn_list
-            if comp not in self.components:
-                raise ValueError('Component %s not found during reordering'%comp)
             i, j = int(i), int(j)
             i = int(start_idxs[comp] + free_idxs[comp][i])
             return i, j
@@ -644,8 +640,6 @@ class Network(Component):
             if comp1 == comp2 and i1 == i2:
                 raise IndexError('Cannot connect two equal ports')
             for i, comp in [(i1,comp1), (i2, comp2)]:
-                if comp not in self.components:
-                    raise ValueError('Component %s not found during connecting'%comp)
                 if i >= len(free_idxs[comp]):
                     raise ValueError('Component %s only has %i ports. Port index '
                                      '%i too high'%(comp, len(free_idxs[comp]), i))

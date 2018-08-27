@@ -46,8 +46,6 @@ def plot(network, detected, **kwargs):
         ''' Helper function '''
         plots = plt.plot(x,y,**kwargs)
         if labels is not None:
-            if len(labels) != len(plots):
-                raise ValueError('# labels does not corresponds to # plots')
             for p, l in zip(plots, labels):
                 p.set_label(l)
         if labels is not None and len(labels) > 1:
@@ -100,11 +98,11 @@ def plot(network, detected, **kwargs):
                 labels = ['batch %i'%i for i in range(y.shape[1])]
             return plotfunc(x, y, labels, **kwargs)
         elif y.ndim == 3:
-            y = y.reshape(0,2,1)
+            y = y.transpose(0,2,1)
             labels = ['%i | %s'%(i, det) for i in range(y.shape[1]) for det in detectors]
             return plotfunc(x, y.reshape(network.env.num_wl, -1), labels, **kwargs)
         else:
-            raise ValueError('When plotting in wavelength mode, the max dim of y should be < 4')
+            raise RuntimeError('When plotting in wavelength mode, the max dim of y should be < 4')
 
     if time_mode:
         if y.ndim == 2:
@@ -130,9 +128,9 @@ def plot(network, detected, **kwargs):
             labels = ['%i | %s | %s'%(b, wl, det) for b in range(y.shape[1]) for wl in wavelengths for det in detectors]
             return plotfunc(x, y.reshape(network.env.num_timesteps, -1), labels, **kwargs)
         else:
-            raise ValueError('When plotting in time mode, the max dim of y should be < 5')
+            raise RuntimeError('When plotting in time mode, the max dim of y should be < 5')
 
     # we should never get here:
-    raise ValueError('Could not plot detected array. Are you sure you are you sure the '
+    raise ValueError('Could not plot detected array. Are you sure you are you sure the ' # pragma: no cover
                      'current simulation environment corresponds to the environment for '
                      'which the detected tensor was calculated?')

@@ -24,7 +24,7 @@ import numpy as np
 # Relative
 from .network import Network
 from ..components.terms import Source, Detector
-from ..torch_ext.nn import Buffer
+from ..torch_ext.nn import Module, Buffer
 
 ######################
 ## Two Port Network ##
@@ -50,7 +50,8 @@ class TwoPortNetwork(Network):
             * delays should be a 1D list or array specifying the delay introduced by the
             twoportcomponents (in contrast to the delay matrix in caphe)
         '''
-        torch.nn.Module.__init__(self)
+        Module.__init__(self)
+        self.name = self.__class__.__name__.lower() if name is None else name
 
         self.device = torch.device('cpu')
 
@@ -88,9 +89,9 @@ class TwoPortNetwork(Network):
         self.detectors_at[-len(self.terms):] = torch.tensor(detectors_at)
 
         if delays is None:
-            self.delays = torch.cat([comp.get_delays() for comp in self.components.values()])
+            self.delays = Buffer(torch.cat([comp.get_delays() for comp in self.components.values()]))
         else:
-            self.delays = np.stack([delays, delays], axis=-1).flatten()
+            self.delays = Buffer(np.stack([delays, delays], axis=-1).flatten())
 
 
         self.add_sources()
@@ -104,10 +105,10 @@ class TwoPortNetwork(Network):
         self.initialized=False
 
     def terminate(self, term=None, name=None):
-        raise NotImplementedError('A TwoPortNetwork is always terminated by default')
+        raise RuntimeError('A TwoPortNetwork is always terminated by default')
 
     def unterminate(self):
-        raise NotImplementedError('A TwoPortNetwork is always terminated by default')
+        raise RuntimeError('A TwoPortNetwork is always terminated by default')
 
     def get_used_components(self):
         return self.components.keys()

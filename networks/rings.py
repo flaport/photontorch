@@ -52,8 +52,6 @@ class AllPass(Network):
             'wg_ring':Waveguide(7e-6, loss=4230, neff=3.47),
             'wg_in':Waveguide(3.5e-6, neff=3.47),
             'wg_pass':Waveguide(3.5e-6, neff=3.47),
-            'term_in':Source(),
-            'term_pass':Detector(),
         }
         connections=[
             'term_in:0:wg_in:0',
@@ -63,6 +61,7 @@ class AllPass(Network):
             'dc:3:wg_ring:1',
             'wg_pass:1:term_pass:0',
         ]
+
         components.update(kwargs)
 
         if 'term_in' not in components:
@@ -97,10 +96,6 @@ class AddDrop(Network):
         '''
         name = kwargs.pop('name', None)
         components = {
-            'term_in':Source(),
-            'term_pass':Detector(),
-            'term_add':Detector(),
-            'term_drop':Detector(),
             'dc1':DirectionalCoupler(0.5),
             'dc2':DirectionalCoupler(0.5),
             'wg1':Waveguide(2.5e-5, loss=0, neff=2.86),
@@ -121,11 +116,11 @@ class AddDrop(Network):
         if 'term_in' not in components:
             connections[0] = 'dc1:0:0'
         if 'term_pass' not in components:
-            connections[-1] = 'dc1:1:1'
+            connections[1] = 'dc1:1:1'
         if 'term_add' not in components:
-            connections[0] = 'dc2:2:2'
+            connections[-2] = 'dc2:2:2'
         if 'term_drop' not in components:
-            connections[-1] = 'dc2:2:3'
+            connections[-1] = 'dc2:3:3'
 
         super(AddDrop, self).__init__(components, connections, name=name)
 
@@ -183,8 +178,11 @@ class RingMolecule(Network):
                 trained seperately. Obviously, this uses more RAM.
             name: name of the ring molecule.
         '''
-        num_segments = {'square':4}[type]
-        self.type = type
+        try:
+            num_segments = {'square':4}[type]
+            self.type = type
+        except KeyError:
+            raise ValueError('"%s" type does not exist'%type)
 
         rings=OrderedDict((k,RingAtom(wg, num_segments=num_segments)) for k, wg in rings.items())
 
@@ -305,8 +303,5 @@ class RingMolecule(Network):
                         C[0,idx1+1,idx1+2]=C[0,idx1+2,idx1+1]=t
                         C[1,idx0+5,idx1+1]=C[1,idx1+1,idx0+5]=k
                         C[1,idx0+6,idx1+2]=C[1,idx1+2,idx0+6]=k
-
-        if self.type == 'hexagonal':
-            raise NotImplementedError
 
         return C
