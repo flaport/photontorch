@@ -59,6 +59,9 @@ class Environment(object):
 
         # wavelength
         wl = kwargs.pop('wl', None)
+        if wl is not None and np.array(wl).ndim > 0:
+            kwargs['wls'] = wl
+            wl = None
         dwl = kwargs.pop('dwl', None)
         num_wl = int(kwargs.pop('num_wl', 1))
         wl_start = float(kwargs.pop('wl_start', 1.5e-6))
@@ -66,7 +69,7 @@ class Environment(object):
         if wl is None and dwl is None and num_wl==1:
             wls = np.array([0.5*(wl_start+wl_end)])
         elif wl is None and dwl is None and num_wl>1:
-            wls = np.array(wl_start, wl_end, num_wl, endpoint=True)
+            wls = np.linspace(wl_start, wl_end, num_wl, endpoint=True)
         elif wl is None and num_wl==1:
             wls = np.arange(wl_start, wl_end, float(dwl))
         elif dwl is None and num_wl==1:
@@ -75,25 +78,24 @@ class Environment(object):
         if wls.ndim == 0: wls = wls[None]
         self.wls = wls
 
+        # use delays
+        # (set to False to speed up frequency calculations with constant source)
+        self.use_delays = bool(kwargs.pop('use_delays', not kwargs.pop('no_delays', False)))
+
         # time data:
-        dt = kwargs.pop('dt', None)
-        num_timesteps = int(kwargs.pop('num_timesteps', 1))
+        dt = kwargs.pop('dt', 1e-14)
+        num_timesteps = int(kwargs.pop('num_timesteps', 1 if not self.use_delays else 1000))
         t_start = float(kwargs.pop('t_start', 0))
-        t_end = float(kwargs.pop('t_end', 1e-12 if dt is None else num_timesteps*dt))
-        dt = float(t_end - t_start if dt is None else dt)
+        t_end = float(kwargs.pop('t_end', t_start + num_timesteps*dt))
         if num_timesteps == 1:
             self.t = np.array([dt])
         else:
             self.t = np.asarray(kwargs.pop('t', np.arange(t_start, t_end, dt)))
 
-        # use delays
-        # (set to False to speed up frequency calculations with constant source)
-        self.use_delays = bool(kwargs.pop('use_delays', not kwargs.pop('no_delays', False)))
-
         # use CUDA or not
         self.cuda = kwargs.pop('cuda', None)
         if self.cuda and not torch.cuda.is_available():
-            warnings.warn('CUDA requested, but is not available. Rollback to CPU')
+            warnings.warn('CUDA requested, but is not available. Rollback to CPU', RuntimeWarning)
             self.cuda = False
 
         # name
@@ -122,7 +124,7 @@ class Environment(object):
     @wl.setter
     def wl(self, value):
         ''' Wavelength of the simulation '''
-        self.wls = np.array([value])
+        self.wls = np.array([float(value)])
 
     @property
     def dwl(self):
@@ -194,16 +196,17 @@ class Environment(object):
     @t_start.setter
     def t_start(self, value):
         ''' Starting time of the simulation '''
-        self.t = np.arange(value, self.t_end, self.dt)
+        self.t = self.t[self.t>value]
+        self.t -= (self.t[0] - value)
 
     @property
     def t_end(self):
         ''' End time of the simulation '''
-        return self.t[-1] + self.dt
+        return self.t[-1] + self.dt if self.t.shape[0] > 1 else self.t[-1]
     @t_end.setter
     def t_end(self, value):
         ''' End time of the simulation '''
-        self.t = np.arange(self.t_start, value, self.dt)
+        self.t = self.t[self.t<value]
 
     @property
     def num_timesteps(self):
@@ -212,7 +215,7 @@ class Environment(object):
     @num_timesteps.setter
     def num_timesteps(self, value):
         ''' Number of timesteps in the simulation '''
-        self.t = np.arange(self.t_start, value*self.dt-0.5*self.dt, self.dt)
+        self.t = np.arange(self.t_start, self.t_start + value*self.dt-0.5*self.dt, self.dt)
 
     @property
     def no_delays(self):

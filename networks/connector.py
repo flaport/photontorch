@@ -83,6 +83,11 @@ class Connector(object):
         self.s = s
         self.components = components
 
+        # check if character appears too often
+        for c in self.s.replace(',',''):
+            if s.count(c) > 2:
+                raise ValueError('Index %s occuring more than 2 times!'%c)
+
     @property
     def idxs(self):
         ''' Get free indices of the connector object '''
@@ -92,8 +97,6 @@ class Connector(object):
         if ',' in s:
             return self._idxs(s.replace(',', ''))
         for c in s:
-            if s.count(c) > 2:
-                raise ValueError('Index %s occuring more than 2 times!'%c)
             if s.count(c) == 2:
                 return self._idxs(s.replace(c, ''))
         return s
@@ -104,13 +107,6 @@ class Connector(object):
             return Connector(s, tuple(self.components)+tuple(other.components))
         else:
             raise ValueError('Cannot connect %s and %s'%(repr(self), repr(other)))
-
-    def __imul__(self, other):
-        if isinstance(other, Connector):
-            self.s = ','.join(self.s.split(',')+other.s.split(','))
-            self.components += tuple(other.components)
-        else:
-            raise ValueError('Cannot connect components %s and %s'%(repr(self), repr(other)))
 
     def __repr__(self):
         ret = []

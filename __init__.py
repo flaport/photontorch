@@ -87,7 +87,6 @@ from .detectors.photodetector import Photodetector
 ## PyTorch extensions
 
 # autograd
-from .torch_ext.autograd import lfilter
 from .torch_ext.autograd import block_diag
 from .torch_ext.autograd import batch_block_diag
 

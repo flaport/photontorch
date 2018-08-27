@@ -63,18 +63,20 @@ class Buffer(torch.Tensor):
 #######################
 
 class BoundedParameter(torch.nn.Parameter):
-    def __new__(cls, data=None, bounds=None, requires_grad=True):
+    def __new__(cls, data=None, bounds=(0,1), requires_grad=True):
         if data is None:
             data = torch.Tensor()
-        if bounds is None:
-            bounds = (0,1)
+
+        if not torch.is_tensor(data):
+            raise TypeError("argument 'data' must be Tensor, not %s"%type(data).__name__)
+
         # check bounds
         try:
             a, b = bounds
         except ValueError:
             raise ValueError('bounds should be a tuple with length 2')
-        if b<a:
-            raise ValueError('bounds should be a tuple with length 2 and with bounds[1] > bounds[2]')
+        if b<=a:
+            raise ValueError('bounds should be a tuple with length 2 and with bounds[0] < bounds[1]')
         if (data < a).any() or (data>b).any():
             raise ValueError('some of your data is outside the specified bounds: [%i, %i]'%(a,b))
         new = torch.Tensor._make_subclass(cls, cls._inverse_sigmoid(data.data, (a,b)), requires_grad)
