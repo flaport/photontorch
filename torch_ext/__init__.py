@@ -34,7 +34,6 @@ Some non-differentiable, but useful functions that act on (or create) torch tens
 
 
 ## custom torch differentiable functions
-from .autograd import lfilter
 from .autograd import block_diag
 from .autograd import batch_block_diag
 
