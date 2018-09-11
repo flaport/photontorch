@@ -83,7 +83,7 @@ class Source(object):
         return (2, self.nw.env.num_timesteps, self.nw.env.num_wl, self.nw.nmc, self.nb)
 
     def __getitem__(self, key):
-        key = (key[0]%2, key[1]%self.nt) + key[2:]
+        key = (key[0], key[1]%self.nt) + key[2:]
         return self.source[key]
 
 

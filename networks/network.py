@@ -417,9 +417,9 @@ class Network(Component):
         self._iC = iC
 
         # Create buffermask (# time, # wavelengths = 1, # mc nodes, # batches = 1)
-        self.buffermask = torch.zeros((int(self._delays.max())+1, 1, self.nmc, 1),
-                                      device=self.device)
-        self.buffermask[self._delays,:,range(self.nmc),:] = 1.0
+        self.buffermask = torch.zeros((2, int(self._delays.max())+1,
+                                       1, self.nmc, 1), device=self.device)
+        self.buffermask[:,self._delays,:,range(self.nmc),:] = 1.0
 
         self.initialized = True
 
@@ -445,10 +445,11 @@ class Network(Component):
         Note:
             obviously, this is a different buffer than Model buffers
         '''
-        rbuffer = torch.zeros((int(self._delays.max())+1, self.env.num_wl, self.nmc, num_batches),
-                              device=self.device)
-        ibuffer = rbuffer.clone()
-        return rbuffer, ibuffer
+        buffer = torch.zeros((2, int(self._delays.max())+1,
+                              self.env.num_wl,
+                              self.nmc,
+                              num_batches), device=self.device)
+        return buffer
 
     @require_initialization
     def forward(self, source=1.0, power=True, detector=None):
@@ -489,55 +490,69 @@ class Network(Component):
             detected = torch.zeros((self.env.num_timesteps,
                                     self.env.num_wl,
                                     self.num_detectors,
-                                    num_batches),
-                                   device=self.device)
-            def update_detected(i):
-                detected[i] = (torch.pow(rx, 2) + torch.pow(ix, 2))[:,-self.num_detectors:]
+                                    num_batches), device=self.device)
         else:
-            detected = torch.zeros((2,
-                                    self.env.num_timesteps,
+            detected = torch.zeros((2, self.env.num_timesteps,
                                     self.env.num_wl,
                                     self.num_detectors,
-                                    num_batches),
-                                   device=self.device)
-            def update_detected(i):
-                detected[0,i] = rx[:,-self.num_detectors:]
-                detected[1,i] = ix[:,-self.num_detectors:]
+                                    num_batches), device=self.device)
 
         ## Get new buffer
-        rbuffer, ibuffer = self.simulation_buffer(num_batches)
+        buffer = self.simulation_buffer(num_batches)
 
         # solve
         for i in range(self.env.num_timesteps):
+            det, buffer = self.step(source[:,i], buffer)
 
-            # get state
-            rx = torch.sum(self.buffermask*rbuffer, dim=0)
-            ix = torch.sum(self.buffermask*ibuffer, dim=0)
-
-            # add source
-            rx = rx + source[0,i]
-            ix = ix + source[1,i]
-
-            # connect memory-less components
-            # rx and ix need to be calculated at the same time because of dependencies on each other
-            rx, ix = ((self._rC).bmm(rx) - (self._iC).bmm(ix),
-                      (self._rC).bmm(ix) + (self._iC).bmm(rx))
-
-            update_detected(i)
-
-            # connect memory-containing components
-            # rx and ix need to be calculated at the same time because of dependencies on each other
-            rx, ix = ((self._rS).bmm(rx) - (self._iS).bmm(ix),
-                      (self._rS).bmm(ix) + (self._iS).bmm(rx))
-
-            # update buffer
-            rbuffer = torch.cat((rx[None], rbuffer[0:-1]), dim=0)
-            ibuffer = torch.cat((ix[None], ibuffer[0:-1]), dim=0)
+            # update detected
+            if power:
+                detected[i] = torch.sum(det**2, 0)
+            else:
+                detected[:, i] = det
 
         if detector is not None:
             detected = detector(detected)
 
         return detected
+
+    def step(self, srcvalue, buffer):
+        ''' Single step forward pass through the network
+
+        Args:
+            srcvalue (torch.tensor): The source value at the next timestep
+            buffer (torch.tensor): The internal state of the network
+
+        Returns:
+            detected (torch.tensor): The detected fields
+            buffer (torch.tensor): The internal state of the network after the step
+        '''
+        # get state
+        rx, ix = torch.sum(self.buffermask*buffer, dim=1)
+
+        # connect memory-containing components
+        # rx and ix need to be calculated at the same time because of dependencies on each other
+        rx, ix = ((self._rS).bmm(rx) - (self._iS).bmm(ix),
+                  (self._rS).bmm(ix) + (self._iS).bmm(rx))
+
+        # add source
+        rx = rx + srcvalue[0]
+        ix = ix + srcvalue[1]
+
+        # connect memory-less components
+        # rx and ix need to be calculated at the same time because of dependencies on each other
+        rx, ix = ((self._rC).bmm(rx) - (self._iC).bmm(ix),
+                  (self._rC).bmm(ix) + (self._iC).bmm(rx))
+
+
+        # update buffer
+        x = torch.stack([rx, ix], 0)
+        buffer = torch.cat((x[:,None], buffer[:,0:-1]), dim=1)
+
+        # get detected
+        detected = x[:,:,-self.num_detectors:]
+
+        return detected, buffer
+
 
     def get_used_components(self):
         ''' Check which components are actually used '''
