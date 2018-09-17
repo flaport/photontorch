@@ -91,6 +91,9 @@ class Environment(object):
             self.t = np.array([dt])
         else:
             self.t = np.asarray(kwargs.pop('t', np.arange(t_start, t_end, dt)))
+        if len(self.t) == 2: # we need this check as long as there are no complex tensors in torch:
+            raise ValueError('A simulation with two timesteps is for the moment not allowed.'
+                             'Take a single timestep OR at least 3 timesteps.')
 
         # use CUDA or not
         self.cuda = kwargs.pop('cuda', None)
