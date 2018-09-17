@@ -20,7 +20,6 @@ from . import components
 from . import constants
 from . import environment
 from . import networks
-from . import sources
 from . import torch_ext
 
 

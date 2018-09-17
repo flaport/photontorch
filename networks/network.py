@@ -91,7 +91,6 @@ import numpy as np
 from .connector import Connector
 from ..components.component import Component
 from ..components.terms import Term
-from ..sources.sources import Source as InputSource
 from ..torch_ext.autograd import block_diag
 from ..torch_ext.autograd import batch_block_diag
 from ..torch_ext.tensor import where
@@ -118,9 +117,6 @@ class Network(Component):
 
     # dedicated plotting function for plotting detected power
     from .plot import plot
-
-    # for adding the different source classes to the network
-    from ..sources.network import add_sources
 
     def __init__(self, components=None, connections=None, name=None):
         ''' Network initialization
@@ -183,10 +179,6 @@ class Network(Component):
         ## Check if network is fully connected
         C = (self.C.detach() > 0).sum(0)
         self.terminated = ((C.sum(0) > 0) | (C.sum(1) > 0)).all()
-
-        # Add all the possible sources to this network:
-        if self.terminated:
-            self.add_sources()
 
         # register components as attributes:
         self._register_components()
@@ -452,13 +444,115 @@ class Network(Component):
         return buffer
 
     @require_initialization
-    def forward(self, source=1.0, power=True, detector=None):
+    def handle_source(self, source, axes=None):
+        stacked = False
+
+        # The source should be a tensor
+        if not torch.is_tensor(source):
+            source = np.asarray(source)
+            source = torch.stack([
+                torch.tensor(np.real(source), dtype=torch.get_default_dtype(), device=self.device),
+                torch.tensor(np.imag(source), dtype=torch.get_default_dtype(), device=self.device),
+            ], 0)
+            stacked = True
+
+        # The source should be a tensor with ndim > 0
+        if len(source.shape) == 0:
+            source = source*torch.ones((self.env.num_timesteps, self.env.num_wl, self.num_sources, 1),
+                                       dtype=source.dtype, device=source.device)
+        if len(source.shape) == 1 and source.shape[0] == 2:
+            source = source[:, None, None, None, None]*torch.ones((self.env.num_timesteps, self.env.num_wl, self.num_sources, 1),
+                                       dtype=source.dtype, device=source.device)
+            stacked = True
+
+        # The source should be a tensor with the first dimension == 2 for the real and imag part
+        if source.shape[0] != 2 or (not stacked and (source.shape[0] == self.num_sources or source.shape[0] == self.env.num_wl or source.shape[0] == self.env.num_timesteps)):
+            source = torch.stack([source, torch.zeros_like(source)])
+
+        # default ordering of the source axis according to the number of dimensions:
+        # the first dimension (real|imag) is ignored
+        if axes is None:
+            if len(source.shape) - 1 == 1:
+                if source.shape[-1] == self.env.num_timesteps:
+                    axes='t'
+                elif source.shape[-1] == self.num_sources:
+                    axes = 's'
+                elif source.shape[-1] == self.env.num_wl:
+                    axes = 'w'
+                else:
+                    axes = 'b'
+            elif len(source.shape) - 1 == 2:
+                if source.shape[-1] == self.num_sources:
+                    axes = 'ts'
+                elif source.shape[-1] == self.env.num_wl:
+                    axes = 'tw'
+                else:
+                    axes = 'tb'
+            elif len(source.shape) - 1 == 3:
+                axes = 't'
+                if source.shape[-2] == self.num_sources:
+                    axes = axes + 's'
+                elif source.shape[-2] == self.env.num_wl:
+                    axes = axes + 'w'
+                else:
+                    axes = axes + 'b'
+                if source.shape[-1] == self.env.num_wl and 'w' not in axes:
+                    axes = axes + 'w'
+                elif source.shape[-1] == self.num_sources and 's' not in axes:
+                    axes = axes + 's'
+                elif 'b' not in axes:
+                    axes = axes + 'b'
+            elif len(source.shape) - 1 == 4:
+                axes = 'twsb'
+            else:
+                raise ValueError('invalid input source shape')
+
+        # Iterate over the axis names and add dimensions if axis does not exist
+        # In the meantime keep track of the order of the axisses
+        for c in 'twsb':
+            if c not in axes:
+                source = source[...,None]
+                axes = axes + c
+
+        # Transpose the source to the default order: (2, time, wls, sources, batches)
+        order = [0]
+        for c in 'twsb':
+            order.append(axes.index(c) + 1)
+
+        source = source.permute(*order)
+
+        # perform checks on the source tensor:
+        _, num_timesteps, num_wl, num_sources, batch_size = source.shape
+
+        # check if the number of wavelengths corresponds to the number of wavelengths in the environment
+        if num_wl > 1 and num_wl != self.env.num_wl:
+            raise ValueError('Number of wavelengths in the source does not correspond'
+                             ' to the number of wavelengths in the environment.')
+
+        # add zeros to the unused mc nodes:
+        if num_sources < self.nmc:
+            source = torch.cat([
+                source,
+                torch.zeros((2, num_timesteps, num_wl, self.nmc-num_sources, batch_size),
+                            dtype=source.dtype, device=source.device),
+            ], -2)
+
+        # repeat last source value if num_timesteps < env.num_timesteps
+        if num_timesteps < self.env.num_timesteps:
+            repeated_source = source[:, -1, None]*torch.ones((2, self.env.num_timesteps - num_timesteps, num_wl, self.nmc, batch_size),
+                                                             device=source.device, dtype=source.dtype)
+            source = torch.cat([source, repeated_source], 1)
+
+        return source
+
+    @require_initialization
+    def forward(self, source=1.0, power=True, detector=None, axes=None):
         '''
         Forward pass of the network.
 
         Args:
             source : should be a FloatTensor of size
-                (2 = (real|imag), # time, # wavelength, # mc nodes, # batches) OR a
+                (2 = (real|imag), # time, # wavelength, # sources, # batches) OR a
                 Source object from photontorch.sources that returns a FloatTensor when
                 indexed.
             power=True (bool): Wether to return a real-valued power or the
@@ -472,30 +566,16 @@ class Network(Component):
             (2 = (real|imag), # time, # wavelengths, # detectors, # batches) if power==False
         '''
 
-        if not (torch.is_tensor(source) or isinstance(source, InputSource)):
-            # try to get the source into a version that photontorch understands
-            source = np.asarray(source)
-            if source.ndim == 0:
-                source = self.ConstantSource(source)
-            elif source.shape[0] == self.env.num_timesteps:
-                source = self.Source(source)
-            elif source.ndim < 2 or (source.ndim==2 and source.shape[0] == self.num_sources):
-                source = self.ConstantSource(source)
-            else:
-                source = self.Source(source)
+        source = self.handle_source(source, axes=axes)
 
         num_batches = source.shape[-1]
 
-        if power:
-            detected = torch.zeros((self.env.num_timesteps,
-                                    self.env.num_wl,
-                                    self.num_detectors,
-                                    num_batches), device=self.device)
-        else:
-            detected = torch.zeros((2, self.env.num_timesteps,
-                                    self.env.num_wl,
-                                    self.num_detectors,
-                                    num_batches), device=self.device)
+        detected = torch.zeros((self.env.num_timesteps,
+                                self.env.num_wl,
+                                self.num_detectors,
+                                num_batches), device=self.device)
+        if not power:
+            detected = torch.stack([detected, detected], 0)
 
         ## Get new buffer
         buffer = self.simulation_buffer(num_batches)
@@ -504,11 +584,10 @@ class Network(Component):
         for i in range(self.env.num_timesteps):
             det, buffer = self.step(source[:,i], buffer)
 
-            # update detected
             if power:
                 detected[i] = torch.sum(det**2, 0)
             else:
-                detected[:, i] = det
+                detected[:,i] = det
 
         if detector is not None:
             detected = detector(detected)

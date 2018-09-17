@@ -91,10 +91,8 @@ class TwoPortNetwork(Network):
         if delays is None:
             self.delays = Buffer(torch.cat([comp.get_delays() for comp in self.components.values()]))
         else:
-            self.delays = Buffer(np.stack([delays, delays], axis=-1).flatten())
-
-
-        self.add_sources()
+            delays = torch.tensor(delays, dtype=torch.get_default_dtype(), device=self.device)
+            self.delays = Buffer(torch.stack([delays, delays], -1).flatten())
 
         self._register_components()
 
