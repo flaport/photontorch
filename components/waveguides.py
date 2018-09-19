@@ -40,7 +40,7 @@ class Waveguide(Connection):
     '''
 
     def __init__(self,
-                 length=1e-6,
+                 length=1e-5,
                  loss=0,
                  neff=2.86,
                  wl0=1.55e-6,

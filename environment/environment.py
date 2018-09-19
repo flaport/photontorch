@@ -123,7 +123,7 @@ class Environment(object):
     @property
     def wl(self):
         ''' Wavelength of the simulation '''
-        return np.mean(self.wls)
+        return float(np.mean(self.wls))
     @wl.setter
     def wl(self, value):
         ''' Wavelength of the simulation '''
@@ -185,7 +185,7 @@ class Environment(object):
     @property
     def dt(self):
         ''' Timestep of the simulation '''
-        return self._dt
+        return float(self._dt)
     @dt.setter
     def dt(self, value):
         ''' Timestep of the simulation '''

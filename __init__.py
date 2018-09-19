@@ -37,7 +37,10 @@ from .components.terms import Detector
 from .components.mirrors import Mirror
 
 # SOAs
+from .components.soas import Soa
+from .components.soas import BaseSoa
 from .components.soas import LinearSoa
+from .components.soas import AgrawalSoa
 
 # MMIs
 from .components.mmis import Mmi21

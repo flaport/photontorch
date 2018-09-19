@@ -307,7 +307,7 @@ class Network(Component):
 
         ## locations of memory-containing and memory-less nodes:
 
-        mc = (self.sources_at | self.detectors_at | (delays > 0)) # memory-containing nodes:
+        mc = (self.sources_at | self.detectors_at | self.functions_at | (delays > 0)) # memory-containing nodes:
         ml = where(mc.ne(1)) # negation of mc: memory-less nodes
         mc = where(mc)
         self.nmc = len(mc)
@@ -317,20 +317,33 @@ class Network(Component):
             return self # break off initialization; network is probably part of a bigger network
 
         # Check if simulation timestep is too big:
-        if (delays[delays_in_seconds.data > 0] < 10).any(): # This bound is rather arbitrary...
+        if (delays[delays_in_seconds.data > 0] < 1).any():
             warnings.warn('Simulation timestep might be too large, resulting '
                           'in too short delays. Try using a smaller timestep', RuntimeWarning)
 
         ## Source and detector locations
         sources_at = where(self.sources_at[mc])
         detectors_at = where(self.detectors_at[mc])
+        functions_at = where(self.functions_at[mc])
         self.num_sources = len(sources_at)
         self.num_detectors = len(detectors_at)
+        self.num_functions = len(functions_at)
+
+        ## Create function for the network if necessary:
+        if self.num_functions > 0:
+            self.function = self._function
+            self.function_comps = [comp for comp in self.components.values() if hasattr(comp, 'function')]
+            self.function_idxs = np.cumsum([self.num_sources] + [comp.num_ports for comp in self.function_comps])
+        elif hasattr(self, 'function'):
+            del self.function
 
         ## New port order
-        others_at = where((self.sources_at | self.detectors_at)[mc].ne(1))
-        new_order = torch.cat((sources_at, others_at, detectors_at))
+        others_at = where((self.sources_at | self.functions_at | self.detectors_at)[mc].ne(1))
+        new_order = torch.cat((sources_at, functions_at, others_at, detectors_at))
         self.mc = mc = mc[new_order]
+        self._sources_at = where(self.sources_at[mc])
+        self._detectors_at = where(self.detectors_at[mc])
+        self._functions_at = where(self.functions_at[mc])
 
         ## S-matrix subsets
 
@@ -581,8 +594,8 @@ class Network(Component):
         buffer = self.simulation_buffer(num_batches)
 
         # solve
-        for i in range(self.env.num_timesteps):
-            det, buffer = self.step(source[:,i], buffer)
+        for i, t in enumerate(self.env.t):
+            det, buffer = self.step(t, source[:,i], buffer)
 
             if power:
                 detected[i] = torch.sum(det**2, 0)
@@ -594,10 +607,11 @@ class Network(Component):
 
         return detected
 
-    def step(self, srcvalue, buffer):
+    def step(self, t, srcvalue, buffer):
         ''' Single step forward pass through the network
 
         Args:
+            t (float): the time of the simulation
             srcvalue (torch.tensor): The source value at the next timestep
             buffer (torch.tensor): The internal state of the network
 
@@ -613,15 +627,21 @@ class Network(Component):
         rx, ix = ((self._rS).bmm(rx) - (self._iS).bmm(ix),
                   (self._rS).bmm(ix) + (self._iS).bmm(rx))
 
-        # add source
-        rx = rx + srcvalue[0]
-        ix = ix + srcvalue[1]
+        # add sources
+        if self.num_functions == 0:
+            rx = rx + srcvalue[0]
+            ix = ix + srcvalue[1]
+        else:
+            x = torch.stack([rx, ix], 0)
+            x = (x + srcvalue).permute(2,0,1,3)
+            x, x_in = torch.zeros_like(x), x
+            self.function(t, x_in, x)
+            rx, ix = x.permute(1,2,0,3)
 
         # connect memory-less components
         # rx and ix need to be calculated at the same time because of dependencies on each other
         rx, ix = ((self._rC).bmm(rx) - (self._iC).bmm(ix),
                   (self._rC).bmm(ix) + (self._iC).bmm(rx))
-
 
         # update buffer
         x = torch.stack([rx, ix], 0)
@@ -631,6 +651,17 @@ class Network(Component):
         detected = x[:,:,-self.num_detectors:]
 
         return detected, buffer
+
+    def _function(self, t, x_in, x_out):
+        ''' This function will be called as self.function if the network contains function nodes '''
+        x_out[:] = x_in[:]
+
+        idxs = self.function_idxs
+        for comp, i, j in zip(self.function_comps, idxs[:-1], idxs[1:]):
+            _x_in = x_in[i:j]
+            _x_out = torch.zeros_like(_x_in)
+            comp.function(t, _x_in, _x_out)
+            x_out[i:j] = _x_out
 
 
     def get_used_components(self):
@@ -660,6 +691,10 @@ class Network(Component):
     def get_sources_at(self):
         ''' get the locations of the sources in the network '''
         return torch.cat([comp.sources_at for comp in self.components.values()])[self.order]
+
+    def get_functions_at(self):
+        ''' get the locations of the functions in the network '''
+        return torch.cat([comp.functions_at for comp in self.components.values()])[self.order]
 
     def get_S(self):
         ''' Combined S-matrix of all the components in the network '''
