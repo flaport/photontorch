@@ -15,10 +15,6 @@ from fixtures import default_components, tenv, comp, wg
 ## Tests ##
 ###########
 
-def test_component_has_no_S(comp):
-    with pytest.raises(NotImplementedError):
-        comp.get_S()
-
 def test_component_name(comp):
     assert comp.name == 'component'
 
