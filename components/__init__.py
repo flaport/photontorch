@@ -29,7 +29,10 @@ from .terms import Detector
 from .mirrors import Mirror
 
 # SOAs
+from .soas import Soa
+from .soas import BaseSoa
 from .soas import LinearSoa
+from .soas import AgrawalSoa
 
 # MMIs
 from .mmis import Mmi21

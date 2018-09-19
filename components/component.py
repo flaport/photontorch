@@ -61,6 +61,7 @@ class Component(Module):
         self.free_idxs = Buffer(self.get_free_idxs())
         self.sources_at = Buffer(self.get_sources_at())
         self.detectors_at = Buffer(self.get_detectors_at())
+        self.functions_at = Buffer(self.get_functions_at())
 
     def initialize(self, env):
         ''' Simulation initialization for the component.
@@ -109,9 +110,7 @@ class Component(Module):
         Note:
             S[0] is the real part, S[1] is the imaginary part.
         '''
-
-        raise NotImplementedError('The real part of the scattering matrix '
-                                  'of %s does not exist'%self.name)
+        return torch.zeros((2, self.env.num_wl, self.num_ports, self.num_ports), device=self.device)
 
     def get_C(self):
         ''' Connection matrix of the component.
@@ -146,6 +145,16 @@ class Component(Module):
 
     def get_detectors_at(self):
         ''' The locations of the detectors in the component.
+
+        Returns:
+            torch tensor containing the locations of the detectors in the component.
+                shape: (# ports, )
+                dtype: uint8 [byte]
+        '''
+        return torch.zeros(self.num_ports, device=self.device, dtype=torch.uint8)
+
+    def get_functions_at(self):
+        ''' The locations of the custom functions in the component.
 
         Returns:
             torch tensor containing the locations of the detectors in the component.
