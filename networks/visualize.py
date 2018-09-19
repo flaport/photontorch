@@ -9,7 +9,6 @@ import torch
 
 # Other
 import numpy as np
-import matplotlib.pyplot as plt
 
 # Relative
 from ..components.terms import Detector
@@ -40,6 +39,8 @@ def plot(network, detected, **kwargs):
         if #timesteps = #wavelengths, the plotting function will choose #timesteps
         as the first dimension
     '''
+
+    import matplotlib.pyplot as plt
 
     # First we define a helper function
     def plotfunc(x, y, labels, **kwargs):
@@ -134,3 +135,82 @@ def plot(network, detected, **kwargs):
     raise ValueError('Could not plot detected array. Are you sure you are you sure the ' # pragma: no cover
                      'current simulation environment corresponds to the environment for '
                      'which the detected tensor was calculated?')
+
+
+def graph(network, draw=True, with_labels=True):
+    ''' a simple network visualization method '''
+    import networkx as nx
+    import matplotlib.pyplot as plt
+
+    # create graph
+    G = nx.MultiGraph()
+    G.add_nodes_from(network.components.keys())
+    G.add_edges_from([conn.split(':')[::2] for conn in network.connections])
+
+    if draw:
+        pos = nx.drawing.spring_layout(G)
+        _draw_nodes(G, network.components.values(), pos)
+        _draw_edges(G, pos)
+        plt.gca().set_axis_off()
+    return G
+
+def _draw_nodes(G, components, pos):
+    import matplotlib.pyplot as plt
+    nodelist = list(G)
+    node_size=300
+    node_color='r'
+    node_shape='o'
+    xy = np.asarray([pos[v] for v in nodelist])
+
+    def _get_bbox_properties(cls):
+        dic = {
+            None:{'fc':'C1'},
+            'object':{'fc':'C1'},
+            'Component':{'fc':'C1'},
+            'Waveguide':None,
+            'Connection':None,
+            'DirectionalCoupler':{'fc':'C0'},
+            'DirectionalCouplerWithLength':{'fc':'C0'},
+            'RealisticDirectionalCoupler':{'fc':'C0'},
+            'Term':None,
+            'Source':{'fc':'C3'},
+            'Detector':{'fc':'C2'},
+            'Mirror':{'fc':'C0'},
+            'GratingCoupler':{'fc':'C6'},
+            'Soa':{'fc':'C4'},
+        }
+        bbox = dic.get(cls.__name__, -1)
+        if bbox==-1:
+            return _get_bbox_properties(cls.__bases__[0])
+        if bbox is None:
+            return bbox
+
+        bbox['ec'] = bbox.get('ec', bbox.get('fc'))
+
+        return bbox
+
+
+    for (x, y), node, comp in zip(xy, nodelist, components):
+        #plt.scatter(xy[:, 0], xy[:, 1], s=node_size, c=node_color, marker=node_shape, zorder=2)
+        text = plt.text(x, y, node,
+            zorder=2,
+            horizontalalignment='center',
+            verticalalignment='center',
+            bbox=_get_bbox_properties(comp.__class__),
+        )
+
+def _draw_edges(G, pos):
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import LineCollection
+    from matplotlib.patches import FancyArrowPatch
+
+    edge_color='k'
+    style='solid'
+    edgelist = list(G.edges())
+    edge_pos = np.asarray([(pos[e[0]], pos[e[1]]) for e in edgelist])
+    for (x1,y1), (x2,y2) in edge_pos:
+        r = np.sqrt((x2-x1)**2 + (y2-y1)**2)
+        a = np.arctan2((y2-y1),(x2-x1))
+        a += (2*np.random.rand() - 1)*np.pi/4
+        plt.plot([x1,x1+0.5*r*np.cos(a), x2],[y1,y1+0.5*r*np.sin(a), y2], lw=1.5, ls='-', color='k', zorder=1)
+    plt.draw()
