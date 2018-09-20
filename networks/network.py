@@ -116,7 +116,7 @@ class Network(Component):
     connections = None
 
     # dedicated plotting function for plotting detected power
-    from .plot import plot
+    from .visualize import plot, graph
 
     def __init__(self, components=None, connections=None, name=None):
         ''' Network initialization

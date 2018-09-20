@@ -134,7 +134,8 @@ class Module(_Module_):
             _attr = '_'+attr
             self.register_parameter(_attr, value)
             value_property = property(lambda self: self._parameters[_attr]._sigmoid(self._parameters[_attr], self._parameters[_attr].bounds))
-            self.__class__ = type('ModuleWithBoundedParameter', (self.__class__,), {attr:value_property}) # subclass on the fly
+            # create a subclass of the original module with the same name:
+            self.__class__ = type(self.__class__.__name__, (self.__class__,), {attr:value_property}) # subclass on the fly
         else:
             super(Module, self).__setattr__(attr, value)
 

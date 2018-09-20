@@ -107,7 +107,7 @@ class Soa(BaseSoa):
 
     '''
 
-    def __init__(self, amplification, startup_time = 100e-12, trainable=False, name=None):
+    def __init__(self, amplification=1.0, startup_time = 100e-12, trainable=False, name=None):
         ''' Soa
 
         Args:
@@ -205,6 +205,7 @@ class AgrawalSoa(BaseSoa):
         self.phase = self.L*self.neff*2*pi*env.wl # phase introduced by the soa
 
         super(AgrawalSoa, self).initialize(env)
+        return self
 
     def get_delays(self):
         ''' Delays introduced by the SOA '''
