@@ -88,6 +88,8 @@ class TwoPortNetwork(Network):
         self.detectors_at = Buffer(torch.zeros(self.num_ports, dtype=torch.uint8, device=self.device))
         self.detectors_at[-len(self.terms):] = torch.tensor(detectors_at)
 
+        self.functions_at = Buffer(torch.zeros(self.num_ports, dtype=torch.uint8, device=self.device))
+
         if delays is None:
             self.delays = Buffer(torch.cat([comp.get_delays() for comp in self.components.values()]))
         else:
@@ -116,6 +118,9 @@ class TwoPortNetwork(Network):
 
     def get_detectors_at(self):
         return self.detectors_at
+
+    def get_functions_at(self):
+        return self.functions_at
 
     def get_delays(self):
         return self.delays
