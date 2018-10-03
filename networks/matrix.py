@@ -89,7 +89,7 @@ class UnitaryMatrixNetwork(Network):
                                phase=phase, trainable=trainable, name='wg%i'%i)
             return new_wg
         def new_dc(i):
-            new_dc = DirectionalCoupler(coupling=dc.coupling.data, trainable=True, name='dc%i'%i)
+            new_dc = DirectionalCoupler(coupling=dc.coupling.item(), trainable=True, name='dc%i'%i)
             return new_dc
 
         # Generate waveguides

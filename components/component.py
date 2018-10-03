@@ -172,7 +172,7 @@ class Component(Module):
                 dtype: int64 [long]
         '''
         C = (abs(self.C)**2).sum(0)
-        return torch.tensor(where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1)), device=self.device)
+        return where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1))
 
     def __repr__(self):
         ''' String Representation of the component '''
