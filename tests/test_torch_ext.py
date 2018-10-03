@@ -23,12 +23,6 @@ def test_block_diag():
     loss = ((t - torch.ones_like(t))**2).sum()
     loss.backward()
 
-def test_batch_block_diag():
-    t1 = torch.rand((5,2,2), requires_grad=True)
-    t2 = torch.rand((5,3,3), requires_grad=True)
-    t = pt.torch_ext.autograd.batch_block_diag(t1,t2)
-    loss = ((t - torch.ones_like(t))**2).sum()
-    loss.backward()
 
 ## Neural Networks
 

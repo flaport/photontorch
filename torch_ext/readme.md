@@ -12,9 +12,6 @@ Below you can find a short summary:
 
 ## [Autograd](autograd) Extensions
   * `block_diag`: a differentiable implementation of a block diagonal matrix
-  * `batch_block_diag`: a differentiable implementation of a block diagonal matrix
-performed over a batch of matrices.
-  * `lfilter`: a differentiable equivalent of scipy's lfilter
 
 ## [Neural Network](nn) Extensions
   * `[Buffer](nn.Buffer)`: A special kind of tensor that automatically will

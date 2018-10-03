@@ -92,7 +92,6 @@ from .connector import Connector
 from ..components.component import Component
 from ..components.terms import Term
 from ..torch_ext.autograd import block_diag
-from ..torch_ext.autograd import batch_block_diag
 from ..torch_ext.tensor import where
 
 
@@ -381,38 +380,29 @@ class Network(Component):
             ## reduced connection matrix
             # C = Cmcml@Smlml@inv(P)@Cmlmc + Cmcmc
             # (with P a helper matrix defined below)
-            # We do this in 6 steps:
+            # We do this in 5 steps:
 
             # 1. Calculation of the helper matrix P = I - Cmlml@Smlml
-            rP = torch.stack([torch.eye(self.nml, device=self.device)]*self.env.num_wl, dim=0)
+            ones = torch.ones((self.env.num_wl, 1, 1), device=self.device)
+            rP = ones*torch.eye(self.nml, device=self.device)[None, :, :]
             rP = rP - bmm(rCmlml, rSmlml) + bmm(iCmlml, iSmlml)
             iP = -bmm(rCmlml, iSmlml) - bmm(iCmlml, rSmlml)
 
-            # 2. Calculation of inv(P) = X + Y
-            # note that real(inv(P)) != inv(real(P)) in most cases!
-            # for a matrix P = rP + i*iP, with rP invertible it is easy to check that
-            # the inverse is given by inv(P) = X + i*Y, with
-            # X = inv(rP + iP@inv(rP)@iP)
-            # Y = -X@iP@inv(rP)
-            inv_rP = torch.stack([torch.inverse(rp) for rp in rP], dim=0)
-            X = torch.stack([torch.inverse(rp + (ip).mm(inv_rp).mm(ip))
-                             for rp, ip, inv_rp in zip(rP, iP, inv_rP)], dim=0)
-            Y = -(X).bmm(iP).bmm(inv_rP)
+            # 2. Calculate inv(P)@Cmlmc [using torch.gesv]
+            M = torch.cat([torch.cat([rP, -iP], -1), torch.cat([iP, rP], -1)], -2)
+            Cmlmc = ones*torch.cat([ones*rCmlmc[None], ones*iCmlmc[None]], -2)
+            x, _ = torch.gesv(Cmlmc, M)
+            rx, ix = torch.split(x, x.shape[-2]//2, -2)
 
-            # 3. calculation of x = Cmcml@Smlml
-            rx, ix = (bmm(rCmcml, rSmlml) - bmm(iCmcml,iSmlml),
-                      bmm(rCmcml, iSmlml) + bmm(iCmcml, rSmlml))
+            # 3. Calculate Smlml@inv(P)@Cmlmc
+            rx, ix = (rSmlml).bmm(rx) - (iSmlml).bmm(ix), (iSmlml).bmm(rx) + (rSmlml).bmm(ix)
 
-            # 4. Calculation of x@inv(P) := x@(X + i*Y)
-            rx, ix = (rx).bmm(X) - (ix).bmm(Y), (rx).bmm(Y) + (ix).bmm(X)
+            # 4. Calculate Cmcml@Smlml@inv(P)@Cmlmc
+            rx, ix = bmm(rCmcml, rx) - bmm(iCmcml, ix), bmm(rCmcml, ix) + bmm(iCmcml, rx)
 
-            # 5. C = x@Cmlmc
-            rC, iC = (torch.matmul(rx, rCmlmc) - torch.matmul(ix, iCmlmc),
-                      torch.matmul(ix, rCmlmc) + torch.matmul(rx, iCmlmc))
-
-            # 6. C = x + Cmcmc
-            rC = rC + rCmcmc[None]
-            iC = iC + iCmcmc[None]
+            # 5. C = x + Cmcmc
+            rC = rx + rCmcmc[None]
+            iC = ix + iCmcmc[None]
 
         ## Save the reduced matrices
         self._delays = delays[mc]
@@ -698,11 +688,11 @@ class Network(Component):
 
     def get_S(self):
         ''' Combined S-matrix of all the components in the network '''
-        rS = batch_block_diag(
+        rS = block_diag(
             *(comp.S[0] for comp in self.components.values())
         )[:,self.order,:][:,:,self.order]
 
-        iS = batch_block_diag(
+        iS = block_diag(
             *(comp.S[1] for comp in self.components.values())
         )[:,self.order,:][:,:,self.order]
         return torch.stack([rS,iS])
