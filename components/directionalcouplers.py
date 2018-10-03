@@ -128,38 +128,29 @@ class DirectionalCouplerWithLength(Component):
         t = (1-self.dc.coupling)**0.5 # Transmission
 
         # Helper matrices
-        rS_wg_t = self.wg.S[0]*t
-        iS_wg_k = self.wg.S[1]*k
-        iS_wg_t = self.wg.S[1]*t
-        rS_wg_k = self.wg.S[0]*k
+        S = self.wg.get_S()
+        rS_wg_t = S[0]*t
+        iS_wg_k = S[1]*k
+        iS_wg_t = S[1]*t
+        rS_wg_k = S[0]*k
+
+        # S matrix
+        S = torch.zeros((2, self.env.num_wl, 4, 4), device=self.device)
 
         # Real part
-        rS = torch.tensor([[[0, 0, 0, 0],
-                            [0, 0, 0, 0],
-                            [0, 0, 0, 0],
-                            [0, 0, 0, 0]]]*self.env.num_wl,
-                          device=self.device,
-                          dtype=torch.get_default_dtype())
-        rS[:,:2, :2] = rS_wg_t # Transmission from i < - > j
-        rS[:,2:, 2:] = rS_wg_t # Transmission from k < - > l
-        rS[:,::2, ::2] = -iS_wg_k
-        rS[:,1::2, 1::2] = -iS_wg_k
+        S[0,:,:2, :2] = rS_wg_t # Transmission from i < - > j
+        S[0,:,2:, 2:] = rS_wg_t # Transmission from k < - > l
+        S[0,:,::2, ::2] = -iS_wg_k
+        S[0,:,1::2, 1::2] = -iS_wg_k
 
         # Imag Part
-        iS = torch.tensor([[[0, 0, 0, 0],
-                            [0, 0, 0, 0],
-                            [0, 0, 0, 0],
-                            [0, 0, 0, 0]]]*self.env.num_wl,
-                          device=self.device,
-                          dtype=torch.get_default_dtype())
-
-        iS[:,:2, :2] = iS_wg_t # Transmission from i < - > j
-        iS[:,2:, 2:] = iS_wg_t # Transmission from k < - > l
-        iS[:,::2, ::2] = rS_wg_k
-        iS[:,1::2, 1::2] = rS_wg_k
+        S[1,:,:2, :2] = iS_wg_t # Transmission from i < - > j
+        S[1,:,2:, 2:] = iS_wg_t # Transmission from k < - > l
+        S[1,:,::2, ::2] = rS_wg_k
+        S[1,:,1::2, 1::2] = rS_wg_k
 
         # Return
-        return torch.stack([rS, iS])
+        return S
 
 
 class RealisticDirectionalCoupler(Component):

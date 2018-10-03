@@ -90,7 +90,6 @@ from .detectors.photodetector import Photodetector
 
 # autograd
 from .torch_ext.autograd import block_diag
-from .torch_ext.autograd import batch_block_diag
 
 # neural networks
 from .torch_ext import nn
