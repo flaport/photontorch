@@ -112,6 +112,14 @@ class DirectionalCouplerWithLength(Component):
         self.wg = wg if wg is not None else Waveguide()
         self.dc = dc if dc is not None else DirectionalCoupler()
 
+    @property
+    def coupling(self):
+        return self.dc.coupling
+
+    @property
+    def phase(self):
+        return self.wg.phase
+
     def initialize(self, env):
         self.wg.initialize(env)
         self.dc.initialize(env)
