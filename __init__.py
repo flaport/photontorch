@@ -43,8 +43,7 @@ from .components.soas import LinearSoa
 from .components.soas import AgrawalSoa
 
 # MMIs
-from .components.mmis import Mmi21
-from .components.mmis import Mmi33
+from .components.mmis import Mmi
 
 # Waveguides
 from .components.waveguides import Waveguide
