@@ -35,8 +35,7 @@ from .soas import LinearSoa
 from .soas import AgrawalSoa
 
 # MMIs
-from .mmis import Mmi21
-from .mmis import Mmi33
+from .mmis import Mmi
 
 # Waveguides
 from .waveguides import Waveguide
