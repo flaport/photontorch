@@ -24,7 +24,7 @@ desired parameter on the fly when it is asked by performing a scaled sigmoid on 
 #############
 
 ## Standard Library
-import copy
+from copy import deepcopy
 
 ## Torch
 import torch
@@ -100,6 +100,12 @@ class BoundedParameter(torch.nn.Parameter):
     def __repr__(self):
         tensor_repr = torch.Tensor.__repr__(self._sigmoid(self.data, self.bounds))
         return 'BoundedParameter in [%.2f, %.2f] representing:\n'%self.bounds+tensor_repr
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        new = torch.Tensor._make_subclass(cls, self.data.clone(), self.requires_grad)
+        new.bounds = deepcopy(self.bounds, memo)
+        return new
 
 
 ######################
