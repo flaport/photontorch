@@ -16,6 +16,7 @@ import torch
 import numpy as np
 
 ## Relative
+from ..constants import c
 from .component import Component
 from ..torch_ext.nn import Buffer, Parameter
 
@@ -44,7 +45,7 @@ class Mmi(Component):
 
     def __init__(self, weights=None, trainable=False, name=None):
         '''
-        MMI2x1 initialization
+        Mmi initialization
 
         Args:
             weights (array). interconnection weights between input and output if MMI
@@ -86,3 +87,48 @@ class Mmi(Component):
         S[:,:, m:, :m] = torch.transpose(weights, -1, -2)
         return S
 
+
+class PhaseArray(Component):
+    r''' A Phase Array adds a phase to n inputs
+
+    Terms:
+              n+1
+         0___/ n+2
+         1____/
+          :  :
+         n____
+              \
+               2*n
+
+    '''
+
+    num_ports = None
+
+    def __init__(self, phases, length=1e-5, ng=2.86, trainable=True, name=None):
+        if len(phases.shape) != 1:
+            raise ValueError('phases should be a 1D array or tensor')
+
+        self.num_ports = 2*phases.shape[0]
+
+        Component.__init__(self, name=name)
+
+        self.ng = float(ng)
+        self.length = float(length)
+
+        parameter = Parameter if trainable else Buffer
+        phases = torch.tensor(phases, dtype=torch.float64, device=self.device)
+        self.phases = parameter(phases)
+
+    def get_delays(self):
+        delay = self.ng*self.length/c
+        return delay*torch.ones(self.num_ports, device=self.device)
+
+    def get_S(self):
+        cos_phase = torch.diag(torch.cos(self.phases).to(torch.get_default_dtype()))
+        sin_phase = torch.diag(torch.sin(self.phases).to(torch.get_default_dtype()))
+        phase = torch.stack([cos_phase, sin_phase], 0)[:, None, :, :]
+        phase = torch.ones((1, self.env.num_wl, 1, 1), device=self.device)*phase
+        S1 = torch.cat([torch.zeros_like(phase), phase], -1)
+        S2 = torch.cat([phase, torch.zeros_like(phase)], -1)
+        S = torch.cat([S1, S2], -2)
+        return S
