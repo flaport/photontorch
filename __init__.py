@@ -44,6 +44,10 @@ from .components.soas import AgrawalSoa
 
 # MMIs
 from .components.mmis import Mmi
+from .components.mmis import PhaseArray
+
+# MZIs
+from .components.mzis import Mzi
 
 # Waveguides
 from .components.waveguides import Waveguide
@@ -63,9 +67,6 @@ from .components.directionalcouplers import DirectionalCouplerWithLength
 # Base Network
 from .networks.network import Network
 
-# Matrix Network
-from .networks.matrix import UnitaryMatrixNetwork
-
 # Ring Networks
 from .networks.rings import AllPass
 from .networks.rings import AddDrop
@@ -73,6 +74,12 @@ from .networks.rings import RingMolecule
 
 # Two Port Networks
 from .networks.twoport import TwoPortNetwork
+
+# Reck Network
+from .networks.reck import ReckMxN
+from .networks.reck import ReckNxN
+from .networks.reck import ReckMmi
+from .networks.clements import ClementsNxN
 
 
 ## Environment

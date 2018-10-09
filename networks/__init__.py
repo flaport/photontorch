@@ -78,9 +78,6 @@ from . import network
 # Base Network
 from .network import Network
 
-# Matrix Networks
-from .matrix import UnitaryMatrixNetwork
-
 # Ring Networks
 from .rings import AllPass
 from .rings import AddDrop
@@ -88,3 +85,10 @@ from .rings import RingMolecule
 
 # Two Port Networks
 from .twoport import TwoPortNetwork
+
+# Reck Network
+from .reck import ReckMxN
+from .reck import ReckNxN
+from .reck import ReckMmi
+
+from .clements import ClementsNxN
