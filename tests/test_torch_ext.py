@@ -4,6 +4,8 @@
 ## Imports ##
 #############
 
+from copy import deepcopy
+
 import torch
 import pytest
 import numpy as np
@@ -63,6 +65,12 @@ def test_bounded_parameter_with_too_many_bounds():
 def test_bounded_parameter_repr():
     s = repr(pt.nn.BoundedParameter(data=torch.tensor([0.5])))
     assert s.startswith('BoundedParameter')
+
+def test_bounded_parameter_deepcopy():
+    bp = pt.nn.BoundedParameter(data=torch.tensor([0.5]))
+    bp2 = deepcopy(bp)
+    assert bp2 is not bp
+    assert bp.__class__ is bp2.__class__
 
 def test_buffer_with_no_data():
     bp = pt.nn.Buffer()

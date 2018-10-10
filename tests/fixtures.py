@@ -114,15 +114,19 @@ def twoportnw():
     return nw
 
 @pytest.fixture
-def um():
-    ''' default unitary matrix network '''
-    um = pt.UnitaryMatrixNetwork(
-        shape=(2,2),
-        dc=pt.DirectionalCoupler(coupling=0.5),
-        wg=pt.Waveguide(length=1e-5),
-    )
-    return um
+def rnw():
+    ''' default ring network '''
+    return pt.RingNetwork(2, 6).terminate()
 
+@pytest.fixture
+def reck():
+    ''' default reck network '''
+    return pt.ReckMxN(3,4).terminate()
+
+@pytest.fixture
+def clements():
+    ''' default reck network '''
+    return pt.ClementsNxN(4).terminate()
 
 ## Detectors
 

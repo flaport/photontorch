@@ -77,17 +77,6 @@ class Photodetector(torch.nn.Module):
         self.conv.bias = None
         self.conv.register_buffer('weight', b)
 
-    # for easy access of the b parameter
-    @property
-    def b(self):
-        ''' get b-parameter for lowpass filtering '''
-        return self.conv.weight
-    @b.setter
-    def b(self, value):
-        ''' set b-parameter for lowpass filtering '''
-        del self.conv._buffers['weight']
-        self.conv.register_buffer('weight', value)
-
     def forward(self, signal):
         # we will perform a convolution, however, the convolution layer needs the signal
         # in a specific shape: (# batches, # in channels, # time)

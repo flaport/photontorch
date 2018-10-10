@@ -55,7 +55,7 @@ class Mmi(Component):
 
         # validate weights
         if weights is None:
-            raise ValueError("No weight matrix specified ")
+            weights = np.sqrt(0.5*np.ones((1,2)))
 
         if len(weights.shape) != 2 and len(weights.shape) != 3:
             raise ValueError('weights should be at least 2D and at most 3D [first index real|imag].')
@@ -104,7 +104,10 @@ class PhaseArray(Component):
 
     num_ports = None
 
-    def __init__(self, phases, length=1e-5, ng=2.86, trainable=True, name=None):
+    def __init__(self, phases=None, length=1e-5, ng=2.86, trainable=True, name=None):
+        if phases is None:
+            phases = np.zeros(2)
+
         if len(phases.shape) != 1:
             raise ValueError('phases should be a 1D array or tensor')
 

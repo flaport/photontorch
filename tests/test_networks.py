@@ -9,13 +9,16 @@ import pytest
 import numpy as np
 import photontorch as pt
 
-from fixtures import unw, nw, tenv, fenv, tnw, fnw, det, wg, twoportnw, um
+from fixtures import unw, nw, tenv, fenv, tnw, fnw, det, wg, twoportnw, fnw, rnw, reck, clements
 
 ###########
 ## Tests ##
 ###########
 
 def test_network(nw):
+    pass
+
+def test_frequency_initialization(fnw):
     pass
 
 def test_network_with_component_list():
@@ -51,6 +54,15 @@ def test_network_with_component_not_defined():
                 'wg3:1:wg2:1',
             ]
         )
+
+def test_ringnetwork(rnw):
+    pass
+
+def test_ringnetwork(reck):
+    pass
+
+def test_clementsnetwork(clements):
+    pass
 
 def test_terminate(unw):
     unw.terminate()
@@ -157,39 +169,6 @@ def test_twoportnetwork_termination(twoportnw):
 
 def test_twoportnetwork_initialiation(twoportnw, tenv):
     twoportnw.initialize(tenv)
-
-def test_unitary_matrix_network(um):
-    pass
-
-def test_unitary_matrix_network_with_m_bigger_than_n():
-    with pytest.raises(ValueError):
-        um = pt.UnitaryMatrixNetwork(
-            shape=(4,2),
-            dc=pt.DirectionalCoupler(coupling=0.5),
-            wg=pt.Waveguide(length=1e-5),
-        )
-
-def test_unitary_matrix_network_with_wrong_dc():
-    with pytest.raises(TypeError):
-        um = pt.UnitaryMatrixNetwork(
-            shape=(2,4),
-            dc=pt.Waveguide(),
-            wg=pt.Waveguide(length=1e-5),
-        )
-
-def test_unitary_matrix_network_with_wrong_wg():
-    with pytest.raises(TypeError):
-        um = pt.UnitaryMatrixNetwork(
-            shape=(2,4),
-            dc=pt.DirectionalCoupler(coupling=0.5),
-            wg=pt.DirectionalCoupler(coupling=0.5),
-        )
-
-def test_unitary_matrix_network_termination(um):
-    um.unterminate() # should do nothing
-    tum = um.terminate()
-    tum.terminate() # should do nothing
-    tum.unterminate()
 
 def test_network_plot(tenv, fenv):
     tnw = pt.AddDrop(
