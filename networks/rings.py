@@ -18,6 +18,8 @@ import numpy as np
 from .network import Network
 
 from ..components.terms import Detector, Source
+from ..components.mzis import Mzi
+from ..components.mmis import PhaseArray
 from ..components.waveguides import Waveguide
 from ..components.directionalcouplers import DirectionalCoupler
 from ..torch_ext.nn import Buffer, Parameter
@@ -123,6 +125,195 @@ class AddDrop(Network):
             connections[-1] = 'dc2:3:3'
 
         super(AddDrop, self).__init__(components, connections, name=name)
+
+
+###################
+## Ring Networks ##
+###################
+
+class _MixingPhaseArray(Network):
+    """ Helper Class for RingNetwork """
+
+    def __init__(
+        self,
+        phases,
+        length=1e-5,
+        loss=0,
+        neff=2.86,
+        ng=None,
+        wl0=1.55e-6,
+        trainable=True,
+        name=None,
+    ):
+        N = phases.shape[0]
+        if N % 2:
+            raise ValueError("the number of output phases should be even")
+
+        ng = float(neff) if ng is None else float(ng)
+
+        num_mzis = N // 2
+        components = {}
+        components["pa"] = PhaseArray(
+            phases=phases, length=0, ng=0, trainable=trainable
+        )
+
+        for i in range(num_mzis):
+            components["mzi%i" % i] = Mzi(
+                length=length,
+                phi=0,
+                theta=np.pi / 4,
+                loss=loss,
+                neff=neff,
+                ng=ng,
+                wl0=wl0,
+                trainable=trainable,
+            )
+
+        connections = []
+        for i in range(num_mzis):
+            connections += ["mzi%i:3:pa:%i" % (i, 2 * i)]
+            connections += ["mzi%i:2:pa:%i" % (i, 2 * i + 1)]
+
+        # input connections:
+        for i in range(0, num_mzis):
+            connections += ["mzi%i:0:%i" % (i, 2 * i)]
+            connections += ["mzi%i:1:%i" % (i, 2 * i + 1)]
+
+        super(_MixingPhaseArray, self).__init__(components, connections, name=name)
+
+class _UnclosedRingArray(Network):
+    r""" Helper Class for RingNetwork
+
+        <- cap==2 ->
+        0__  ______0
+           \/
+        1__/\__  __1
+               \/
+        2__  __/\__2
+           \/
+        3__/\______3
+
+    """
+
+    def __init__(
+        self,
+        hidden_size,
+        length=1e-5,
+        loss=0,
+        neff=2.86,
+        ng=None,
+        wl0=1.55e-6,
+        trainable=True,
+        name=None,
+    ):
+        if hidden_size % 2:
+            raise ValueError("hidden size should be even")
+
+        num_rings = hidden_size // 2
+
+        num_mzis = 2 * num_rings - 1
+
+        # define components
+        components = {}
+        for i in range(2):
+            components["wg%i" % i] = Waveguide(
+                length=length, phase=0, neff=neff, ng=ng, wl0=wl0, loss=loss, trainable=trainable,
+            )
+        for i in range(num_mzis):
+            components["mzi%i" % i] = Mzi(
+                length=length,
+                phi=0,
+                theta=np.pi / 4,
+                neff=neff,
+                ng=ng,
+                wl0=wl0,
+                loss=loss,
+                trainable=trainable,
+            )
+
+        # connections between mzis:
+        connections = ["wg0:0:mzi0:3"]
+        for i in range(1, num_mzis, 2):
+            connections += ["mzi%i:0:mzi%i:2" % (i, i - 1)]
+            connections += ["mzi%i:3:mzi%i:3" % (i, i + 1)]
+        connections += ["wg1:0:mzi%i:2" % (num_mzis - 1)]
+
+        # input connections:
+        for i in range(0, num_mzis, 2):
+            connections += ["mzi%i:0:%i" % (i, i)]
+            connections += ["mzi%i:1:%i" % (i, i + 1)]
+
+        # output connections:
+        k = 2 * num_rings
+        connections += ["wg0:1:%i" % k]
+        for i in range(1, num_mzis, 2):
+            connections += ["mzi%i:1:%i" % (i, k + i)]
+            connections += ["mzi%i:2:%i" % (i, k + i + 1)]
+        connections += ["wg1:1:%i" % (4 * num_rings - 1)]
+
+        # initialize network
+        super(_UnclosedRingArray, self).__init__(components, connections, name=name)
+
+
+class RingNetwork(Network):
+    def __init__(
+        self,
+        hidden_size,
+        capacity=None,
+        ring_length=1e-5,
+        loss=0,
+        neff=2.86,
+        ng=None,
+        wl0=1.55e-6,
+        trainable=True,
+        name=None,
+    ):
+        if hidden_size % 2:
+            raise ValueError('hidden size should be even')
+        if capacity is None:
+            capacity = hidden_size
+
+        self.hidden_size = N = hidden_size
+
+        # create components
+        components = {}
+        for i in range(capacity//2):
+            components['layer%i'%i] = _UnclosedRingArray(
+                hidden_size=hidden_size,
+                length=0.25*ring_length,
+                neff=neff,
+                ng=ng,
+                wl0=wl0,
+                loss=loss,
+                trainable=trainable,
+            )
+        components['layer%i'%(capacity//2)] = _MixingPhaseArray(
+            phases=np.zeros(hidden_size),
+            length=0.25*ring_length,
+            neff=neff,
+            ng=ng,
+            loss=loss,
+            wl0=wl0,
+            trainable=trainable
+        )
+
+        # create connections
+        connections = []
+        for i in range(capacity//2):
+            for j in range(hidden_size):
+                connections += ['layer%i:%i:layer%i:%i'%(i, N+j, i+1, j)]
+
+        # initialize network
+        super(RingNetwork, self).__init__(components, connections, name=name)
+
+    def terminate(self, term=None):
+        if term is None:
+            term = [Source(name='s%i'%i) for i in range(self.hidden_size)]
+            term+= [Detector(name='d%i'%i) for i in range(self.hidden_size)]
+        ret = super(RingNetwork, self).terminate(term)
+        ret.to(self.device)
+        return ret
+
 
 
 ####################

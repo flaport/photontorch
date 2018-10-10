@@ -82,6 +82,7 @@ from .network import Network
 from .rings import AllPass
 from .rings import AddDrop
 from .rings import RingMolecule
+from .rings import RingNetwork
 
 # Two Port Networks
 from .twoport import TwoPortNetwork
