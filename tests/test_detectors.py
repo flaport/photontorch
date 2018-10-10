@@ -26,18 +26,6 @@ def test_photodetector_a_parameter(det):
     assert a in det._buffers.values()
     assert a.shape[0] == det.filter_order+1
 
-def test_photodetector_b_parameter(det):
-    b = det.b
-    assert (b == det.conv.weight).all()
-    assert b.shape[0] == 1
-    assert b.shape[1] == 1
-    assert b.shape[2] == det.filter_order+1
-
-def test_photodetector_b_setter(det):
-    with pytest.raises(TypeError):
-        det.b = 4
-    det.b = torch.rand(det.b.shape)
-
 def test_photodetector_forward(det):
     with torch.no_grad():
         num_bits = 10
