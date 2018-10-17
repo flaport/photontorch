@@ -1,4 +1,4 @@
-r'''
+r"""
 # PhotonTorch Network
 
 The Network is the core of Photontorch. This is where everything comes together.
@@ -69,7 +69,7 @@ exist, and thus we can write for the real and imaginary part of \(P^{-1}\):
 ```
 This equation is valid, even if \({\rm imag}(P)^{-1}\) does not exist.
 
-'''
+"""
 
 #############
 ## Imports ##
@@ -99,8 +99,9 @@ from ..torch_ext.tensor import where
 ## Network ##
 #############
 
+
 class Network(Component):
-    ''' a Network (circuit) of Components
+    """ a Network (circuit) of Components
 
     The Network is the core of Photontorch. This is where everything comes together.
     The Network is a special kind of torch.nn.Module, where all subcomponents are
@@ -108,23 +109,23 @@ class Network(Component):
 
     It's two core method's are `initialize` and `forward`.
 
-    '''
+    """
 
     # components and connections are defined here for easy subclassing
     components = None
     connections = None
 
-    # dedicated plotting function for plotting detected power
+    # dedicated plotting methods for plotting detected power
     from .visualize import plot, graph
 
     def __init__(self, components=None, connections=None, name=None):
-        ''' Network initialization
+        """ Network initialization
 
         Args:
-            components (dict): a dictionary containing the components of the network.
-                keys (str): new names for the components (will override the component name)
-                values (Component): component
-            connections (list[str]): a list containing the connections of the network.
+            components: dict = {}: a dictionary containing the components of the network.
+                keys: str: new names for the components (will override the component name)
+                values: Component: the component
+            connections list = []: a list containing the connections of the network.
                 the connection string can have two formats:
                     1. "comp1:port1:comp2:port2": signifying a connection between ports
                        (always reflexive)
@@ -135,8 +136,8 @@ class Network(Component):
             be careful not to repeat keys in your component dictionary.
 
         Note:
-            the order of the components is determined by the order of the connections
-        '''
+            the final order of the components is determined by the order of the connections
+        """
 
         if isinstance(components, Connector) and connections is None:
             components, connections = components.parse()
@@ -150,7 +151,6 @@ class Network(Component):
         else:
             connections = self.connections
 
-
         # Get the components that were used in the connections:
         used_components = self.get_used_components()
 
@@ -162,7 +162,9 @@ class Network(Component):
 
         self.components = OrderedDict()
         for name in used_components:
-            comp = copy(components[name]) # shallow copy to allow for different name but same params
+            comp = copy(
+                components[name]
+            )  # shallow copy to allow for different name but same params
             comp.name = name
             self.components[name] = comp
 
@@ -173,7 +175,7 @@ class Network(Component):
         self.order = self.get_order()
 
         ## Initialize
-        Component.__init__(self, name=self.name)
+        super(Network, self).__init__(name=self.name)
 
         ## Check if network is fully connected
         C = (self.C.detach() > 0).sum(0)
@@ -185,9 +187,8 @@ class Network(Component):
         # flag to see if the network is initialized with an environment.
         self.initialized = False
 
-
     def _register_components(self):
-        ''' Register Components as submodules of the network
+        """ Register Components as submodules of the network
 
         Pytorch requires submodules to be registered as attributes of a module.
         This method registers all components in self.components under the component's
@@ -195,57 +196,63 @@ class Network(Component):
 
         Note:
             This Method should only be called one single in the __init__.
-        '''
+        """
         for name, comp in self.components.items():
             setattr(self, name, comp)
 
     def terminate(self, term=None, name=None):
-        '''
+        """
         Terminate open conections with the term of your choice
 
-        Args (Term | dict): Which term to use. Defaults to Term.
-            if dict: specify as many name:terms as free indices in the network
-        '''
+        Args:
+            term: Term | list | dict = None: A dictionary containing the terms to use
+                Which term to use. Defaults to Term. If a dictionary or list is specified,
+                then one needs to specify as many terms as there are open connections.
+        """
         n = len(self.free_idxs)
         if n == 0:
-            raise IndexError('no free ports for termination')
+            raise IndexError("no free ports for termination")
         if term is None:
             term = Term()
-        if isinstance(term , Term):
-            term = OrderedDict((term.name+'_%i'%i,deepcopy(term)) for i in range(n))
+        if isinstance(term, Term):
+            term = OrderedDict(
+                (term.name + "_%i" % i, deepcopy(term)) for i in range(n)
+            )
         if isinstance(term, (list, tuple)):
-            term = OrderedDict((t.name,t) for t in term)
+            term = OrderedDict((t.name, t) for t in term)
         if self.is_cuda:
-            term = OrderedDict((name,t.cuda()) for name, t in term.items())
-        components = OrderedDict([(self.name,self)])
+            term = OrderedDict((name, t.cuda()) for name, t in term.items())
+        components = OrderedDict([(self.name, self)])
         components.update(term)
-        connections = [name+':0:'+self.name+':%i'%i for i, name in enumerate(term)]
+        connections = [
+            name + ":0:" + self.name + ":%i" % i for i, name in enumerate(term)
+        ]
         if name is None:
-            name = self.name+'_terminated'
+            name = self.name + "_terminated"
         nw = Network(components, connections, name=self.name)
         nw.base = self
         return nw
 
     def unterminate(self):
-        ''' remove termination of network '''
+        """ remove termination of network """
         return self.base
 
     def cuda(self, device=None):
-        ''' move the parameters and buffers of the network to the gpu '''
+        """ move the parameters and buffers of the network to the gpu """
         nw = super(Network, self).cuda(device=device)
         if nw._env is not None:
             nw.initialize(nw.env)
         return nw
 
     def cpu(self):
-        ''' move the parameters and buffers of the network to the cpu '''
+        """ move the parameters and buffers of the network to the cpu """
         nw = super(Network, self).cpu()
         if nw._env is not None:
             nw.initialize(nw.env)
         return nw
 
     def initialize(self, env=None):
-        r''' Initialize
+        r""" Initialize
         Initializer of the network. The initializer should be called before
         doing any simulation (forward pass through the network). It creates all the
         internal variables necessary.
@@ -281,7 +288,7 @@ class Network(Component):
             (and the self.initialized flag will remain False). This is to speed up
             the initialization of nested networks, where only the top level needs to be
             fully initialized.
-        '''
+        """
         ## get environment
         if env is None:
             env = self.env
@@ -299,83 +306,95 @@ class Network(Component):
         ## delays
         # delays can be turned off for frequency calculations
         # with constant input sources
-        delays_in_seconds = self.delays * float(self.env.use_delays)
+        delays_in_seconds = self.delays * float(not self.env.frequency_domain)
         # resulting delays in terms of the simulation timestep:
-        delays = (delays_in_seconds/self.env.dt + 0.5).long()
-
+        delays = (delays_in_seconds / self.env.dt + 0.5).long()
 
         ## locations of memory-containing and memory-less nodes:
 
-        mc = (self.sources_at | self.detectors_at | self.functions_at | (delays > 0)) # memory-containing nodes:
-        ml = where(mc.ne(1)) # negation of mc: memory-less nodes
+        mc = (
+            self.sources_at | self.detectors_at | self.actions_at | (delays > 0)
+        )  # memory-containing nodes:
+        ml = where(mc.ne(1))  # negation of mc: memory-less nodes
         mc = where(mc)
         self.nmc = len(mc)
         self.nml = len(ml)
 
         if not self.terminated or self.nmc == 0:
-            return self # break off initialization; network is probably part of a bigger network
+            return (
+                self
+            )  # break off initialization; network is probably part of a bigger network
 
         # Check if simulation timestep is too big:
         if (delays[delays_in_seconds.data > 0] < 1).any():
-            warnings.warn('Simulation timestep might be too large, resulting '
-                          'in too short delays. Try using a smaller timestep', RuntimeWarning)
+            warnings.warn(
+                "Simulation timestep might be too large, resulting "
+                "in too short delays. Try using a smaller timestep",
+                RuntimeWarning,
+            )
 
         ## Source and detector locations
         sources_at = where(self.sources_at[mc])
         detectors_at = where(self.detectors_at[mc])
-        functions_at = where(self.functions_at[mc])
+        actions_at = where(self.actions_at[mc])
         self.num_sources = len(sources_at)
         self.num_detectors = len(detectors_at)
-        self.num_functions = len(functions_at)
+        self.num_functions = len(actions_at)
 
-        ## Create function for the network if necessary:
+        ## Create action for the network if necessary:
         if self.num_functions > 0:
-            self.function = self._function
-            self.function_comps = [comp for comp in self.components.values() if hasattr(comp, 'function')]
-            self.function_idxs = np.cumsum([self.num_sources] + [comp.num_ports for comp in self.function_comps])
-        elif hasattr(self, 'function'):
-            del self.function
+            self.action = self._action
+            self.function_comps = [
+                comp for comp in self.components.values() if hasattr(comp, "action")
+            ]
+            self.function_idxs = np.cumsum(
+                [self.num_sources] + [comp.num_ports for comp in self.function_comps]
+            )
+        elif hasattr(self, "action"):
+            del self.action
 
         ## New port order
-        others_at = where((self.sources_at | self.functions_at | self.detectors_at)[mc].ne(1))
-        new_order = torch.cat((sources_at, functions_at, others_at, detectors_at))
+        others_at = where(
+            (self.sources_at | self.actions_at | self.detectors_at)[mc].ne(1)
+        )
+        new_order = torch.cat((sources_at, actions_at, others_at, detectors_at))
         self.mc = mc = mc[new_order]
         self._sources_at = where(self.sources_at[mc])
         self._detectors_at = where(self.detectors_at[mc])
-        self._functions_at = where(self.functions_at[mc])
+        self._functions_at = where(self.actions_at[mc])
 
         ## S-matrix subsets
 
         # MC subsets of scattering matrix:
-        rSmcmc = self.S[0,:,mc,:][:,:,mc]
-        iSmcmc = self.S[1,:,mc,:][:,:,mc]
+        rSmcmc = self.S[0, :, mc, :][:, :, mc]
+        iSmcmc = self.S[1, :, mc, :][:, :, mc]
 
         # MC subset of Connection matrix
-        rCmcmc = self.C[0,mc,:][:,mc]
-        iCmcmc = self.C[1,mc,:][:,mc]
+        rCmcmc = self.C[0, mc, :][:, mc]
+        iCmcmc = self.C[1, mc, :][:, mc]
 
         if self.nml == 0:
-            rC = torch.stack([rCmcmc]*self.env.num_wl, dim=0)
-            iC = torch.stack([iCmcmc]*self.env.num_wl, dim=0)
+            rC = torch.stack([rCmcmc] * self.env.num_wavelengths, dim=0)
+            iC = torch.stack([iCmcmc] * self.env.num_wavelengths, dim=0)
         else:
             # Only do the following steps if there is at least one ml node:
 
             # ML subsets of scattering matrix:
-            rSmlml = self.S[0,:,ml,:][:,:,ml]
-            iSmlml = self.S[1,:,ml,:][:,:,ml]
+            rSmlml = self.S[0, :, ml, :][:, :, ml]
+            iSmlml = self.S[1, :, ml, :][:, :, ml]
 
             # ML subsets of connection matrix:
-            rCmcml = self.C[0,mc,:][:,ml]
-            rCmlmc = self.C[0,ml,:][:,mc]
-            rCmlml = self.C[0,ml,:][:,ml]
-            iCmcml = self.C[1,mc,:][:,ml]
-            iCmlmc = self.C[1,ml,:][:,mc]
-            iCmlml = self.C[1,ml,:][:,ml]
+            rCmcml = self.C[0, mc, :][:, ml]
+            rCmlmc = self.C[0, ml, :][:, mc]
+            rCmlml = self.C[0, ml, :][:, ml]
+            iCmcml = self.C[1, mc, :][:, ml]
+            iCmlmc = self.C[1, ml, :][:, mc]
+            iCmlml = self.C[1, ml, :][:, ml]
 
             ## Helper function bmm
             def bmm(C, S):
-                ''' Batch multiply a normal matrix [C] with a batched matrix [S] '''
-                return torch.matmul(S.permute(0,2,1),C.t()).permute(0,2,1)
+                """ Batch multiply a normal matrix [C] with a batched matrix [S] """
+                return torch.matmul(S.permute(0, 2, 1), C.t()).permute(0, 2, 1)
 
             ## reduced connection matrix
             # C = Cmcml@Smlml@inv(P)@Cmlmc + Cmcmc
@@ -383,22 +402,28 @@ class Network(Component):
             # We do this in 5 steps:
 
             # 1. Calculation of the helper matrix P = I - Cmlml@Smlml
-            ones = torch.ones((self.env.num_wl, 1, 1), device=self.device)
-            rP = ones*torch.eye(self.nml, device=self.device)[None, :, :]
+            ones = torch.ones((self.env.num_wavelengths, 1, 1), device=self.device)
+            rP = ones * torch.eye(self.nml, device=self.device)[None, :, :]
             rP = rP - bmm(rCmlml, rSmlml) + bmm(iCmlml, iSmlml)
             iP = -bmm(rCmlml, iSmlml) - bmm(iCmlml, rSmlml)
 
             # 2. Calculate inv(P)@Cmlmc [using torch.gesv]
             M = torch.cat([torch.cat([rP, -iP], -1), torch.cat([iP, rP], -1)], -2)
-            Cmlmc = ones*torch.cat([ones*rCmlmc[None], ones*iCmlmc[None]], -2)
+            Cmlmc = ones * torch.cat([ones * rCmlmc[None], ones * iCmlmc[None]], -2)
             x, _ = torch.gesv(Cmlmc, M)
-            rx, ix = torch.split(x, x.shape[-2]//2, -2)
+            rx, ix = torch.split(x, x.shape[-2] // 2, -2)
 
             # 3. Calculate Smlml@inv(P)@Cmlmc
-            rx, ix = (rSmlml).bmm(rx) - (iSmlml).bmm(ix), (iSmlml).bmm(rx) + (rSmlml).bmm(ix)
+            rx, ix = (
+                (rSmlml).bmm(rx) - (iSmlml).bmm(ix),
+                (iSmlml).bmm(rx) + (rSmlml).bmm(ix),
+            )
 
             # 4. Calculate Cmcml@Smlml@inv(P)@Cmlmc
-            rx, ix = bmm(rCmcml, rx) - bmm(iCmcml, ix), bmm(rCmcml, ix) + bmm(iCmcml, rx)
+            rx, ix = (
+                bmm(rCmcml, rx) - bmm(iCmcml, ix),
+                bmm(rCmcml, ix) + bmm(iCmcml, rx),
+            )
 
             # 5. C = x + Cmcmc
             rC = rx + rCmcmc[None]
@@ -412,9 +437,10 @@ class Network(Component):
         self._iC = iC
 
         # Create buffermask (# time, # wavelengths = 1, # mc nodes, # batches = 1)
-        self.buffermask = torch.zeros((2, int(self._delays.max())+1,
-                                       1, self.nmc, 1), device=self.device)
-        self.buffermask[:,self._delays,:,range(self.nmc),:] = 1.0
+        self.buffermask = torch.zeros(
+            (2, int(self._delays.max()) + 1, 1, self.nmc, 1), device=self.device
+        )
+        self.buffermask[:, self._delays, :, range(self.nmc), :] = 1.0
 
         self.initialized = True
 
@@ -422,54 +448,122 @@ class Network(Component):
         return self
 
     def require_initialization(func):
-        '''Decorator.
-        Some functions require the Network to be initialized.
-        '''
+        """ a decorator that checks if the network is properly initialized before
+        executing the method.
+        """
+
         @functools.wraps(func)
         def wrapped(self, *args, **kwargs):
             if not self.initialized:
-                raise RuntimeError('Network not fully initialized. Is the network fully terminated?')
+                raise RuntimeError(
+                    "Network not fully initialized. Is the network fully terminated?"
+                )
             return func(self, *args, **kwargs)
+
         return wrapped
 
     @require_initialization
     def simulation_buffer(self, num_batches):
-        ''' Create buffer to keep the hidden states of the Network (RNN)
-        The buffer has shape (# time, # wavelengths, # mc nodes, # batches)
+        """ Create buffer to keep the hidden states of the Network (RNN)
+
+        Args:
+            num_batches: int: number of batches to create the buffer for
+
+        Returns:
+            buffer: torch.Tensor[2, #timesteps, #wavelengths, #mc nodes, num_batches]
 
         Note:
-            obviously, this is a different buffer than Model buffers
-        '''
-        buffer = torch.zeros((2, int(self._delays.max())+1,
-                              self.env.num_wl,
-                              self.nmc,
-                              num_batches), device=self.device)
+            obviously, this is a different buffer than a Model Buffer.
+        """
+        buffer = torch.zeros(
+            (
+                2,
+                int(self._delays.max()) + 1,
+                self.env.num_wavelengths,
+                self.nmc,
+                num_batches,
+            ),
+            device=self.device,
+        )
         return buffer
 
     @require_initialization
     def handle_source(self, source, axes=None):
+        """ bring a source in a usable form
+
+        the .forward method ideally expects an input source of shape
+        source.shape == (2, #timesteps, #wavelengths, #mc nodes, #batches)
+
+        however, it can be tedious to bring your input array in exactly this format.
+        This method brings the source array (which may be lower dimensional) in the
+        expected format.
+
+        Args:
+            source: torch.Tensor: the input tensor to be brought in the expected format
+                for the forward pass
+            axes: str = None: the "priority" order of the axes. If a certain input
+                array has to be expanded to more dimensions, it is often ambiguous which
+                dimensions (axes) are already present. You can override the default
+                priority (which can change with the type of environment used) by specifying
+                a list of axes present. Allowed characters to use are:
+                    t: time axis
+                    w: wavelength axis
+                    s: source axis
+                    b: batch axis
+
+        Example:
+            >>> src = torch.random.randn(num_batches, num_timesteps)
+            >>> new_src = nw.handle_source(src, axes="bt")
+            >>> new_src.shape == (2, num_timesteps, num_wavelengths, num_mc_nodes, num_batches)
+            True
+
+        """
         stacked = False
 
         # The source should be a tensor
         if not torch.is_tensor(source):
             source = np.asarray(source)
-            source = torch.stack([
-                torch.tensor(np.real(source), dtype=torch.get_default_dtype(), device=self.device),
-                torch.tensor(np.imag(source), dtype=torch.get_default_dtype(), device=self.device),
-            ], 0)
+            source = torch.stack(
+                [
+                    torch.tensor(
+                        np.real(source),
+                        dtype=torch.get_default_dtype(),
+                        device=self.device,
+                    ),
+                    torch.tensor(
+                        np.imag(source),
+                        dtype=torch.get_default_dtype(),
+                        device=self.device,
+                    ),
+                ],
+                0,
+            )
             stacked = True
 
         # The source should be a tensor with ndim > 0
         if len(source.shape) == 0:
-            source = source*torch.ones((self.env.num_timesteps, self.env.num_wl, self.num_sources, 1),
-                                       dtype=source.dtype, device=source.device)
+            source = source * torch.ones(
+                (self.env.num_timesteps, self.env.num_wavelengths, self.num_sources, 1),
+                dtype=source.dtype,
+                device=source.device,
+            )
         if len(source.shape) == 1 and source.shape[0] == 2:
-            source = source[:, None, None, None, None]*torch.ones((self.env.num_timesteps, self.env.num_wl, self.num_sources, 1),
-                                       dtype=source.dtype, device=source.device)
+            source = source[:, None, None, None, None] * torch.ones(
+                (self.env.num_timesteps, self.env.num_wavelengths, self.num_sources, 1),
+                dtype=source.dtype,
+                device=source.device,
+            )
             stacked = True
 
         # The source should be a tensor with the first dimension == 2 for the real and imag part
-        if source.shape[0] != 2 or (not stacked and (source.shape[0] == self.num_sources or source.shape[0] == self.env.num_wl or source.shape[0] == self.env.num_timesteps)):
+        if source.shape[0] != 2 or (
+            not stacked
+            and (
+                source.shape[0] == self.num_sources
+                or source.shape[0] == self.env.num_wavelengths
+                or source.shape[0] == self.env.num_timesteps
+            )
+        ):
             source = torch.stack([source, torch.zeros_like(source)])
 
         # default ordering of the source axis according to the number of dimensions:
@@ -477,106 +571,131 @@ class Network(Component):
         if axes is None:
             if len(source.shape) - 1 == 1:
                 if source.shape[-1] == self.env.num_timesteps:
-                    axes='t'
+                    axes = "t"
                 elif source.shape[-1] == self.num_sources:
-                    axes = 's'
-                elif source.shape[-1] == self.env.num_wl:
-                    axes = 'w'
+                    axes = "s"
+                elif source.shape[-1] == self.env.num_wavelengths:
+                    axes = "w"
                 else:
-                    axes = 'b'
+                    axes = "b"
             elif len(source.shape) - 1 == 2:
                 if source.shape[-1] == self.num_sources:
-                    axes = 'ts'
-                elif source.shape[-1] == self.env.num_wl:
-                    axes = 'tw'
+                    axes = "ts"
+                elif source.shape[-1] == self.env.num_wavelengths:
+                    axes = "tw"
                 else:
-                    axes = 'tb'
+                    axes = "tb"
             elif len(source.shape) - 1 == 3:
-                axes = 't'
+                axes = "t"
                 if source.shape[-2] == self.num_sources:
-                    axes = axes + 's'
-                elif source.shape[-2] == self.env.num_wl:
-                    axes = axes + 'w'
+                    axes = axes + "s"
+                elif source.shape[-2] == self.env.num_wavelengths:
+                    axes = axes + "w"
                 else:
-                    axes = axes + 'b'
-                if source.shape[-1] == self.env.num_wl and 'w' not in axes:
-                    axes = axes + 'w'
-                elif source.shape[-1] == self.num_sources and 's' not in axes:
-                    axes = axes + 's'
-                elif 'b' not in axes:
-                    axes = axes + 'b'
+                    axes = axes + "b"
+                if source.shape[-1] == self.env.num_wavelengths and "w" not in axes:
+                    axes = axes + "w"
+                elif source.shape[-1] == self.num_sources and "s" not in axes:
+                    axes = axes + "s"
+                elif "b" not in axes:
+                    axes = axes + "b"
             elif len(source.shape) - 1 == 4:
-                axes = 'twsb'
+                axes = "twsb"
             else:
-                raise ValueError('invalid input source shape')
+                raise ValueError("invalid input source shape")
 
         # Iterate over the axis names and add dimensions if axis does not exist
         # In the meantime keep track of the order of the axisses
-        for c in 'twsb':
+        for c in "twsb":
             if c not in axes:
-                source = source[...,None]
+                source = source[..., None]
                 axes = axes + c
 
         # Transpose the source to the default order: (2, time, wls, sources, batches)
         order = [0]
-        for c in 'twsb':
+        for c in "twsb":
             order.append(axes.index(c) + 1)
 
         source = source.permute(*order)
 
         # perform checks on the source tensor:
-        _, num_timesteps, num_wl, num_sources, batch_size = source.shape
+        _, num_timesteps, num_wl, num_sources, num_batches = source.shape
 
         # check if the number of wavelengths corresponds to the number of wavelengths in the environment
-        if num_wl > 1 and num_wl != self.env.num_wl:
-            raise ValueError('Number of wavelengths in the source does not correspond'
-                             ' to the number of wavelengths in the environment.')
+        if num_wl > 1 and num_wl != self.env.num_wavelengths:
+            raise ValueError(
+                "Number of wavelengths in the source does not correspond"
+                " to the number of wavelengths in the environment."
+            )
 
         # add zeros to the unused mc nodes:
         if num_sources < self.nmc:
-            source = torch.cat([
-                source,
-                torch.zeros((2, num_timesteps, num_wl, self.nmc-num_sources, batch_size),
-                            dtype=source.dtype, device=source.device),
-            ], -2)
+            source = torch.cat(
+                [
+                    source,
+                    torch.zeros(
+                        (2, num_timesteps, num_wl, self.nmc - num_sources, num_batches),
+                        dtype=source.dtype,
+                        device=source.device,
+                    ),
+                ],
+                -2,
+            )
 
         # repeat last source value if num_timesteps < env.num_timesteps
         if num_timesteps < self.env.num_timesteps:
-            repeated_source = source[:, -1, None]*torch.ones((2, self.env.num_timesteps - num_timesteps, num_wl, self.nmc, batch_size),
-                                                             device=source.device, dtype=source.dtype)
+            repeated_source = source[:, -1, None] * torch.ones(
+                (
+                    2,
+                    self.env.num_timesteps - num_timesteps,
+                    num_wl,
+                    self.nmc,
+                    num_batches,
+                ),
+                device=source.device,
+                dtype=source.dtype,
+            )
             source = torch.cat([source, repeated_source], 1)
 
         return source
 
     @require_initialization
     def forward(self, source=1.0, power=True, detector=None, axes=None):
-        '''
+        """
         Forward pass of the network.
 
         Args:
-            source : should be a FloatTensor of size
-                (2 = (real|imag), # time, # wavelength, # sources, # batches) OR a
-                Source object from photontorch.sources that returns a FloatTensor when
-                indexed.
-            power=True (bool): Wether to return a real-valued power or the
-                complex-valued field.
-            detector=None (Detector): Pass an extra detector instance to detect the fields
-                                      (or power)
+            source: torch.Tensor: should ideally be a float tensor of shape
+                (2 = (real|imag), #time, #wavelength, #sources, #batches)
+                if the tensor shape does not match the ideal shape, photontorch will try
+                to be smart enough to cast the tensor in the right shape.
+
+            power: bool = True: choose to return the power as output or the complex
+                valued fields. In the latter case, the complex components will be stacked
+                along the first dimension (PyTorch does not support complex tensors (yet))
+
+            detector: Detector = None: pass an extra detector instance to detect the fields
 
         Returns:
-            detected (torch.Floattensor): a tensor with shape
-            (# time, # wavelengths, # detectors, # batches) if power==True
-            (2 = (real|imag), # time, # wavelengths, # detectors, # batches) if power==False
-        '''
+            detected: torch.Tensor: a tensor containin the the detected fields. This
+                tensor has shape
+                    (# time, # wavelengths, # detectors, # batches) if power==True
+                 or (2 = (real|imag), # time, # wavelengths, # detectors, # batches) if power==False
+        """
 
         source = self.handle_source(source, axes=axes)
 
         num_batches = source.shape[-1]
 
-        detected = torch.zeros((self.env.num_timesteps,
-                                self.env.num_wl,
-                                self.num_detectors,
-                                num_batches), device=self.device)
+        detected = torch.zeros(
+            (
+                self.env.num_timesteps,
+                self.env.num_wavelengths,
+                self.num_detectors,
+                num_batches,
+            ),
+            device=self.device,
+        )
         if not power:
             detected = torch.stack([detected, detected], 0)
 
@@ -584,13 +703,13 @@ class Network(Component):
         buffer = self.simulation_buffer(num_batches)
 
         # solve
-        for i, t in enumerate(self.env.t):
-            det, buffer = self.step(t, source[:,i], buffer)
+        for i, t in enumerate(self.env.time):
+            det, buffer = self.step(t, source[:, i], buffer)
 
             if power:
-                detected[i] = torch.sum(det**2, 0)
+                detected[i] = torch.sum(det ** 2, 0)
             else:
-                detected[:,i] = det
+                detected[:, i] = det
 
         if detector is not None:
             detected = detector(detected)
@@ -598,7 +717,7 @@ class Network(Component):
         return detected
 
     def step(self, t, srcvalue, buffer):
-        ''' Single step forward pass through the network
+        """ Single step forward pass through the network
 
         Args:
             t (float): the time of the simulation
@@ -608,14 +727,16 @@ class Network(Component):
         Returns:
             detected (torch.tensor): The detected fields
             buffer (torch.tensor): The internal state of the network after the step
-        '''
+        """
         # get state
-        rx, ix = torch.sum(self.buffermask*buffer, dim=1)
+        rx, ix = torch.sum(self.buffermask * buffer, dim=1)
 
         # connect memory-containing components
         # rx and ix need to be calculated at the same time because of dependencies on each other
-        rx, ix = ((self._rS).bmm(rx) - (self._iS).bmm(ix),
-                  (self._rS).bmm(ix) + (self._iS).bmm(rx))
+        rx, ix = (
+            (self._rS).bmm(rx) - (self._iS).bmm(ix),
+            (self._rS).bmm(ix) + (self._iS).bmm(rx),
+        )
 
         # add sources
         if self.num_functions == 0:
@@ -623,89 +744,110 @@ class Network(Component):
             ix = ix + srcvalue[1]
         else:
             x = torch.stack([rx, ix], 0)
-            x = (x + srcvalue).permute(2,0,1,3)
+            x = (x + srcvalue).permute(2, 0, 1, 3)
             x, x_in = torch.zeros_like(x), x
-            self.function(t, x_in, x)
-            rx, ix = x.permute(1,2,0,3)
+            self.action(t, x_in, x)
+            rx, ix = x.permute(1, 2, 0, 3)
 
         # connect memory-less components
         # rx and ix need to be calculated at the same time because of dependencies on each other
-        rx, ix = ((self._rC).bmm(rx) - (self._iC).bmm(ix),
-                  (self._rC).bmm(ix) + (self._iC).bmm(rx))
+        rx, ix = (
+            (self._rC).bmm(rx) - (self._iC).bmm(ix),
+            (self._rC).bmm(ix) + (self._iC).bmm(rx),
+        )
 
         # update buffer
         x = torch.stack([rx, ix], 0)
-        buffer = torch.cat((x[:,None], buffer[:,0:-1]), dim=1)
+        buffer = torch.cat((x[:, None], buffer[:, 0:-1]), dim=1)
 
         # get detected
-        detected = x[:,:,-self.num_detectors:]
+        detected = x[:, :, -self.num_detectors :]
 
         return detected, buffer
 
-    def _function(self, t, x_in, x_out):
-        ''' This function will be called as self.function if the network contains function nodes '''
+    def _action(self, t, x_in, x_out):
+        """ The action of the active components on the network
+
+        This function will be called as .action (without underscore) during self.step
+        if the network contains any active nodes.
+        """
         x_out[:] = x_in[:]
 
         idxs = self.function_idxs
         for comp, i, j in zip(self.function_comps, idxs[:-1], idxs[1:]):
             _x_in = x_in[i:j]
             _x_out = torch.zeros_like(_x_in)
-            comp.function(t, _x_in, _x_out)
+            comp.action(t, _x_in, _x_out)
             x_out[i:j] = _x_out
 
-
     def get_used_components(self):
-        ''' Check which components are actually used '''
+        """ Get which components are already used in a connection """
+
         def is_int(s):
             try:
                 int(s)
                 return True
             except ValueError:
                 return False
-        used_components = [conn.split(':') for conn in self.connections]
+
+        used_components = [conn.split(":") for conn in self.connections]
         # here we would like to use an ordered set, but this does not exist.
         # therefore, we use an OrderedDict, for which we don't care about
         # the values. [all for python 2 compatibility...]
-        used_components = OrderedDict([(comp,None) for tup in used_components
-                                       for comp in tup if not is_int(comp)])
+        used_components = OrderedDict(
+            [
+                (comp, None)
+                for tup in used_components
+                for comp in tup
+                if not is_int(comp)
+            ]
+        )
         return list(used_components.keys())
 
     def get_delays(self):
-        ''' get all the delays in the network '''
+        """ get all the delays in the network """
         return torch.cat([comp.delays for comp in self.components.values()])[self.order]
 
     def get_detectors_at(self):
-        ''' get the locations of the detectors in the network '''
-        return torch.cat([comp.detectors_at for comp in self.components.values()])[self.order]
+        """ get the locations of the detectors in the network """
+        return torch.cat([comp.detectors_at for comp in self.components.values()])[
+            self.order
+        ]
 
     def get_sources_at(self):
-        ''' get the locations of the sources in the network '''
-        return torch.cat([comp.sources_at for comp in self.components.values()])[self.order]
+        """ get the locations of the sources in the network """
+        return torch.cat([comp.sources_at for comp in self.components.values()])[
+            self.order
+        ]
 
-    def get_functions_at(self):
-        ''' get the locations of the functions in the network '''
-        return torch.cat([comp.functions_at for comp in self.components.values()])[self.order]
+    def get_actions_at(self):
+        """ get the locations of the functions in the network """
+        return torch.cat([comp.actions_at for comp in self.components.values()])[
+            self.order
+        ]
 
     def get_S(self):
-        ''' Combined S-matrix of all the components in the network '''
-        rS = block_diag(
-            *(comp.S[0] for comp in self.components.values())
-        )[:,self.order,:][:,:,self.order]
+        """ Get the combined S-matrix of all the components in the network """
+        rS = block_diag(*(comp.S[0] for comp in self.components.values()))[
+            :, self.order, :
+        ][:, :, self.order]
 
-        iS = block_diag(
-            *(comp.S[1] for comp in self.components.values())
-        )[:,self.order,:][:,:,self.order]
-        return torch.stack([rS,iS])
+        iS = block_diag(*(comp.S[1] for comp in self.components.values()))[
+            :, self.order, :
+        ][:, :, self.order]
+        return torch.stack([rS, iS])
 
     def get_order(self):
-        ''' Yields reordering indices for the S matrix '''
-        start_idxs = list(np.cumsum([0]+[comp.num_ports for comp in self.components.values()])[:-1])
+        """ Get the reordering indices for the S matrix """
+        start_idxs = list(
+            np.cumsum([0] + [comp.num_ports for comp in self.components.values()])[:-1]
+        )
         start_idxs = OrderedDict(zip(self.components.keys(), start_idxs))
         free_idxs = [comp.free_idxs for comp in self.components.values()]
         free_idxs = OrderedDict(zip(self.components.keys(), free_idxs))
 
         def parse_connection(conn):
-            conn_list = conn.split(':')
+            conn_list = conn.split(":")
             if len(conn_list) == 4:
                 return None, None
             comp, i, j = conn_list
@@ -732,36 +874,40 @@ class Network(Component):
         return order
 
     def get_C(self):
-        ''' Combined Connection matrix of all the components in the network
+        """ Combined Connection matrix of all the components in the network
 
         Returns:
             torch.FloatTensors with only 1's and 0's.
 
         Note:
             To create the connection matrix, the connection string is parsed.
-        '''
+        """
 
         rC = block_diag(*(comp.C[0] for comp in self.components.values()))
         iC = block_diag(*(comp.C[1] for comp in self.components.values()))
-        C = torch.stack([rC,iC])
+        C = torch.stack([rC, iC])
 
-        start_idxs = list(np.cumsum([0]+[comp.num_ports for comp in self.components.values()])[:-1])
+        start_idxs = list(
+            np.cumsum([0] + [comp.num_ports for comp in self.components.values()])[:-1]
+        )
         start_idxs = OrderedDict(zip(self.components.keys(), start_idxs))
         free_idxs = [comp.free_idxs for comp in self.components.values()]
         free_idxs = OrderedDict(zip(self.components.keys(), free_idxs))
 
         def parse_connection(conn):
-            conn_list = conn.split(':')
+            conn_list = conn.split(":")
             if len(conn_list) < 4:
                 return None, None
             comp1, i1, comp2, i2 = conn_list
             i1, i2 = int(i1), int(i2)
             if comp1 == comp2 and i1 == i2:
-                raise IndexError('Cannot connect two equal ports')
-            for i, comp in [(i1,comp1), (i2, comp2)]:
+                raise IndexError("Cannot connect two equal ports")
+            for i, comp in [(i1, comp1), (i2, comp2)]:
                 if i >= len(free_idxs[comp]):
-                    raise ValueError('Component %s only has %i ports. Port index '
-                                     '%i too high'%(comp, len(free_idxs[comp]), i))
+                    raise ValueError(
+                        "Component %s only has %i ports. Port index "
+                        "%i too high" % (comp, len(free_idxs[comp]), i)
+                    )
             j1 = start_idxs[comp1] + free_idxs[comp1][i1]
             j2 = start_idxs[comp2] + free_idxs[comp2][i2]
             return int(j1), int(j2)
@@ -769,6 +915,6 @@ class Network(Component):
         for conn in self.connections:
             i, j = parse_connection(conn)
             if i is not None:
-                C[0,i,j] = C[0,j,i] = 1.0
+                C[0, i, j] = C[0, j, i] = 1.0
 
-        return C[:,self.order,:][:,:,self.order]
+        return C[:, self.order, :][:, :, self.order]

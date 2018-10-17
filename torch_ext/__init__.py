@@ -1,4 +1,4 @@
-'''
+"""
 # Torch Extensions for PhotonTorch
 
 Since PhotonTorch is a photonic simulation framework in the first place,
@@ -28,7 +28,7 @@ desired parameter on the fly when it is asked by performing a scaled sigmoid on 
 ## [Tensor](tensor) functions
 Some non-differentiable, but useful functions that act on (or create) torch tensors.
 
-'''
+"""
 
 
 ## custom torch differentiable functions

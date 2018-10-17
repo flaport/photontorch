@@ -1,26 +1,34 @@
-'''
-# Base Component Submodule
+"""
+# Photontorch base component
 
-The base component is a parent class meant for subclassing. It should not be used directly.
+The base component is a parent class meant for subclassing. It should not be used
+directly.
 
-Each Component is generally defined by several key properties:
+Each Component is generally defined by several key attributes defining the behavior
+of the component in a network.
 
-  * num_ports: The number of ports of the components.
-  * C: The connection matrix for the component (usually all zero for base components)
-  * rS: The real part of the Scattering matrix
-  * iS: The imaginary part of the Scattering matrix
-  * sources_at: Where there are sources in the component (usually all zero for base components)
-  * detectors_at: Where there are detectors in the component (usually all zero for base components)
-  * delays: delays introduced by the nodes of the component.
+    `num_ports`: The number of ports of the components.
 
-'''
+    `S`: The scattering matrix of the component.
+
+    `C`: The connection matrix for the component (usually all zero for base components)
+
+    `sources_at`: The location of the sources in the component (usually all zero for
+        base components)
+
+    `detectors_at`: The location of the detectors in the component (usually all zero
+        for base components)
+
+    `actions_at`: The location of the active nodes in the component (usually all zero
+        for passive components)
+
+    `delays`: delays introduced by the nodes of the component.
+
+"""
 
 #############
 ## Imports ##
 #############
-
-## Standard library
-from copy import copy, deepcopy
 
 ## Torch
 import torch
@@ -35,21 +43,24 @@ from ..torch_ext.nn import Buffer
 ## Component ##
 ###############
 
+
 class Component(Module):
-    ''' Generic base component.
+    """ Generic base component.
 
-        The base component is a parent class meant for subclassing.
-        It should not be used directly.
-    '''
+        The base component is a parent class meant for subclassing; it should not be
+        used directly.
 
-    num_ports = 1 # Number of ports of the component
+        To define your own component, overwrite the __init__ method and the get_* methods.
+    """
+
+    num_ports = 1  # Number of ports of the component
 
     def __init__(self, name=None):
-        ''' Component
+        """ Component
 
         Args:
-            name (str): the name of the component (defaults to the classname in lowercase)
-        '''
+            name: str = None: the name of the component (default: lowercase classname)
+        """
         Module.__init__(self)
         if name is None:
             name = self.__class__.__name__.lower()
@@ -61,139 +72,137 @@ class Component(Module):
         self.free_idxs = Buffer(self.get_free_idxs())
         self.sources_at = Buffer(self.get_sources_at())
         self.detectors_at = Buffer(self.get_detectors_at())
-        self.functions_at = Buffer(self.get_functions_at())
+        self.actions_at = Buffer(self.get_actions_at())
 
-    def initialize(self, env):
-        ''' Simulation initialization for the component.
+    def initialize(self, env=None):
+        """ Set the simulation initialization for the component.
 
-        Befor a component can be used for simulation, it should be initialized with a
+        Before a component can be used for simulation, it should be initialized with a
         simulation environment.
 
         Args:
-            env (Environment): simulation environment.
+            env: Environment = None: Simulation environment to initialize the component
+                with. If no environment is specified, the component will be initialized
+                with the previous environment the component was initialized with.
+        """
 
-        Note:
-            Just initializing the component with a simulation environment is not enough
-            to be able to start a simulation. A connection matrix for which
-            C.sum(0) == C.sum(1) == all ones is required.
-            You can achieve this by connecting the component into a network with some Terms.
-        '''
-        self._env = env
-        if env.cuda is not None:
-            if env.cuda and not self.is_cuda:
-                self.cuda()
-            elif not env.cuda and self.is_cuda:
-                self.cpu()
+        if env is None:
+            env = self._env
+        else:
+            self._env = env
+
+        if env.device is not None:
+            self.to(env.device)
+
         self.zero_grad()
         if (self.sources_at & self.detectors_at).any():
-            raise ValueError('Sources and Detectors cannot be combined in the same node.')
+            raise ValueError(
+                "Sources and Detectors cannot be combined in the same node."
+            )
 
         self.delays = self.get_delays()
         self.S = self.get_S()
 
-        return self
+        return self  # return the initialized component, so operations can be chained
 
     @property
     def env(self):
-        '''@property
-        Returns:
-            The environment for which the component is initialized.
-        '''
+        """ Get the environment object for which the component is initialized """
         return self._env
 
     def get_S(self):
-        ''' Scattering matrix of the component
+        """ Calculate the scattering matrix of the component
 
         Returns:
-            torch tensor with shape (2, # wavelengths, # ports, # ports) and dtype float32
+            S: torch.Tensor[2, #wavelengths, #ports, #ports]: the scattering matrix for
+                each wavelength of the simulation.
 
         Note:
             S[0] is the real part, S[1] is the imaginary part.
-        '''
-        return torch.zeros((2, self.env.num_wl, self.num_ports, self.num_ports), device=self.device)
+        """
+        return torch.zeros(
+            (2, self.env.num_wavelengths, self.num_ports, self.num_ports),
+            device=self.device,
+        )
 
     def get_C(self):
-        ''' Connection matrix of the component.
+        """ Calculate the connection matrix of the component.
 
         Returns:
-            torch tensor with shape (2, # ports, # ports) and dtype float32
+            C: torch.Tensor[2, #ports, #ports]: the connection matrix.
 
         Note:
-            C[0] is the real part, S[0] is the imaginary part
-        '''
+            C[0] is the real part, C[0] is the imaginary part
+        """
         return torch.zeros((2, self.num_ports, self.num_ports), device=self.device)
 
     def get_delays(self):
-        ''' Delays introduced by the component.
+        """ Get the delays introduced by the component.
 
         Returns:
-            torch tensor with the delays in each node of the component.
-                shape: (# ports, )
-                dtype: float32
-        '''
+            delays: torch.Tensor[#ports]: The delays in each node of the component.
+        """
         return torch.zeros(self.num_ports, device=self.device)
 
     def get_sources_at(self):
-        ''' The locations of the sources in the component.
+        """ Get the locations of the sources in the component.
 
         Returns:
-            torch tensor containing the locations of the sources in the component.
-                shape: (# ports, )
-                dtype: uint8 [byte]
-        '''
+            sources_at: torch.Tensor[#ports]: a uint8 tensor where the locations of the
+                sources are denoted by a 1.
+        """
         return torch.zeros(self.num_ports, device=self.device, dtype=torch.uint8)
 
     def get_detectors_at(self):
-        ''' The locations of the detectors in the component.
+        """ Get the locations of the detectors in the component.
 
         Returns:
-            torch tensor containing the locations of the detectors in the component.
-                shape: (# ports, )
-                dtype: uint8 [byte]
-        '''
+            detectors_at: torch.Tensor[#ports]: a uint8 tensor where the locations of the
+                detectors are denoted by a 1.
+        """
         return torch.zeros(self.num_ports, device=self.device, dtype=torch.uint8)
 
-    def get_functions_at(self):
-        ''' The locations of the custom functions in the component.
+    def get_actions_at(self):
+        """ Get the locations of the active nodes in the component.
 
         Returns:
-            torch tensor containing the locations of the detectors in the component.
-                shape: (# ports, )
-                dtype: uint8 [byte]
-        '''
+            actions_at: torch.Tensor[#ports]: a uint8 tensor where the locations of the
+                active nodes are denoted by a 1.
+        """
         return torch.zeros(self.num_ports, device=self.device, dtype=torch.uint8)
 
     def get_free_idxs(self):
-        ''' Free indices to make connections to
+        """ Calculate locations of the free indices to make a connections to.
 
         Returns:
-            torch tensor containing the free indices in the components connection matrix
-                shape: (# ports, )
-                dtype: int64 [long]
-        '''
-        C = (abs(self.C)**2).sum(0)
+            actions_at: torch.Tensor[#ports]: a int64 tensor containing the locations
+                of the open ports denoted by a 1.
+        """
+        C = (abs(self.C) ** 2).sum(0)
         return where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1))
 
     def __repr__(self):
-        ''' String Representation of the component '''
+        """ String Representation of the component """
         return self.name
 
     def __str__(self):
-        ''' String Representation of the component '''
+        """ String Representation of the component """
         return self.name
 
     def __getitem__(self, key):
-        ''' Special __getitem__
+        """ Get a connector item with certain key
 
         Each component contains a special __getitem__, which is solely used to connect
         components together. Indexing a component with a string index will create a
         connector with that same index. This connector will connect to any other connector
         where the same string index is used. Connected connectors can be made into a
-        network. See Network for more invormation.
+        network. See Network for more information.
 
         Args:
             key (str): string key of the connection.
 
-        '''
+        """
+
         from ..networks.connector import Connector
+
         return Connector(key, [self])

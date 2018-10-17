@@ -1,4 +1,4 @@
-'''
+"""
 # PhotonTorch Networks
 
 The Network is the core of Photontorch. This is where everything comes together.
@@ -69,7 +69,7 @@ of component connections, where each connection entry hase the form
     )
 ```
 
-'''
+"""
 
 ## Networks
 

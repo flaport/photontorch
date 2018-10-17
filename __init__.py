@@ -1,4 +1,4 @@
-'''
+"""
 # PhotonTorch
 
 PhotonTorch is a photonic simulation framework based on the deep learning framework PyTorch.
@@ -7,17 +7,19 @@ PhotonTorch features CUDA enabled optimization of photonic circuits. It leverage
 deep learning framework PyTorch to view the photonic circuit as essentially a recurrent
 neural network. This enables the use of native PyTorch optimizers to optimize the
 (physical) parameters of your circuit.
-'''
+"""
 
 # Test pytorch version
 import torch
-if torch.__version__.split('.')[0] == '0' and int(torch.__version__.split('.')[1]) < 4:
-    raise ImportError('Torch version [%s] is not compatible with'
-                      'minimum required version >= 0.4.x'%torch.__version__)
+
+if torch.__version__.split(".")[0] == "0" and int(torch.__version__.split(".")[1]) < 4:
+    raise ImportError(
+        "Torch version [%s] is not compatible with"
+        "minimum required version >= 0.4.x" % torch.__version__
+    )
 
 ## Submodules
 from . import components
-from . import constants
 from . import environment
 from . import networks
 from . import torch_ext
@@ -86,6 +88,7 @@ from .networks.clements import ClementsNxN
 ## Environment
 
 from .environment.environment import Environment
+from .environment.environment import default_environment
 
 
 ## Detectors

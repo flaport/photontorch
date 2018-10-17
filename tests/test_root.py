@@ -1,4 +1,4 @@
-''' root tests '''
+""" root tests """
 
 #############
 ## Imports ##
@@ -18,10 +18,12 @@ except NameError:
 ## Tests ##
 ###########
 
+
 def test_wrong_pytorch_version(monkeypatch):
-    monkeypatch.setattr(torch, '__version__', '0.3.1')
+    monkeypatch.setattr(torch, "__version__", "0.3.1")
     with pytest.raises(ImportError):
         reload(photontorch)
+
 
 def test_import():
     reload(photontorch)
@@ -32,5 +34,5 @@ def test_import():
 ## Run Tests ##
 ###############
 
-if __name__ == '__main__': # pragma: no cover
+if __name__ == "__main__":  # pragma: no cover
     pytest.main([__file__])
