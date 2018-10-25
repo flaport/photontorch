@@ -113,7 +113,7 @@ class Environment(dict):
         self["wavelength_end"] = wavelength[-1]
         self["num_wavelengths"] = wavelength.shape[0]
         if len(wavelength) > 1:
-            self['wavelength_step'] = wavelength[1] - wavelength[0]
+            self["wavelength_step"] = wavelength[1] - wavelength[0]
 
         ## Handle time
         # create default time:
