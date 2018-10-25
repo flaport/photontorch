@@ -1,12 +1,9 @@
 # Photontorch
 
+Photonic simulation tools for highly parallel simulation and optimization of photonic circuits in time and frequency domain.
 
 ## Introduction
-Photontorch is a photonic simulation framework based on the deep learning framework PyTorch.
-
-
-## Features
-Photontorch features CUDA enabled optimization of photonic circuits. It leverages the
+Photontorch features CUDA enabled simulation and optimization of photonic circuits. It leverages the
 deep learning framework PyTorch to view the photonic circuit as essentially a recurrent
 neural network. This enables the use of native PyTorch optimizers to optimize the
 (physical) parameters of your circuit.
