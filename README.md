@@ -10,8 +10,14 @@ neural network. This enables the use of native PyTorch optimizers to optimize th
 
 
 ## Installation
-First make sure all the necessary dependencies are installed. Then
-clone this repository and put it in your python path.
+Clone the photontorch repository:
+```
+git clone http://github.ugent.be/fplaport/photontorch
+```
+and link it with `pip`:
+```
+pip install -e photontorch
+```
 
 
 ## Where to start
@@ -29,13 +35,12 @@ in the folder that contains photontorch.
 ## Tests
 Tests can be performed by using pytest:
 ```
-pytest photontorch
+pytest tests
 ```
-in the folder that contains photontorch.
 
 To generate a test coverage report, run
 ```
-pytest photontorch --cov-report html --cov photontorch --verbose
+pytest tests --cov-report html --cov photontorch
 ```
 
 ## Dependencies

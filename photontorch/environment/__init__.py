@@ -8,4 +8,4 @@ This class contains all the necessary parameters to initialize a network for a s
 """
 
 from .environment import Environment
-from .environment import default_environment
+from .environment import current_environment

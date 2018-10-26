@@ -4,4 +4,6 @@ torch>=0.4.0
 matplotlib>=1.5
 networkx>=2.0
 setuptools==40.2.0
-pytest==3.8.0
+pytest>=3.8.0
+coverage>=4.5
+pytest-cov>=2.6

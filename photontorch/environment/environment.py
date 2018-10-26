@@ -14,9 +14,20 @@ This class contains all the necessary parameters to initialize a network for a s
 # Standard Library
 from copy import deepcopy
 from collections import OrderedDict
+from collections import deque
+
+# Torch
+import torch
 
 # Other
 import numpy as np
+
+
+#############
+## Globals ##
+#############
+
+_current_environments = deque()
 
 
 #################
@@ -154,6 +165,12 @@ class Environment(dict):
                 "Take a single timestep OR at least 3 timesteps."
             )
 
+        self["grad_enabled"] = kwargs.pop("grad_enabled", False)
+        if self["grad_enabled"]:
+            self["grad_manager"] = torch.enable_grad()
+        else:
+            self["grad_manager"] = torch.no_grad()
+
         # other keyword arguments are added to the attributes:
         super(Environment, self).__init__(**kwargs)
 
@@ -192,6 +209,27 @@ class Environment(dict):
 
         return self.__class__(**new)
 
+    def set(self):
+        _current_environments.appendleft(self)
+        self.grad_manager.__enter__()
+        return self
+
+    def close(self):
+        if _current_environments[0] is self:
+            del _current_environments[0]
+        self.grad_manager.__exit__()
+
+    def __enter__(self):
+        """ enter the with block """
+        return self.set()
+
+    def __exit__(self, error, value, traceback):
+        """ exit the with block """
+        self.close()
+        if error is not None:
+            raise  # raise the last error thrown
+        return self
+
     def __setattr__(self, name, value):
         """ this locks the attributes """
         if self._initialized:
@@ -211,6 +249,18 @@ class Environment(dict):
             )
         else:
             super(Environment, self).__setitem__(name, value)
+
+    def __eq__(self, other):
+        """ check if two environments are equal to each other """
+        if not isinstance(other, Environment):
+            return False
+        d1 = dict(self)
+        del d1["time"]
+        del d1["wavelength"]
+        d2 = dict(other)
+        del d2["time"]
+        del d2["wavelength"]
+        return d1 == d2
 
     def __to_str_dict(self):
         """ Dictionary representation of the environment """
@@ -251,7 +301,42 @@ class Environment(dict):
 
 
 #########################
-## Default Environment ##
+## Current Environment ##
 #########################
 
-default_environment = Environment()
+
+def current_environment():
+    """ get the current environment """
+    if _current_environments:
+        return _current_environments[0]
+    else:
+        raise RuntimeError(
+            "Environment is not set. Execute your code inside an "
+            "environment-defining with-block or use the 'set_environment()' "
+            "function to set your environment globally."
+        )
+
+
+def set_environment(*args, **kwargs):
+    """ set the current environment
+
+    Args:
+        env: Environment: The environment to set globally.
+
+    Kwargs:
+        **kwargs: The keyword arguments to create a new environment to set globally
+
+    Note:
+        It is recommended to set the Environment using a with-block. However, if you
+        would like to set the environment globally, this can be done with this function.
+    """
+    if len(args) > 2:
+        raise ValueError('Only one positional argument allowed')
+    elif len(args) == 1:
+        env = args[0]
+    elif "env" in kwargs:
+        env = kwargs["env"]
+    else:
+        env = Environment(**kwargs)
+    
+    return env.set()
