@@ -77,6 +77,7 @@ from . import network
 
 # Base Network
 from .network import Network
+from .network import current_network
 
 # Ring Networks
 from .rings import AllPass

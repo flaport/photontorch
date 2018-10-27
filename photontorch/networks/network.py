@@ -79,7 +79,7 @@ This equation is valid, even if \({\rm imag}(P)^{-1}\) does not exist.
 import warnings
 import functools
 from copy import copy, deepcopy
-from collections import OrderedDict
+from collections import OrderedDict, deque
 
 ## Torch
 import torch
@@ -88,11 +88,17 @@ import torch
 import numpy as np
 
 ## Relative
-from .connector import Connector
 from ..components.component import Component
 from ..components.terms import Term
 from ..torch_ext.autograd import block_diag
 from ..torch_ext.tensor import where
+from ..environment import current_environment
+
+
+#############
+## Globals ##
+#############
+_current_networks = deque()
 
 
 #############
@@ -118,19 +124,21 @@ class Network(Component):
     # dedicated plotting methods for plotting detected power
     from .visualize import plot, graph
 
-    def __init__(self, components=None, connections=None, name=None):
+    def __init__(self, components=None, connections=None, name=None, deepcopy=False):
         """ Network initialization
 
         Args:
             components: dict = {}: a dictionary containing the components of the network.
                 keys: str: new names for the components (will override the component name)
                 values: Component: the component
-            connections list = []: a list containing the connections of the network.
+            connections: list = []: a list containing the connections of the network.
                 the connection string can have two formats:
                     1. "comp1:port1:comp2:port2": signifying a connection between ports
                        (always reflexive)
                     2. "comp:port:output_port": signifying a connection to an output port index
-            name (str): name of the network
+            name: str = None: name of the network
+            deepcopy: bool = False: if a deepcopy of the components should be taken
+                before the components are registered to the network.
 
         Note:
             be careful not to repeat keys in your component dictionary.
@@ -139,34 +147,24 @@ class Network(Component):
             the final order of the components is determined by the order of the connections
         """
 
-        if isinstance(components, Connector) and connections is None:
-            components, connections = components.parse()
-
-        # Save name of component
-        self.name = name
-
-        # Save connections
-        if connections is not None:
-            self.connections = connections
-        else:
-            connections = self.connections
-
-        # Get the components that were used in the connections:
-        used_components = self.get_used_components()
-
-        # Save components
-        if self.components is not None and components is None:
-            components = self.components
-        if isinstance(components, (tuple, list)):
-            components = OrderedDict([(comp.name, comp) for comp in components])
+        # initial network initialization without calculating the necessary buffers
+        super(Network, self).__init__(name=name, _calculate_buffers=False)
 
         self.components = OrderedDict()
-        for name in used_components:
-            comp = copy(
-                components[name]
-            )  # shallow copy to allow for different name but same params
-            comp.name = name
-            self.components[name] = comp
+        self.connections = []
+        self.deepcopy = deepcopy
+
+        # if no components or connections specified, stop initialization here:
+        if not components and not connections:
+            return
+
+        # Save components
+        if isinstance(components, (tuple, list)):
+            components = {comp.name:comp for comp in components}
+
+        self.connections = connections
+        for name in self._get_used_component_names(self.connections):
+            self.add_component(name, components[name])
 
         ## Get component starting indices in the connection matrix
         self.num_ports = sum(comp.num_ports for comp in self.components.values())
@@ -177,28 +175,47 @@ class Network(Component):
         ## Initialize
         super(Network, self).__init__(name=self.name)
 
+        # register components as modules:
+        for name, comp in self.components.items():
+            self.add_module(name, comp)
+
         ## Check if network is fully connected
         C = (self.C.detach() > 0).sum(0)
         self.terminated = ((C.sum(0) > 0) | (C.sum(1) > 0)).all()
 
-        # register components as attributes:
-        self._register_components()
-
         # flag to see if the network is initialized with an environment.
         self.initialized = False
 
-    def _register_components(self):
-        """ Register Components as submodules of the network
+    def __enter__(self):
+        """ enter the with block """
+        # and add to _current_networks, so the components and networks will
+        # be updated with the "link" function
+        _current_networks.appendleft(self)
+        return self
+
+    def __exit__(self, error, value, traceback):
+        """ exit the with block """
+        if error is not None:
+            raise  # raise the last error thrown
+        self.__init__(self.components, self.connections, self.name)
+        del _current_networks[0]
+        return self
+
+    def add_component(self, name, comp):
+        """ Add a components to the network
 
         Pytorch requires submodules to be registered as attributes of a module.
-        This method registers all components in self.components under the component's
-        name. If the attribute name is already taken, an error will be raised
-
-        Note:
-            This Method should only be called one single in the __init__.
+        This method registers all components in self.components as modules.
         """
-        for name, comp in self.components.items():
-            setattr(self, name, comp)
+        if name in self.components:
+            raise AttributeError('A component with name "%s" was already added to the network'%name)
+        if self.deepcopy:
+            comp = deepcopy(comp)
+        else:
+            comp = copy(comp) # shallow copy of component so that name can be changed
+        comp.name = name
+        self.components[name] = comp
+        self.add_module(name, comp)
 
     def terminate(self, term=None, name=None):
         """
@@ -251,7 +268,60 @@ class Network(Component):
             nw.initialize(nw.env)
         return nw
 
-    def initialize(self, env=None):
+    def link(self, *ports):
+        """ link components together
+
+        Args:
+            *ports: the ports to link together. The first and last port can be an integer
+            to specify the ordering of the network ports.
+
+        Note:
+            if more than two ports are specified (not including the input and output indices),
+                then the intermediate ports intermediate ports should be of the Doubleport
+                type (i.e. component[idx1, idx2]). The first index will connect to the port
+                before; the second index will connect to the port after.
+
+        Note:
+            This function can only be used inside a network-definition with-block.
+
+        Example:
+            >>> with pt.Network(name='test_network') as nw:
+            >>>     wg1 = pt.Waveguide(name='wg1')
+            >>>     wg2 = pt.Waveguide(name='wg2')
+            >>>     link(wg1[1], wg2[0])
+
+
+        """
+
+        ports = [tuple(p.split(':')) for p in ports]
+
+        if len(ports[0]) == 2:
+            ports[0] = (None,) + ports[0]
+
+        if len(ports[-1]) == 2:
+            ports[-1] = ports[-1] + (None,)
+
+        if len(ports) < 2:
+            raise ValueError("At least two ports need to be specified.")
+
+
+        # add connection to current network:
+        for (_, name1, p1), (p2, name2, _) in zip(ports[:-1], ports[1:]):
+            connection_string = "%s:%s:%s:%s" % (name1, p1, name2, p2)
+            self.connections.append(connection_string)
+
+        # add input and output connection orders:
+        q, name, p = ports[0]
+        if q is not None:
+            connection_string = "%s:%s:%s"%(name, p, q)
+            self.connections.append(connection_string)
+
+        p, name, q = ports[-1]
+        if q is not None:
+            connection_string = "%s:%s:%s"%(name, p, q)
+            self.connections.append(connection_string)
+
+    def initialize(self):
         r""" Initialize
         Initializer of the network. The initializer should be called before
         doing any simulation (forward pass through the network). It creates all the
@@ -289,19 +359,19 @@ class Network(Component):
             the initialization of nested networks, where only the top level needs to be
             fully initialized.
         """
+
         ## get environment
-        if env is None:
-            env = self.env
+        self._env = env = current_environment()
 
         ## begin initialization:
         self.initialized = False
 
         ## Initialize components in the network
         for comp in self.components.values():
-            comp.initialize(env)
+            comp.initialize()
 
         ## Initialize network
-        super(Network, self).initialize(env)
+        super(Network, self).initialize()
 
         ## delays
         # delays can be turned off for frequency calculations
@@ -659,7 +729,6 @@ class Network(Component):
 
         return source
 
-    @require_initialization
     def forward(self, source=1.0, power=True, detector=None, axes=None):
         """
         Forward pass of the network.
@@ -682,6 +751,9 @@ class Network(Component):
                     (# time, # wavelengths, # detectors, # batches) if power==True
                  or (2 = (real|imag), # time, # wavelengths, # detectors, # batches) if power==False
         """
+
+        if self.env is not current_environment() or torch.is_grad_enabled():
+            self.initialize()
 
         source = self.handle_source(source, axes=axes)
 
@@ -780,7 +852,8 @@ class Network(Component):
             comp.action(t, _x_in, _x_out)
             x_out[i:j] = _x_out
 
-    def get_used_components(self):
+    @staticmethod
+    def _get_used_component_names(connections):
         """ Get which components are already used in a connection """
 
         def is_int(s):
@@ -790,7 +863,7 @@ class Network(Component):
             except ValueError:
                 return False
 
-        used_components = [conn.split(":") for conn in self.connections]
+        used_components = [conn.split(":") for conn in connections]
         # here we would like to use an ordered set, but this does not exist.
         # therefore, we use an OrderedDict, for which we don't care about
         # the values. [all for python 2 compatibility...]
@@ -802,7 +875,7 @@ class Network(Component):
                 if not is_int(comp)
             ]
         )
-        return list(used_components.keys())
+        return used_components.keys()
 
     def get_delays(self):
         """ get all the delays in the network """
@@ -877,7 +950,7 @@ class Network(Component):
         """ Combined Connection matrix of all the components in the network
 
         Returns:
-            torch.FloatTensors with only 1's and 0's.
+            torch.FloatTensor with only 1's and 0's.
 
         Note:
             To create the connection matrix, the connection string is parsed.
@@ -918,3 +991,20 @@ class Network(Component):
                 C[0, i, j] = C[0, j, i] = 1.0
 
         return C[:, self.order, :][:, :, self.order]
+
+    def __setattr__(self, name, attr):
+        if isinstance(attr, Component):
+            self.add_component(name, attr)
+        else:
+            super(Network, self).__setattr__(name, attr)
+
+
+#####################
+## Current Network ##
+#####################
+
+
+def current_network():
+    """ get the current network being defined """
+    if _current_networks:
+        return _current_networks[0]

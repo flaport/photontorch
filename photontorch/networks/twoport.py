@@ -67,8 +67,6 @@ class TwoPortNetwork(Network):
         self.components = OrderedDict()
         for i, comp in enumerate(twoportcomponents):
             name = comp.__class__.__name__.lower() + str(i)
-            comp = copy(comp)  # shallow copy
-            comp.name = name
             self.components[name] = comp
             twoportcomponents[i] = comp
 
@@ -106,10 +104,11 @@ class TwoPortNetwork(Network):
 
         self._node_delays = delays
 
-        self._register_components()
+        for name, comp in self.components.items():
+            self.add_component(name, comp)
 
         self._env = None
-        self.order = self.get_order()
+        self.order = slice(None) # no reordering necessary
         self.C = Buffer(self.get_C())
         self.terminated = True
         self.initialized = False
@@ -119,9 +118,6 @@ class TwoPortNetwork(Network):
 
     def unterminate(self):
         raise RuntimeError("A TwoPortNetwork is always terminated by default")
-
-    def get_used_components(self):
-        return self.components.keys()
 
     def get_sources_at(self):
         return self.sources_at
@@ -137,9 +133,6 @@ class TwoPortNetwork(Network):
             return torch.cat([comp.get_delays() for comp in self.components.values()])
         else:
             return torch.stack([self._node_delays, self._node_delays], -1).flatten()
-
-    def get_order(self):
-        return slice(None)  # no reordering necessary
 
     def get_C(self):
         n = 2 * self.connections.shape[0]

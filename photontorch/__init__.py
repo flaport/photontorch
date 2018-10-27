@@ -70,6 +70,7 @@ from .components.directionalcouplers import DirectionalCouplerWithLength
 
 # Base Network
 from .networks.network import Network
+from .networks.network import current_network
 
 # Ring Networks
 from .networks.rings import AllPass
@@ -90,7 +91,7 @@ from .networks.clements import ClementsNxN
 ## Environment
 
 from .environment.environment import Environment
-from .environment.environment import default_environment
+from .environment.environment import current_environment
 
 
 ## Detectors
