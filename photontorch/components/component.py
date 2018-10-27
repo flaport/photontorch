@@ -37,6 +37,7 @@ import torch
 from ..torch_ext import where
 from ..torch_ext.nn import Module
 from ..torch_ext.nn import Buffer
+from ..environment import current_environment
 
 
 ###############
@@ -55,26 +56,34 @@ class Component(Module):
 
     num_ports = 1  # Number of ports of the component
 
-    def __init__(self, name=None):
+    def __init__(self, name=None, _calculate_buffers=True):
         """ Component
 
         Args:
             name: str = None: the name of the component (default: lowercase classname)
         """
         Module.__init__(self)
-        if name is None:
-            name = self.__class__.__name__.lower()
         self.name = name
 
-        # set attributes
-        self._env = None
-        self.C = Buffer(self.get_C())
-        self.free_idxs = Buffer(self.get_free_idxs())
-        self.sources_at = Buffer(self.get_sources_at())
-        self.detectors_at = Buffer(self.get_detectors_at())
-        self.actions_at = Buffer(self.get_actions_at())
+        # add component to current network if a component with that name does not yet exist
+        nw = current_network()
+        if nw is not None and nw is not self:
+            if self.name is not None:
+                nw.add_component(self.name, self)
 
-    def initialize(self, env=None):
+        # set environment
+        self._env = None
+
+        # calculate buffers
+        if _calculate_buffers:
+            self.C = Buffer(self.get_C())
+            self.free_idxs = Buffer(self.get_free_idxs())
+            self.sources_at = Buffer(self.get_sources_at())
+            self.detectors_at = Buffer(self.get_detectors_at())
+            self.actions_at = Buffer(self.get_actions_at())
+
+
+    def initialize(self):
         """ Set the simulation initialization for the component.
 
         Before a component can be used for simulation, it should be initialized with a
@@ -83,13 +92,9 @@ class Component(Module):
         Args:
             env: Environment = None: Simulation environment to initialize the component
                 with. If no environment is specified, the component will be initialized
-                with the previous environment the component was initialized with.
+                with the last defined environment (the result of current_environment())
         """
-
-        if env is None:
-            env = self._env
-        else:
-            self._env = env
+        self._env = env = current_environment()
 
         if env.device is not None:
             self.to(env.device)
@@ -183,26 +188,20 @@ class Component(Module):
 
     def __repr__(self):
         """ String Representation of the component """
-        return self.name
+        s = self.__class__.__name__
+        if self.name is not None:
+            s = s + '(name="' + self.name + '")'
+        return s
 
     def __str__(self):
         """ String Representation of the component """
-        return self.name
+        return repr(self)
 
-    def __getitem__(self, key):
-        """ Get a connector item with certain key
 
-        Each component contains a special __getitem__, which is solely used to connect
-        components together. Indexing a component with a string index will create a
-        connector with that same index. This connector will connect to any other connector
-        where the same string index is used. Connected connectors can be made into a
-        network. See Network for more information.
+#############
+## Imports ##
+#############
 
-        Args:
-            key (str): string key of the connection.
+# placed here to prevent circular imports
 
-        """
-
-        from ..networks.connector import Connector
-
-        return Connector(key, [self])
+from ..networks.network import current_network

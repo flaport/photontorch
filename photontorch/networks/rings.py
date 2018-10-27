@@ -486,21 +486,18 @@ class RingMolecule(Network):
         for k, v in self.couplings.items():
             setattr(self, "coupling_%s" % k, v)
 
-    def initialize(self, env=None):
+    def initialize(self):
         if self.trainable:
             if "C" in self._buffers:
                 del self._buffers["C"]
             self.C = self.get_C()
-        super(RingMolecule, self).initialize(env)
+        super(RingMolecule, self).initialize()
 
     def get_coupling(self, type1, type2):
         """ get couplings between the rings """
         return self.couplings.get(
             type1 + type2, self.couplings.get(type2 + type1, self.standard_coupling)
         )
-
-    def get_used_components(self):
-        return self.components.keys()
 
     def get_order(self):
         return slice(None)

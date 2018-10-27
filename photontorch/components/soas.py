@@ -22,6 +22,7 @@ import numpy as np
 ## Relative
 from .component import Component
 from ..torch_ext.nn import Parameter, Buffer
+from ..environment import current_environment
 
 
 ################
@@ -257,9 +258,8 @@ class AgrawalSoa(BaseSoa):
         self.alpha = alpha  # linewidth enhancement
         self.wl = wl  # wavelength of the simulation
 
-    def initialize(self, env=None):
-        if env is None:
-            env = self._env
+    def initialize(self):
+        self._env = env = current_environment()
 
         # elementary charge
         q = 1.6e-19
@@ -283,7 +283,7 @@ class AgrawalSoa(BaseSoa):
             * np.mean(env.wavelength)  # TODO: make this an array
         )  # phase introduced by the soa
 
-        super(AgrawalSoa, self).initialize(env)
+        super(AgrawalSoa, self).initialize()
         return self
 
     def get_delays(self):

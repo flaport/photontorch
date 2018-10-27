@@ -19,6 +19,7 @@ import numpy as np
 from .component import Component
 from .waveguides import Waveguide
 from ..torch_ext.nn import BoundedParameter
+from ..environment import current_environment
 
 
 #########################
@@ -121,10 +122,10 @@ class DirectionalCouplerWithLength(Component):
         """ Get the phase introduced by the directional coupler """
         return self.wg.phase
 
-    def initialize(self, env=None):
-        self.wg.initialize(env)
-        self.dc.initialize(env)
-        Component.initialize(self, env)
+    def initialize(self):
+        self.wg.initialize()
+        self.dc.initialize()
+        Component.initialize(self)
         return self
 
     def get_delays(self):
