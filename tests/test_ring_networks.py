@@ -9,7 +9,7 @@ import pytest
 import numpy as np
 
 import photontorch as pt
-from photontorch.networks.rings import RingAtom
+from photontorch.networks.rings import _RingAtom
 
 from fixtures import unw, nw, tenv, fenv, tnw, fnw, det
 
@@ -18,19 +18,19 @@ from fixtures import unw, nw, tenv, fenv, tnw, fnw, det
 ###########
 
 
-def test_allpass():
+def test_allpass_creation():
     ap = pt.AllPass()
 
 
-def test_adddrop():
+def test_adddrop_creation():
     ad = pt.AddDrop()
 
 
-def test_ringatom():
-    ra = RingAtom(pt.Waveguide(), 4)
+def test_ringatom_creation():
+    ra = _RingAtom(pt.Waveguide(), 4)
 
 
-def test_ringmolecule():
+def test_ringmolecule_creation():
     rm = pt.RingMolecule(
         "@oo.\n.oo@", rings={"o": pt.Waveguide()}, coupling={"oo": 0.3, "standard": 0.5}
     )
@@ -42,14 +42,14 @@ def test_ringmolecule_with_copy_rings():
     )
 
 
-def test_ringmolecule_with_wrong_ring_symbols2():
-    with pytest.raises(ValueError):
-        rm = pt.RingMolecule(".@oo@.", rings={".": pt.Waveguide()}, coupling=0.2)
-
-
 def test_ringmolecule_with_wrong_ring_symbols1():
     with pytest.raises(ValueError):
         rm = pt.RingMolecule(".@oo@.", rings={"@": pt.Waveguide()}, coupling=0.2)
+
+
+def test_ringmolecule_with_wrong_ring_symbols2():
+    with pytest.raises(ValueError):
+        rm = pt.RingMolecule(".@oo@.", rings={".": pt.Waveguide()}, coupling=0.2)
 
 
 def test_ringmolecule_initialize(tenv):

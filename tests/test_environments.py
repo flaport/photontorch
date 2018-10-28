@@ -19,28 +19,28 @@ from fixtures import tenv, fenv
 ###########
 
 
-def test_tenv(tenv):
+def test_tenv_creation(tenv):
     pass
 
 
-def test_fenv(fenv):
+def test_fenv_creation(fenv):
     assert fenv.frequency_domain == True
     assert fenv.num_timesteps == 1
 
 
-def test_env_with_multiple_wavelengths():
+def test_env_with_multiple_wavelengths_creation():
     env = pt.Environment(num_wavlengths=3)
 
 
-def test_env_with_wl_specified():
+def test_env_with_wl_specified_creation():
     env = pt.Environment(wavelength=1.55e-6)
 
 
-def test_env_with_no_delays():
+def test_env_with_no_delays_creation():
     env = pt.Environment(use_delays=False)
 
 
-def test_env_with_extra_arguments():
+def test_env_with_extra_arguments_creation():
     env = pt.Environment(test_attribute="hello")
     assert env.test_attribute == "hello"
 

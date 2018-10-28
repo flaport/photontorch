@@ -29,7 +29,7 @@ def test_block_diag():
 ## Neural Networks
 
 
-def test_module(mod):
+def test_module_creation(mod):
     pass
 
 

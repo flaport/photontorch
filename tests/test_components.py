@@ -7,7 +7,6 @@
 import torch
 import pytest
 import photontorch as pt
-from photontorch.networks.connector import Connector
 
 from fixtures import default_components, tenv, comp, wg
 
@@ -26,10 +25,6 @@ def test_component_repr(comp):
 
 def test_component_str(comp):
     assert comp.__str__() == "component"
-
-
-def test_component_getitem_type(comp):
-    assert isinstance(comp["abc"], Connector)
 
 
 @pytest.mark.parametrize("comp", default_components())
@@ -53,14 +48,14 @@ def test_initialization_with_sources_detectors_at_same_port(tenv):
         wt.initialize(tenv)
 
 
-def test_initialization_with_cuda_flag_true(wg, tenv):
+def test_initialization_with_device_cuda(wg, tenv):
     if not torch.cuda.is_available():  # pragma: no cover
         pytest.skip("cannot perform cuda-required tests on a pc without cuda.")
     wg = wg.initialize(tenv.copy(device="cuda"))
     assert wg.is_cuda
 
 
-def test_initialization_with_cuda_flag_false(wg, tenv):
+def test_initialization_with_device_cpu(wg, tenv):
     wg.device = type("device", (object,), {"type": "dummy"})
     wg = wg.initialize(tenv.copy(device="cpu"))
     assert not wg.is_cuda

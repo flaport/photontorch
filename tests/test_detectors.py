@@ -16,12 +16,8 @@ from fixtures import det
 ###########
 
 
-def test_photodetector(det):
+def test_photodetector_creation(det):
     pass
-
-
-def test_photodetector_with_normal_cutoff_too_big():
-    det = pt.Photodetector(bitrate=50e9, bandwidth=1000e9)
 
 
 def test_photodetector_a_parameter(det):
