@@ -30,7 +30,7 @@ from fixtures import (
 ###########
 
 
-def test_network(nw):
+def test_network_creation(nw):
     pass
 
 
@@ -38,14 +38,14 @@ def test_frequency_initialization(fnw):
     pass
 
 
-def test_network_with_component_list():
+def test_network_with_component_list_creation():
     nw = pt.Network(
         components=[pt.Waveguide(name="wg1"), pt.Waveguide(name="wg2")],
         connections=["wg1:1:wg2:1"],
     )
 
 
-def test_network_defined_in_class():
+def test_network_defined_in_class_creation():
     class NewNetwork(pt.Network):
         components = [pt.Waveguide(name="wg1"), pt.Waveguide(name="wg2")]
         connections = ["wg1:1:wg2:1"]
@@ -53,7 +53,7 @@ def test_network_defined_in_class():
     nw = NewNetwork()
 
 
-def test_network_with_component_not_defined():
+def test_network_with_component_not_defined_creation():
     with pytest.raises(KeyError):
         nw = pt.Network(
             components=[pt.Waveguide(name="wg1"), pt.Waveguide(name="wg2")],
@@ -61,24 +61,33 @@ def test_network_with_component_not_defined():
         )
 
 
-def test_ringnetwork(rnw):
+def test_ringnetwork_creation(rnw):
     pass
 
 
-def test_ringnetwork(reck):
+def test_recknetwork_creation(reck):
     pass
 
 
-def test_clementsnetwork(clements):
+def test_clementsnetwork_creation(clements):
     pass
 
 
-def test_terminate(unw):
+def test_termination(unw):
     unw.terminate()
     unw.terminate([pt.Source("src"), pt.Detector("det")])
     if torch.cuda.is_available():  # pragma: no cover
         unw.cuda()
         unw.terminate()
+
+
+def test_untermination(unw):
+    nw2 = unw.terminate().unterminate()
+
+
+def test_termination_on_terminated_network(nw):
+    with pytest.raises(IndexError):
+        nw.terminate()
 
 
 def test_cuda(tnw):
@@ -93,17 +102,8 @@ def test_cpu(tnw):
         assert not tnw.is_cuda
 
 
-def test_unterminate(unw):
-    nw2 = unw.terminate().unterminate()
-
-
-def test_termination_on_terminated_network(nw):
-    with pytest.raises(IndexError):
-        nw.terminate()
-
-
 def test_reinitialize(tnw):
-    tnw.initialized = False
+    tnw.initialized = False  # fake the fact that the network is uninitialized
     tnw.initialize()
     assert tnw.initialized
 
@@ -161,7 +161,7 @@ def test_network_connection_with_too_high_port_index(wg):
         nw = pt.Network(components={"wg1": wg, "wg2": wg}, connections=["wg1:1:wg2:2"])
 
 
-def test_twoportnetwork(twoportnw):
+def test_twoportnetwork_creation(twoportnw):
     pass
 
 
