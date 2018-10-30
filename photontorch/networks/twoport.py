@@ -108,7 +108,7 @@ class TwoPortNetwork(Network):
             self.add_component(name, comp)
 
         self._env = None
-        self.order = slice(None) # no reordering necessary
+        self.order = slice(None)  # no reordering necessary
         self.C = Buffer(self.get_C())
         self.terminated = True
         self.initialized = False
