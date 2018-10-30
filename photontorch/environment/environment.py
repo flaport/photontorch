@@ -331,12 +331,12 @@ def set_environment(*args, **kwargs):
         would like to set the environment globally, this can be done with this function.
     """
     if len(args) > 2:
-        raise ValueError('Only one positional argument allowed')
+        raise ValueError("Only one positional argument allowed")
     elif len(args) == 1:
         env = args[0]
     elif "env" in kwargs:
         env = kwargs["env"]
     else:
         env = Environment(**kwargs)
-    
+
     return env.set()

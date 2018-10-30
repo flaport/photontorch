@@ -82,7 +82,6 @@ class Component(Module):
             self.detectors_at = Buffer(self.get_detectors_at())
             self.actions_at = Buffer(self.get_actions_at())
 
-
     def initialize(self):
         """ Set the simulation initialization for the component.
 

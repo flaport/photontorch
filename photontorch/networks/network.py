@@ -160,7 +160,7 @@ class Network(Component):
 
         # Save components
         if isinstance(components, (tuple, list)):
-            components = {comp.name:comp for comp in components}
+            components = {comp.name: comp for comp in components}
 
         self.connections = connections
         for name in self._get_used_component_names(self.connections):
@@ -208,11 +208,20 @@ class Network(Component):
         This method registers all components in self.components as modules.
         """
         if name in self.components:
-            raise AttributeError('A component with name "%s" was already added to the network'%name)
+            raise AttributeError(
+                'A component with name "%s" was already added to the network' % name
+            )
+        if comp.name is not None and comp.name != name:
+            raise ValueError(
+                'The chosen component has name "%s", but is assigned to attribute "%s". '
+                "Please do not specify a name when assigning to an attribute of the "
+                "network. The name will be inferred from the attributes name."
+                % (comp.name, name)
+            )
         if self.deepcopy:
             comp = deepcopy(comp)
         else:
-            comp = copy(comp) # shallow copy of component so that name can be changed
+            comp = copy(comp)  # shallow copy of component so that name can be changed
         comp.name = name
         self.components[name] = comp
         self.add_module(name, comp)
@@ -293,7 +302,7 @@ class Network(Component):
 
         """
 
-        ports = [tuple(p.split(':')) for p in ports]
+        ports = [tuple(p.split(":")) for p in ports]
 
         if len(ports[0]) == 2:
             ports[0] = (None,) + ports[0]
@@ -304,7 +313,6 @@ class Network(Component):
         if len(ports) < 2:
             raise ValueError("At least two ports need to be specified.")
 
-
         # add connection to current network:
         for (_, name1, p1), (p2, name2, _) in zip(ports[:-1], ports[1:]):
             connection_string = "%s:%s:%s:%s" % (name1, p1, name2, p2)
@@ -313,12 +321,12 @@ class Network(Component):
         # add input and output connection orders:
         q, name, p = ports[0]
         if q is not None:
-            connection_string = "%s:%s:%s"%(name, p, q)
+            connection_string = "%s:%s:%s" % (name, p, q)
             self.connections.append(connection_string)
 
         p, name, q = ports[-1]
         if q is not None:
-            connection_string = "%s:%s:%s"%(name, p, q)
+            connection_string = "%s:%s:%s" % (name, p, q)
             self.connections.append(connection_string)
 
     def initialize(self):
