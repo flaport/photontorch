@@ -18,7 +18,7 @@ import numpy as np
 ## Relative
 from .component import Component
 from .waveguides import Waveguide
-from ..torch_ext.nn import BoundedParameter
+from ..torch_ext.nn import BoundedParameter, Buffer
 from ..environment import current_environment
 
 
@@ -54,11 +54,17 @@ class DirectionalCoupler(Component):
         """
         super(DirectionalCoupler, self).__init__(name=name)
 
-        self.coupling = BoundedParameter(
-            data=torch.tensor(coupling, device=self.device),
-            bounds=(0, 1),
-            requires_grad=trainable,
-        )
+        if trainable:
+            self.coupling = BoundedParameter(
+                data=torch.tensor(coupling, device=self.device),
+                bounds=(0, 1),
+                requires_grad=True,
+            )
+        else:
+            self.coupling = Buffer(
+                data=torch.tensor(coupling, device=self.device),
+                requires_grad=False,
+            )
 
     def get_S(self):
         ones = torch.ones((self.env.num_wavelengths, 1, 1), device=self.device)

@@ -14,12 +14,9 @@ from fixtures import (
     nw,
     tenv,
     fenv,
-    tnw,
-    fnw,
     det,
     wg,
     twoportnw,
-    fnw,
     rnw,
     reck,
     clements,
@@ -34,31 +31,36 @@ def test_network_creation(nw):
     pass
 
 
-def test_frequency_initialization(fnw):
-    pass
-
-
-def test_network_with_component_list_creation():
-    nw = pt.Network(
-        components=[pt.Waveguide(name="wg1"), pt.Waveguide(name="wg2")],
-        connections=["wg1:1:wg2:1"],
-    )
+def test_frequency_initialization(nw, fenv):
+    with fenv:
+        nw.initialize()
 
 
 def test_network_defined_in_class_creation():
     class NewNetwork(pt.Network):
-        components = [pt.Waveguide(name="wg1"), pt.Waveguide(name="wg2")]
-        connections = ["wg1:1:wg2:1"]
+        def __init__(self):
+            super(NewNetwork, self).__init__()
+            self.wg1 = pt.Waveguide()
+            self.wg2 = pt.Waveguide()
+            self.link('wg1:1','0:wg2')
 
     nw = NewNetwork()
 
 
 def test_network_with_component_not_defined_creation():
+    class NewNetwork(pt.Network):
+        def __init__(self):
+            super(NewNetwork, self).__init__()
+            self.wg1 = pt.Waveguide()
+            self.wg2 = pt.Waveguide()
+            self.link('wg3:1','0:wg2')
     with pytest.raises(KeyError):
-        nw = pt.Network(
-            components=[pt.Waveguide(name="wg1"), pt.Waveguide(name="wg2")],
-            connections=["wg3:1:wg2:1"],
-        )
+        nw = NewNetwork()
+
+def test_network_with_component_with_different_name_as_attribute():
+    with pytest.raises(ValueError):
+        with pt.Network() as nw:
+            nw.wg = pt.Waveguide(name='wg0')
 
 
 def test_ringnetwork_creation(rnw):
@@ -90,32 +92,35 @@ def test_termination_on_terminated_network(nw):
         nw.terminate()
 
 
-def test_cuda(tnw):
+def test_cuda(nw):
     if torch.cuda.is_available():  # pragma: no cover
-        tnw.cuda()
-        assert tnw.is_cuda
+        nw.cuda()
+        assert nw.is_cuda
 
 
-def test_cpu(tnw):
+def test_cpu(nw):
     if torch.cuda.is_available():  # pragma: no cover
-        tnw.cuda().cpu()
-        assert not tnw.is_cuda
+        nw.cuda().cpu()
+        assert not nw.is_cuda
 
 
-def test_reinitialize(tnw):
-    tnw.initialized = False  # fake the fact that the network is uninitialized
-    tnw.initialize()
-    assert tnw.initialized
+def test_reinitialize(nw, tenv):
+    with tenv:
+        nw.initialized = False  # fake the fact that the network is uninitialized
+        nw.initialize()
+        assert nw.initialized
 
 
 def test_initialize_on_unterminated_network(unw, tenv):
-    unw.initialize(tenv)
+    with tenv:
+        unw.initialize()
     assert not unw.initialized
 
 
 def test_initializion_with_too_big_simulation_timestep(nw, tenv):
     with pytest.warns(RuntimeWarning):
-        nw.initialize(tenv.copy(dt=1))
+        with tenv.copy(dt=1):
+            nw.initialize()
 
 
 def test_forward_with_uninitialized_network(nw):
@@ -123,32 +128,40 @@ def test_forward_with_uninitialized_network(nw):
         nw(source=1)
 
 
-def test_forward_with_constant_source(tnw):
-    tnw(source=1)
+def test_forward_with_constant_source(nw, tenv):
+    with tenv:
+        nw(source=1)
 
 
-def test_forward_with_timesource(tnw):
-    tnw(np.random.rand(tnw.env.num_timesteps))
+def test_forward_with_timesource(nw, tenv):
+    with tenv:
+        nw(np.random.rand(tenv.num_timesteps))
 
 
-def test_forward_with_different_value_for_each_source(tnw):
-    tnw(np.random.rand(tnw.num_sources))
+def test_forward_with_different_value_for_each_source(nw, tenv):
+    with tenv:
+        nw.initialize()
+        nw(np.random.rand(nw.num_sources))
 
 
-def test_forward_with_batch_weights(tnw):
-    tnw(
-        np.random.rand(
-            tnw.env.num_wavelengths, tnw.env.num_wavelengths, tnw.num_sources, 3
+def test_forward_with_batch_weights(nw, tenv):
+    with tenv:
+        nw.initialize()
+        nw(
+            np.random.rand(
+                tenv.num_wavelengths, tenv.num_wavelengths, nw.num_sources, 3
+            )
         )
-    )
 
 
-def test_forward_with_power_false(tnw):
-    tnw(1, power=False)
+def test_forward_with_power_false(nw, tenv):
+    with tenv:
+        nw(1, power=False)
 
 
-def test_forwar_with_detector(tnw, det):
-    tnw(1, detector=det)
+def test_forward_with_detector(nw, tenv, det):
+    with tenv:
+        nw(1, detector=det)
 
 
 def test_network_connection_with_equal_ports(wg):
@@ -187,83 +200,87 @@ def test_twoportnetwork_termination(twoportnw):
 
 
 def test_twoportnetwork_initialiation(twoportnw, tenv):
-    twoportnw.initialize(tenv)
+    with tenv:
+        twoportnw.initialize()
 
 
 def test_network_plot(tenv, fenv):
     tnw = pt.AddDrop(
-        term_in=pt.Source(name="in"),
-        term_pass=pt.Detector(name="pass"),
-        term_add=pt.Detector(name="add"),
-        term_drop=pt.Detector(name="drop"),
-    ).initialize(tenv.copy(wls=np.array([1.5, 1.55, 1.6]) * 1e-6))
+        term_in=pt.Source(),
+        term_pass=pt.Detector(),
+        term_add=pt.Detector(),
+        term_drop=pt.Detector(),
+    )
 
-    # test time mode 0
-    with pytest.raises(ValueError):
-        detected = torch.tensor(np.random.rand(5), dtype=torch.float32)
+    with  tenv.copy(wls=np.array([1.5, 1.55, 1.6]) * 1e-6) as env:
+        tnw.initialize()
+
+        # test time mode 1
+        detected = torch.tensor(np.random.rand(env.num_timesteps), dtype=torch.float32)
         tnw.plot(detected)
 
-    # test time mode 1
-    detected = torch.tensor(np.random.rand(tnw.env.num_timesteps), dtype=torch.float32)
-    tnw.plot(detected)
+        # test time mode 0
+        with pytest.raises(ValueError):
+            detected = torch.tensor(np.random.rand(5), dtype=torch.float32)
+            tnw.plot(detected)
 
-    # test time mode 2
-    detected = np.random.rand(tnw.env.num_timesteps, tnw.num_detectors)
-    tnw.plot(detected)
+        # test time mode 2
+        detected = np.random.rand(env.num_timesteps, tnw.num_detectors)
+        tnw.plot(detected)
 
-    # test time mode 3
-    detected = np.random.rand(tnw.env.num_timesteps, tnw.env.num_wavelengths)
-    tnw.plot(detected)
+        # test time mode 3
+        detected = np.random.rand(env.num_timesteps, env.num_wavelengths)
+        tnw.plot(detected)
 
-    # test time mode 4
-    detected = np.random.rand(
-        tnw.env.num_timesteps, tnw.env.num_wavelengths, tnw.num_detectors
-    )
-    tnw.plot(detected)
-
-    # test time mode 5
-    detected = np.random.rand(tnw.env.num_timesteps, tnw.env.num_wavelengths, 11)
-    tnw.plot(detected)
-
-    # test time mode 6
-    detected = np.random.rand(
-        tnw.env.num_timesteps, tnw.num_detectors, 11
-    )  # this one is not covered?
-    tnw.plot(detected)
-
-    # test time mode 6
-    detected = np.random.rand(
-        tnw.env.num_timesteps, tnw.env.num_wavelengths, tnw.num_detectors, 11
-    )
-    tnw.plot(detected)
-
-    # test time mode 7
-    with pytest.raises(RuntimeError):
+        # test time mode 4
         detected = np.random.rand(
-            tnw.env.num_timesteps, tnw.env.num_wavelengths, tnw.num_detectors, 11, 2
+            env.num_timesteps, env.num_wavelengths, tnw.num_detectors
         )
         tnw.plot(detected)
 
-    # test wl mode 1
-    detected = np.random.rand(tnw.env.num_wavelengths)
-    tnw.plot(detected)
-
-    # test wl mode 2
-    detected = np.random.rand(tnw.env.num_wavelengths, tnw.num_detectors)
-    tnw.plot(detected)
-
-    # test wl mode 3
-    detected = np.random.rand(tnw.env.num_wavelengths, 11)
-    tnw.plot(detected)
-
-    # test wl mode 4
-    detected = np.random.rand(tnw.env.num_wavelengths, tnw.num_detectors, 11)
-    tnw.plot(detected)
-
-    # test wl mode 5
-    with pytest.raises(RuntimeError):
-        detected = np.random.rand(tnw.env.num_wavelengths, tnw.num_detectors, 11, 2)
+        # test time mode 5
+        detected = np.random.rand(env.num_timesteps, env.num_wavelengths, 11)
         tnw.plot(detected)
+
+        # test time mode 6
+        detected = np.random.rand(
+            env.num_timesteps, tnw.num_detectors, 11
+        )  # this one is not covered?
+        tnw.plot(detected)
+
+        # test time mode 6
+        detected = np.random.rand(
+            env.num_timesteps, env.num_wavelengths, tnw.num_detectors, 11
+        )
+        tnw.plot(detected)
+
+        # test time mode 7
+        with pytest.raises(RuntimeError):
+            detected = np.random.rand(
+                env.num_timesteps, env.num_wavelengths, tnw.num_detectors, 11, 2
+            )
+            tnw.plot(detected)
+
+        # test wl mode 1
+        detected = np.random.rand(env.num_wavelengths)
+        tnw.plot(detected)
+
+        # test wl mode 2
+        detected = np.random.rand(env.num_wavelengths, tnw.num_detectors)
+        tnw.plot(detected)
+
+        # test wl mode 3
+        detected = np.random.rand(env.num_wavelengths, 11)
+        tnw.plot(detected)
+
+        # test wl mode 4
+        detected = np.random.rand(env.num_wavelengths, tnw.num_detectors, 11)
+        tnw.plot(detected)
+
+        # test wl mode 5
+        with pytest.raises(RuntimeError):
+            detected = np.random.rand(env.num_wavelengths, tnw.num_detectors, 11, 2)
+            tnw.plot(detected)
 
 
 ###############
