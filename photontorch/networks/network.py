@@ -124,7 +124,9 @@ class Network(Component):
     # dedicated plotting methods for plotting detected power
     from .visualize import plot, graph
 
-    def __init__(self, components=None, connections=None, name=None, deepcopy=False):
+    def __init__(
+        self, components=None, connections=None, name=None, copy_components=False
+    ):
         """ Network initialization
 
         Args:
@@ -150,41 +152,28 @@ class Network(Component):
         # initial network initialization without calculating the necessary buffers
         super(Network, self).__init__(name=name, _calculate_buffers=False)
 
+        # flag to see if a deepcopy of the component should be
+        # made before it's added to the network.
+        self.copy_components = copy_components
+
+        # to store the components and connections:
         self.components = OrderedDict()
-        self.connections = []
-        self.deepcopy = deepcopy
+        self.connections = []  # a list of individual connections
+        self.links = []  # a list of complete network links
 
-        # if no components or connections specified, stop initialization here:
-        if not components and not connections:
-            return
+        # store the components as torch modules:
+        if components is not None:
+            for name, comp in components.items():
+                self.add_component(name, comp) # add components to the _modules dict
 
-        # Save components
-        if isinstance(components, (tuple, list)):
-            components = {comp.name: comp for comp in components}
+        # register connections:
+        if connections is not None:
+            self.connections += connections
+            self._register_connections() # add components tot he components dict
 
-        self.connections = connections
-        for name in self._get_used_component_names(self.connections):
-            self.add_component(name, components[name])
-
-        ## Get component starting indices in the connection matrix
-        self.num_ports = sum(comp.num_ports for comp in self.components.values())
-
-        ## We will reorder the obtained C and S matrices:
-        self.order = self.get_order()
-
-        ## Initialize
-        super(Network, self).__init__(name=self.name)
-
-        # register components as modules:
-        for name, comp in self.components.items():
-            self.add_module(name, comp)
-
-        ## Check if network is fully connected
-        C = (self.C.detach() > 0).sum(0)
-        self.terminated = ((C.sum(0) > 0) | (C.sum(1) > 0)).all()
-
-        # flag to see if the network is initialized with an environment.
-        self.initialized = False
+    @property
+    def num_ports(self):
+        return sum(comp.num_ports for comp in self.components.values())
 
     def __enter__(self):
         """ enter the with block """
@@ -197,7 +186,6 @@ class Network(Component):
         """ exit the with block """
         if error is not None:
             raise  # raise the last error thrown
-        self.__init__(self.components, self.connections, self.name)
         del _current_networks[0]
         return self
 
@@ -218,12 +206,11 @@ class Network(Component):
                 "network. The name will be inferred from the attributes name."
                 % (comp.name, name)
             )
-        if self.deepcopy:
+        if self.copy_components:
             comp = deepcopy(comp)
         else:
             comp = copy(comp)  # shallow copy of component so that name can be changed
         comp.name = name
-        self.components[name] = comp
         self.add_module(name, comp)
 
     def terminate(self, term=None, name=None):
@@ -310,6 +297,8 @@ class Network(Component):
         if len(ports[-1]) == 2:
             ports[-1] = ports[-1] + (None,)
 
+        self.links.append(ports)
+
         if len(ports) < 2:
             raise ValueError("At least two ports need to be specified.")
 
@@ -328,6 +317,25 @@ class Network(Component):
         if q is not None:
             connection_string = "%s:%s:%s" % (name, p, q)
             self.connections.append(connection_string)
+
+        # register connections made:
+        self._register_connections()
+
+    def _register_connections(self):
+        # get the registered modules from the network:
+        modules = self._modules
+
+        # add used components to the components dictionary:
+        self.components = OrderedDict()
+        for name in self._get_used_component_names():
+            self.components[name] = modules[name]
+
+        ## reinitialize the network
+        super(Network, self).__init__(name=self.name)
+
+        ## reinitialization removed the already registered modules
+        ## we add them to the network again:
+        self._modules = modules
 
     def initialize(self):
         r""" Initialize
@@ -860,8 +868,7 @@ class Network(Component):
             comp.action(t, _x_in, _x_out)
             x_out[i:j] = _x_out
 
-    @staticmethod
-    def _get_used_component_names(connections):
+    def _get_used_component_names(self):
         """ Get which components are already used in a connection """
 
         def is_int(s):
@@ -871,7 +878,7 @@ class Network(Component):
             except ValueError:
                 return False
 
-        used_components = [conn.split(":") for conn in connections]
+        used_components = [conn.split(":") for conn in self.connections]
         # here we would like to use an ordered set, but this does not exist.
         # therefore, we use an OrderedDict, for which we don't care about
         # the values. [all for python 2 compatibility...]
