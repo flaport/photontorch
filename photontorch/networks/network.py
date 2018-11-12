@@ -195,6 +195,8 @@ class Network(Component):
         Pytorch requires submodules to be registered as attributes of a module.
         This method registers all components in self.components as modules.
         """
+        if self.components is None:
+            raise RuntimeError("Network not yet initialized.")
         if name in self.components:
             raise AttributeError(
                 'A component with name "%s" was already added to the network' % name
@@ -229,20 +231,23 @@ class Network(Component):
             term = Term()
         if isinstance(term, Term):
             term = OrderedDict(
-                (term.name + "_%i" % i, deepcopy(term)) for i in range(n)
+                (term.__class__.__name__.lower()+"_%i" % i, deepcopy(term)) for i in range(n)
             )
         if isinstance(term, (list, tuple)):
             term = OrderedDict((t.name, t) for t in term)
         if self.is_cuda:
             term = OrderedDict((name, t.cuda()) for name, t in term.items())
-        components = OrderedDict([(self.name, self)])
+        copied = copy(self) # shallow copy so we can change name if necessary
+        if copied.name is None:
+            copied.name = copied.__class__.__name__.lower()
+        components = OrderedDict([(copied.name, copied)])
         components.update(term)
         connections = [
-            name + ":0:" + self.name + ":%i" % i for i, name in enumerate(term)
+            name + ":0:" + copied.name + ":%i" % i for i, name in enumerate(term)
         ]
         if name is None:
-            name = self.name + "_terminated"
-        nw = Network(components, connections, name=self.name)
+            name = copied.name + "_terminated"
+        nw = Network(components, connections, name=name)
         nw.base = self
         return nw
 
@@ -253,15 +258,11 @@ class Network(Component):
     def cuda(self, device=None):
         """ move the parameters and buffers of the network to the gpu """
         nw = super(Network, self).cuda(device=device)
-        if nw._env is not None:
-            nw.initialize(nw.env)
         return nw
 
     def cpu(self):
         """ move the parameters and buffers of the network to the cpu """
         nw = super(Network, self).cpu()
-        if nw._env is not None:
-            nw.initialize(nw.env)
         return nw
 
     def link(self, *ports):
@@ -272,50 +273,64 @@ class Network(Component):
             to specify the ordering of the network ports.
 
         Note:
-            if more than two ports are specified (not including the input and output indices),
-                then the intermediate ports intermediate ports should be of the Doubleport
-                type (i.e. component[idx1, idx2]). The first index will connect to the port
-                before; the second index will connect to the port after.
+            if more than two ports are specified, then the intermediate ports should be
+            of the 'double port' type (i.e. "idx1:comp_name:idx2"). The first index will
+            connect to the port before; the second index will connect to the port
+            after.
 
         Note:
             This function can only be used inside a network-definition with-block.
 
         Example:
-            >>> with pt.Network(name='test_network') as nw:
-            >>>     wg1 = pt.Waveguide(name='wg1')
-            >>>     wg2 = pt.Waveguide(name='wg2')
-            >>>     link(wg1[1], wg2[0])
+            >>> with pt.Network() as nw:
+            >>>     nw.dc = pt.DirectionalCoupler()
+            >>>     nw.wg = pt.Waveguide()
+            >>>     nw.link(0, '0:dc:2','0:wg:1','3:dc:1', 1)
 
 
         """
 
-        ports = [tuple(p.split(":")) for p in ports]
+        try:
+            if ports[0] is not None:
+                ports = (int(ports[0]),) + ports[1:]
+        except ValueError:
+            ports = (None,) + ports
 
-        if len(ports[0]) == 2:
-            ports[0] = (None,) + ports[0]
+        try:
+            if ports[-1] is not None:
+                ports = ports[:-1] + (int(ports[-1]),)
+        except ValueError:
+            ports = ports + (None,)
 
-        if len(ports[-1]) == 2:
-            ports[-1] = ports[-1] + (None,)
+        ports = [ports[0],] + [tuple(p.split(":")) for p in ports[1:-1]] + [ports[-1]]
 
-        self.links.append(ports)
+        if len(ports[1]) == 2:
+            ports[1] = (None,) + ports[1]
 
-        if len(ports) < 2:
-            raise ValueError("At least two ports need to be specified.")
+        if len(ports[-2]) == 2:
+            ports[-2] = ports[-2] + (None,)
+
+        self.links.append(tuple(ports))
+
+        if len(ports) < 3:
+            raise ValueError("At least one port needs to be specified.")
 
         # add connection to current network:
-        for (_, name1, p1), (p2, name2, _) in zip(ports[:-1], ports[1:]):
+        for (_, name1, p1), (p2, name2, _) in zip(ports[1:-2], ports[2:-1]):
             connection_string = "%s:%s:%s:%s" % (name1, p1, name2, p2)
             self.connections.append(connection_string)
 
         # add input and output connection orders:
-        q, name, p = ports[0]
-        if q is not None:
-            connection_string = "%s:%s:%s" % (name, p, q)
+        p = str(ports[0])
+        q, name, _ = ports[1]
+        if p is not None and q is not None:
+            connection_string = "%s:%s:%s" % (name, q, p)
             self.connections.append(connection_string)
 
-        p, name, q = ports[-1]
-        if q is not None:
-            connection_string = "%s:%s:%s" % (name, p, q)
+        p = str(ports[-1])
+        _, name, q = ports[-2]
+        if p is not None and q is not None:
+            connection_string = "%s:%s:%s" % (name, q, p)
             self.connections.append(connection_string)
 
         # register connections made:

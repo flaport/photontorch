@@ -11,7 +11,7 @@ import numpy as np
 import photontorch as pt
 from photontorch.networks.rings import _RingAtom
 
-from fixtures import unw, nw, tenv, fenv, tnw, fnw, det
+from fixtures import unw, nw, tenv, fenv, det
 
 ###########
 ## Tests ##
@@ -56,7 +56,8 @@ def test_ringmolecule_initialize(tenv):
     rm = pt.RingMolecule(
         "@oo@", rings={"o": pt.Waveguide()}, coupling={"oo": 0.3, "standard": 0.5}
     )
-    rm.initialize(tenv)
+    with tenv:
+        rm.initialize()
 
 
 def test_ringmolecule_wrong_type():

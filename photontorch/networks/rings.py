@@ -361,7 +361,6 @@ class _RingAtom(Network):
 
     def __init__(self, wg, num_segments=4, name=None):
         self.num_segments = num_segments
-        self.num_ports = 2 * num_segments
         segment = Waveguide(
             length=wg.length / num_segments,
             loss=wg.loss,
@@ -371,7 +370,6 @@ class _RingAtom(Network):
             if wg.phase is None
             else wg.phase.detach().cpu().numpy() / num_segments,
             trainable=wg.trainable,
-            name="segment",
         )
         components = OrderedDict(
             [("segment%i" % i, segment) for i in range(num_segments)]
@@ -394,7 +392,6 @@ class RingMolecule(Network):
         rings,
         coupling=None,
         type="square",
-        trainable=True,
         copy_rings=False,
         name=None,
     ):
@@ -413,10 +410,10 @@ class RingMolecule(Network):
                 as keys signifies the coupling between those ring types.
                 e.g. coupling = {'aa':0.5, 'ab':0.4, 'bb':0.2}
             type: str= "square:: The lattice type of the map. For now, only square lattices are supported
-            trainable: bool = True: If the couplings in the RingMolecule are trainable
             copy_rings: bool = False: If the rings are copied, then the phase of each ring can be
                 trained seperately. Obviously, this uses more RAM.
             name: str = None: the name of the network (default: lowercase classname)
+
         """
         try:
             num_segments = {"square": 4}[type]
@@ -475,23 +472,14 @@ class RingMolecule(Network):
 
         self.standard_coupling = standard_coupling
 
-        self.trainable = trainable
-        parameter = Parameter if self.trainable else Buffer
-        self.couplings = {k: parameter(torch.tensor(v)) for k, v in coupling.items()}
+        # TODO: find a way to make the couplings trainable
+        self.couplings = {k: Buffer(torch.tensor(v)) for k, v in coupling.items()}
 
-        super(RingMolecule, self).__init__(
-            components=self.components, connections=None, name=name
-        )
+        super(Network, self).__init__(name=name)
+        self._modules = self.components
 
         for k, v in self.couplings.items():
             setattr(self, "coupling_%s" % k, v)
-
-    def initialize(self):
-        if self.trainable:
-            if "C" in self._buffers:
-                del self._buffers["C"]
-            self.C = self.get_C()
-        super(RingMolecule, self).initialize()
 
     def get_coupling(self, type1, type2):
         """ get couplings between the rings """

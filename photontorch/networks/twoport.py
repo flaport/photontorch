@@ -86,7 +86,7 @@ class TwoPortNetwork(Network):
         sources_at = [isinstance(term, Source) for term in self.terms.values()]
         detectors_at = [isinstance(term, Detector) for term in self.terms.values()]
 
-        self.num_ports = 2 * len(twoportcomponents) + len(self.terms)
+        self._num_ports = 2 * len(twoportcomponents) + len(self.terms)
 
         self.sources_at = Buffer(
             torch.zeros(self.num_ports, dtype=torch.uint8, device=self.device)
@@ -104,14 +104,17 @@ class TwoPortNetwork(Network):
 
         self._node_delays = delays
 
-        for name, comp in self.components.items():
-            self.add_component(name, comp)
+        self._modules.update(self.components)
 
         self._env = None
         self.order = slice(None)  # no reordering necessary
         self.C = Buffer(self.get_C())
         self.terminated = True
         self.initialized = False
+
+    @property
+    def num_ports(self):
+        return self._num_ports
 
     def terminate(self, term=None, name=None):
         raise RuntimeError("A TwoPortNetwork is always terminated by default")

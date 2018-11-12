@@ -78,40 +78,21 @@ def d():
 @pytest.fixture
 def unw():
     """ default unterminated network """
-    wg = pt.Waveguide(length=5e-6)
-    return pt.Network(wg["ab"] * wg["bc"])
+    with pt.Network() as nw:
+        nw.wg1 = nw.wg2 = pt.Waveguide(length=5e-6)
+        nw.link(1, '0:wg1:1','0:wg2:1', 0)
+    return nw
 
 
 @pytest.fixture
 def nw():
     """ default network (source-waveguide-detector) """
-    wg = pt.Waveguide(length=1e-5)
-    s = pt.Source()
-    d = pt.Detector()
-    nw = pt.Network(wg["ab"] * s["a"] * d["b"])
+    with pt.Network() as nw:
+        nw.wg = pt.Waveguide(length=1e-5)
+        nw.s = pt.Source()
+        nw.d = pt.Detector()
+        nw.link('s:0','0:wg:1','0:d')
     return nw
-
-
-@pytest.fixture
-def tnw():
-    """ default time initialized network (source-waveguide-detector) """
-    wg = pt.Waveguide(length=1e-5)
-    s = pt.Source()
-    d = pt.Detector()
-    nw = pt.Network(wg["ab"] * s["a"] * d["b"])
-    return nw.initialize(pt.Environment(num_timesteps=7))
-
-
-@pytest.fixture
-def fnw():
-    """ default frequency initialized network (source-waveguide-detector) """
-    wg = pt.Waveguide(length=1e-5)
-    s = pt.Source()
-    d = pt.Detector()
-    nw = pt.Network(wg["ab"] * s["a"] * d["b"])
-    return nw.initialize(
-        pt.Environment(wls=np.linspace(1.5, 1.6, 100), use_delays=False)
-    )
 
 
 @pytest.fixture
