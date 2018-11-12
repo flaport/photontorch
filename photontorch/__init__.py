@@ -91,6 +91,7 @@ from .networks.clements import ClementsNxN
 ## Environment
 
 from .environment.environment import Environment
+from .environment.environment import set_environment
 from .environment.environment import current_environment
 
 
