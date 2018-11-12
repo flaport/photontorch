@@ -165,8 +165,8 @@ class Environment(dict):
                 "Take a single timestep OR at least 3 timesteps."
             )
 
-        self["grad_enabled"] = kwargs.pop("grad_enabled", False)
-        if self["grad_enabled"]:
+        self["enable_grad"] = kwargs.pop("enable_grad", not kwargs.pop("no_grad", True))
+        if self["enable_grad"]:
             self["grad_manager"] = torch.enable_grad()
         else:
             self["grad_manager"] = torch.no_grad()
@@ -188,8 +188,9 @@ class Environment(dict):
             keyword arguments.
         """
         new = deepcopy(dict(self))
-        new.update(kwargs)
         del new["_initialized"]
+        del new["grad_manager"]
+        new.update(kwargs)
 
         if "dt" in kwargs or "num_timesteps" in kwargs:
             if "dt" in kwargs:
@@ -209,19 +210,19 @@ class Environment(dict):
 
         return self.__class__(**new)
 
-    def set(self):
-        _current_environments.appendleft(self)
-        self.grad_manager.__enter__()
-        return self
-
     def close(self):
         if _current_environments[0] is self:
             del _current_environments[0]
         self.grad_manager.__exit__()
 
+    def _set(self):
+        _current_environments.appendleft(self)
+        self.grad_manager.__enter__()
+        return self
+
     def __enter__(self):
         """ enter the with block """
-        return self.set()
+        return self._set()
 
     def __exit__(self, error, value, traceback):
         """ exit the with block """
@@ -339,4 +340,4 @@ def set_environment(*args, **kwargs):
     else:
         env = Environment(**kwargs)
 
-    return env.set()
+    env._set()
