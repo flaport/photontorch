@@ -54,7 +54,7 @@ class Component(Module):
         To define your own component, overwrite the __init__ method and the get_* methods.
     """
 
-    num_ports = 1  # Number of ports of the component
+    num_ports = 0  # Number of ports of the component
 
     def __init__(self, name=None, _calculate_buffers=True):
         """ Component
@@ -76,11 +76,16 @@ class Component(Module):
 
         # calculate buffers
         if _calculate_buffers:
+            self.order = self.get_order()
             self.C = Buffer(self.get_C())
             self.free_idxs = Buffer(self.get_free_idxs())
             self.sources_at = Buffer(self.get_sources_at())
             self.detectors_at = Buffer(self.get_detectors_at())
             self.actions_at = Buffer(self.get_actions_at())
+
+            # check if component or network is terminated (no free ports left):
+            C = (self.C.detach() ** 2 > 0).sum(0)
+            self.terminated = ((C.sum(0) > 0) | (C.sum(1) > 0)).all()
 
     def initialize(self):
         """ Set the simulation initialization for the component.
@@ -184,6 +189,14 @@ class Component(Module):
         """
         C = (abs(self.C) ** 2).sum(0)
         return where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1))
+
+    def get_order(self):
+        """ Get the reordering indices for the S matrix
+
+        Returns:
+            order: list: the order in which to reorder the ports
+        """
+        return slice(None)
 
     def __repr__(self):
         """ String Representation of the component """
