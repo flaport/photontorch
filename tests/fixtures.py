@@ -80,7 +80,7 @@ def unw():
     """ default unterminated network """
     with pt.Network() as nw:
         nw.wg1 = nw.wg2 = pt.Waveguide(length=5e-6)
-        nw.link(1, '0:wg1:1','0:wg2:1', 0)
+        nw.link(1, "0:wg1:1", "0:wg2:1", 0)
     return nw
 
 
@@ -91,7 +91,7 @@ def nw():
         nw.wg = pt.Waveguide(length=1e-5)
         nw.s = pt.Source()
         nw.d = pt.Detector()
-        nw.link('s:0','0:wg:1','0:d')
+        nw.link("s:0", "0:wg:1", "0:d")
     return nw
 
 

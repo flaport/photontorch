@@ -164,12 +164,12 @@ class Network(Component):
         # store the components as torch modules:
         if components is not None:
             for name, comp in components.items():
-                self.add_component(name, comp) # add components to the _modules dict
+                self.add_component(name, comp)  # add components to the _modules dict
 
         # register connections:
         if connections is not None:
             self.connections += connections
-            self._register_connections() # add components tot he components dict
+            self._register_connections()  # add components tot he components dict
 
     @property
     def num_ports(self):
@@ -231,13 +231,14 @@ class Network(Component):
             term = Term()
         if isinstance(term, Term):
             term = OrderedDict(
-                (term.__class__.__name__.lower()+"_%i" % i, deepcopy(term)) for i in range(n)
+                (term.__class__.__name__.lower() + "_%i" % i, deepcopy(term))
+                for i in range(n)
             )
         if isinstance(term, (list, tuple)):
             term = OrderedDict((t.name, t) for t in term)
         if self.is_cuda:
             term = OrderedDict((name, t.cuda()) for name, t in term.items())
-        copied = copy(self) # shallow copy so we can change name if necessary
+        copied = copy(self)  # shallow copy so we can change name if necessary
         if copied.name is None:
             copied.name = copied.__class__.__name__.lower()
         components = OrderedDict([(copied.name, copied)])
@@ -302,7 +303,7 @@ class Network(Component):
         except ValueError:
             ports = ports + (None,)
 
-        ports = [ports[0],] + [tuple(p.split(":")) for p in ports[1:-1]] + [ports[-1]]
+        ports = [ports[0]] + [tuple(p.split(":")) for p in ports[1:-1]] + [ports[-1]]
 
         if len(ports[1]) == 2:
             ports[1] = (None,) + ports[1]
