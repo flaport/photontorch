@@ -62,8 +62,7 @@ class DirectionalCoupler(Component):
             )
         else:
             self.coupling = Buffer(
-                data=torch.tensor(coupling, device=self.device),
-                requires_grad=False,
+                data=torch.tensor(coupling, device=self.device), requires_grad=False
             )
 
     def get_S(self):

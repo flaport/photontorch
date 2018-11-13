@@ -387,13 +387,7 @@ class RingMolecule(Network):
     """ A Ring Molecule is a network of rings."""
 
     def __init__(
-        self,
-        map,
-        rings,
-        coupling=None,
-        type="square",
-        copy_rings=False,
-        name=None,
+        self, map, rings, coupling=None, type="square", copy_rings=False, name=None
     ):
         """ ring Molecule __init__
 

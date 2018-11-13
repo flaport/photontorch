@@ -9,18 +9,7 @@ import pytest
 import numpy as np
 import photontorch as pt
 
-from fixtures import (
-    unw,
-    nw,
-    tenv,
-    fenv,
-    det,
-    wg,
-    twoportnw,
-    rnw,
-    reck,
-    clements,
-)
+from fixtures import unw, nw, tenv, fenv, det, wg, twoportnw, rnw, reck, clements
 
 ###########
 ## Tests ##
@@ -42,7 +31,7 @@ def test_network_defined_in_class_creation():
             super(NewNetwork, self).__init__()
             self.wg1 = pt.Waveguide()
             self.wg2 = pt.Waveguide()
-            self.link('wg1:1','0:wg2')
+            self.link("wg1:1", "0:wg2")
 
     nw = NewNetwork()
 
@@ -53,14 +42,16 @@ def test_network_with_component_not_defined_creation():
             super(NewNetwork, self).__init__()
             self.wg1 = pt.Waveguide()
             self.wg2 = pt.Waveguide()
-            self.link('wg3:1','0:wg2')
+            self.link("wg3:1", "0:wg2")
+
     with pytest.raises(KeyError):
         nw = NewNetwork()
+
 
 def test_network_with_component_with_different_name_as_attribute():
     with pytest.raises(ValueError):
         with pt.Network() as nw:
-            nw.wg = pt.Waveguide(name='wg0')
+            nw.wg = pt.Waveguide(name="wg0")
 
 
 def test_ringnetwork_creation(rnw):
@@ -212,7 +203,7 @@ def test_network_plot(tenv, fenv):
         term_drop=pt.Detector(),
     )
 
-    with  tenv.copy(wls=np.array([1.5, 1.55, 1.6]) * 1e-6) as env:
+    with tenv.copy(wls=np.array([1.5, 1.55, 1.6]) * 1e-6) as env:
         tnw.initialize()
 
         # test time mode 1
