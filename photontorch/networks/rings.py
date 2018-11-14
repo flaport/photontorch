@@ -471,6 +471,7 @@ class RingMolecule(Network):
 
         super(Network, self).__init__(name=name)
         self._modules = self.components
+        self.order = slice(None)
 
         for k, v in self.couplings.items():
             setattr(self, "coupling_%s" % k, v)
@@ -480,9 +481,6 @@ class RingMolecule(Network):
         return self.couplings.get(
             type1 + type2, self.couplings.get(type2 + type1, self.standard_coupling)
         )
-
-    def get_order(self):
-        return slice(None)
 
     def get_C(self):
         rC = block_diag(*(comp.C[0] for comp in self.components.values()))

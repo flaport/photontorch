@@ -53,7 +53,7 @@ class Mmi(Component):
                 wageguides and output waveguides. If no weights are specified, the
                 component defaults to a 1x2 splitter.
             trainable: bool = True: makes the interconnection weights trainable
-            name: str = None: the name of the component (default: lowercase classname)
+            name: str = None: the name of the component
         """
 
         # validate weights
@@ -84,13 +84,11 @@ class Mmi(Component):
         parameter = Parameter if trainable else Buffer
         self.weights = parameter(weights)
 
-    def get_S(self):
+    def set_S(self, S):
         weights = self.weights[:, None, :, :]  # same weight for each wavelength
         _, _, m, n = weights.shape
-        S = torch.zeros((2, self.env.num_wavelengths, m + n, m + n), device=self.device)
         S[:, :, :m, m:] = weights
         S[:, :, m:, :m] = torch.transpose(weights, -1, -2)
-        return S
 
 
 class PhaseArray(Component):
@@ -106,7 +104,7 @@ class PhaseArray(Component):
                2*n
 
     Note:
-        This component is used in bigger networks. On itself its not immediately useful.
+        This component is used in bigger networks. On itself it's not immediately useful.
 
     """
 
@@ -137,18 +135,13 @@ class PhaseArray(Component):
         phases = torch.tensor(phases, dtype=torch.float64, device=self.device)
         self.phases = parameter(phases)
 
-    def get_delays(self):
-        delay = self.ng * self.length / self.env.c
-        return delay * torch.ones(self.num_ports, device=self.device)
+    def set_delays(self, delays):
+        delays[:] = self.ng * self.length / self.env.c
 
-    def get_S(self):
+    def set_S(self, S):
+        n = self.num_ports // 2
         cos_phase = torch.diag(torch.cos(self.phases).to(torch.get_default_dtype()))
         sin_phase = torch.diag(torch.sin(self.phases).to(torch.get_default_dtype()))
         phase = torch.stack([cos_phase, sin_phase], 0)[:, None, :, :]
-        phase = (
-            torch.ones((1, self.env.num_wavelengths, 1, 1), device=self.device) * phase
-        )
-        S1 = torch.cat([torch.zeros_like(phase), phase], -1)
-        S2 = torch.cat([phase, torch.zeros_like(phase)], -1)
-        S = torch.cat([S1, S2], -2)
-        return S
+        S[:, :, :n, n:] = phase
+        S[:, :, n:, :n] = phase

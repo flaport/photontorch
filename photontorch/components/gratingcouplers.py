@@ -58,19 +58,16 @@ class GratingCoupler(Component):
         self.wl0 = wl0
         self.Tmax = Tmax
 
-    def get_S(self):
+    def set_S(self, S):
         fwhm2sigma = 1.0 / (2 * np.sqrt(2 * np.log(2)))
         sigma = fwhm2sigma * self.bandwidth
         wls = torch.tensor(
-            self.env.wavelength[:, None, None],
-            device=self.device,
-            dtype=torch.get_default_dtype(),
+            self.env.wavelength, device=self.device, dtype=torch.get_default_dtype()
         )
         loss = torch.sqrt(
             self.Tmax * torch.exp(-(self.wl0 - wls) ** 2 / (2 * sigma ** 2))
         )
-        rS = loss * torch.tensor([[[0.0, 1.0], [1.0, 0.0]]], device=self.device)
-        iS = torch.ones_like(loss) * torch.tensor(
-            [[[self.R_in, 0], [0, self.R]]], device=self.device
-        )
-        return torch.stack([rS, iS])
+
+        S[0, :, 0, 1] = S[0, :, 1, 0] = loss
+        S[1, :, 0, 0] = self.R_in
+        S[1, :, 1, 1] = self.R
