@@ -51,11 +51,14 @@ class Mirror(Component):
             requires_grad=trainable,
         )
 
-    def get_S(self):
-        r = torch.cat([(self.R ** 0.5).view(1, 1, 1)] * self.env.num_wavelengths, dim=0)
-        t = torch.cat(
-            [((1 - self.R) ** 0.5).view(1, 1, 1)] * self.env.num_wavelengths, dim=0
-        )
-        rS = r * torch.tensor([[[1.0, 0.0], [0.0, 1.0]]], device=self.device)
-        iS = t * torch.tensor([[[0.0, 1.0], [1.0, 0.0]]], device=self.device)
-        return torch.stack([rS, iS])
+    def set_S(self, S):
+        r = self.R ** 0.5
+        t = (1 - self.R) ** 0.5
+
+        # real part
+        S[0, :, 0, 0] = r
+        S[0, :, 1, 1] = r
+
+        # imag part
+        S[1, :, 0, 1] = t
+        S[1, :, 1, 0] = t

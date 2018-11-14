@@ -60,12 +60,8 @@ class LinearSoa(Component):
             torch.tensor(float(amplification), device=self.device)
         )
 
-    def get_S(self):
+    def set_S(self, S):
         """ Scattering matrix with shape: (2, # wavelengths, # ports, # ports) """
-        S = torch.zeros(
-            (2, self.env.num_wavelengths, self.num_ports, self.num_ports),
-            device=self.device,
-        )
         S[0, :, 0, 1] = self.amplification
         return S
 
@@ -85,7 +81,7 @@ class BaseSoa(Component):
     num_ports = 3
 
     def action(self, t, x_in, x_out):
-        """ Action of the component on its active nodes
+        """ Nonlinear action of the component on its active nodes
 
         Args:
             t:float: the current time in the simulation
@@ -127,27 +123,18 @@ class BaseSoa(Component):
 
         return 0.0
 
-    def get_actions_at(self):
-        return torch.ones(self.num_ports, device=self.device, dtype=torch.uint8)
+    def set_actions_at(self, actions_at):
+        actions_at[:] = 1
 
-    def get_S(self):
-        S = torch.zeros(
-            (2, self.env.num_wavelengths, self.num_ports, self.num_ports),
-            device=self.device,
-        )
+    def set_S(self, S):
         S[0, :, 0, 0] = 1.0
         S[0, :, 1, 1] = 1.0
         S[0, :, 2, 2] = 1.0
         return S
 
-    def get_C(self):
-        S = torch.zeros((2, self.num_ports, self.num_ports), device=self.device)
-        S[
-            0, 1, 1
-        ] = (
-            1.0
-        )  # the internal state should be connected onto itself to keep track of it.
-        return S
+    def set_C(self, C):
+        # the internal state should be connected onto itself to keep track of it.
+        C[0, 1, 1] = 1.0
 
 
 class Soa(BaseSoa):
@@ -286,10 +273,8 @@ class AgrawalSoa(BaseSoa):
         super(AgrawalSoa, self).initialize()
         return self
 
-    def get_delays(self):
-        return torch.tensor(
-            [self.delay, 0, 0], device=self.device, dtype=torch.get_default_dtype()
-        )
+    def set_delays(self, delays):
+        delays[0] = self.delay
 
     def dhdt(self, t, h, a):
         # input power

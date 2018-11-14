@@ -39,7 +39,6 @@ class Connection(Component):
 
     num_ports = 2
 
-    def get_S(self):
-        ones = torch.ones((2, self.env.num_wavelengths, 1, 1), device=self.device)
-        eye = torch.eye(2, device=self.device).flip(1)[None, None]
-        return ones * eye
+    def set_S(self, S):
+        S[0, :, 0, 1] = 1.0
+        S[0, :, 1, 0] = 1.0

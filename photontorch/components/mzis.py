@@ -81,9 +81,8 @@ class Mzi(Component):
             torch.tensor(theta, dtype=torch.float64, device=self.device)
         )
 
-    def get_delays(self):
-        delay = self.ng * self.length / self.env.c
-        return delay * torch.ones(self.num_ports, device=self.device)
+    def set_delays(self, delays):
+        delays[:] = self.ng * self.length / self.env.c
 
     def get_S(self):
         wls = torch.tensor(self.env.wavelength, dtype=torch.float64, device=self.device)

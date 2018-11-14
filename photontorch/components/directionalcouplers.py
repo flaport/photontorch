@@ -65,22 +65,17 @@ class DirectionalCoupler(Component):
                 data=torch.tensor(coupling, device=self.device), requires_grad=False
             )
 
-    def get_S(self):
-        ones = torch.ones((self.env.num_wavelengths, 1, 1), device=self.device)
-        t = ((1 - self.coupling) ** 0.5) * ones
-        k = (self.coupling ** 0.5) * ones
+    def set_S(self, S):
+        t = (1 - self.coupling) ** 0.5
+        k = self.coupling ** 0.5
 
-        rS = t * torch.tensor(
-            [[[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]]],
-            dtype=t.dtype,
-            device=self.device,
-        )
-        iS = k * torch.tensor(
-            [[[0, 0, 1, 0], [0, 0, 0, 1], [1, 0, 0, 0], [0, 1, 0, 0]]],
-            dtype=k.dtype,
-            device=self.device,
-        )
-        return torch.stack([rS, iS])
+        # real part scattering matrix (transmission):
+        S[0, :, 0, 1] = S[0, :, 1, 0] = t
+        S[0, :, 2, 3] = S[0, :, 3, 2] = t
+
+        # imag part scattering matrix (coupling):
+        S[1, :, 0, 2] = S[1, :, 2, 0] = k
+        S[1, :, 1, 3] = S[1, :, 3, 1] = k
 
 
 #####################################
@@ -133,22 +128,19 @@ class DirectionalCouplerWithLength(Component):
         Component.initialize(self)
         return self
 
-    def get_delays(self):
-        return torch.cat((self.wg.delays, self.wg.delays))
+    def set_delays(self, delays):
+        delays[:] = self.wg.ng * self.wg.length / self.env.c
 
-    def get_S(self):
+    def set_S(self, S):
         k = self.dc.coupling ** 0.5  # coupling
         t = (1 - self.dc.coupling) ** 0.5  # Transmission
 
         # Helper matrices
-        S = self.wg.get_S()
-        rS_wg_t = S[0] * t
-        iS_wg_k = S[1] * k
-        iS_wg_t = S[1] * t
-        rS_wg_k = S[0] * k
-
-        # S matrix
-        S = torch.zeros((2, self.env.num_wavelengths, 4, 4), device=self.device)
+        s = self.wg.S
+        rS_wg_t = s[0] * t
+        iS_wg_k = s[1] * k
+        iS_wg_t = s[1] * t
+        rS_wg_k = s[0] * k
 
         # Real part
         S[0, :, :2, :2] = rS_wg_t  # Transmission from i < - > j
@@ -161,9 +153,6 @@ class DirectionalCouplerWithLength(Component):
         S[1, :, 2:, 2:] = iS_wg_t  # Transmission from k < - > l
         S[1, :, ::2, ::2] = rS_wg_k
         S[1, :, 1::2, 1::2] = rS_wg_k
-
-        # Return
-        return S
 
 
 class RealisticDirectionalCoupler(Component):
@@ -225,7 +214,7 @@ class RealisticDirectionalCoupler(Component):
         self.de2_n0 = de2_n0
         self.wl0 = wl0
 
-    def get_S(self):
+    def set_S(self, S):
         wl = torch.tensor(self.env.wavelength, dtype=torch.float64, device=self.device)
         dwl = wl - self.wl0
         dn = self.n0 + self.de1_n0 * dwl + 0.5 * self.de2_n0 * dwl ** 2
@@ -233,17 +222,13 @@ class RealisticDirectionalCoupler(Component):
         kappa1 = np.pi * dn / wl
 
         dtype = torch.get_default_dtype()
-        tau = torch.cos(kappa0 + kappa1 * self.length).to(dtype)[:, None, None]
-        kappa = -torch.sin(kappa0 + kappa1 * self.length).to(dtype)[:, None, None]
+        tau = torch.cos(kappa0 + kappa1 * self.length).to(dtype)
+        kappa = -torch.sin(kappa0 + kappa1 * self.length).to(dtype)
 
-        rS = tau * torch.tensor(
-            [[[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]]],
-            dtype=dtype,
-            device=self.device,
-        )
-        iS = kappa * torch.tensor(
-            [[[0, 0, 1, 0], [0, 0, 0, 1], [1, 0, 0, 0], [0, 1, 0, 0]]],
-            dtype=dtype,
-            device=self.device,
-        )
-        return torch.stack([rS, iS])
+        # real part scattering matrix (transmission):
+        S[0, :, 0, 1] = S[0, :, 1, 0] = tau
+        S[0, :, 2, 3] = S[0, :, 3, 2] = tau
+
+        # imag part scattering matrix (coupling):
+        S[1, :, 0, 2] = S[1, :, 2, 0] = kappa
+        S[1, :, 1, 3] = S[1, :, 3, 1] = kappa

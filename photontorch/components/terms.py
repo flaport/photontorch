@@ -35,12 +35,6 @@ class Term(Component):
 
     num_ports = 1
 
-    def get_S(self):
-        return torch.zeros(
-            (2, self.env.num_wavelengths, self.num_ports, self.num_ports),
-            device=self.device,
-        )
-
 
 ############
 ## Source ##
@@ -53,8 +47,8 @@ class Source(Term):
         --0
     """
 
-    def get_sources_at(self):
-        return torch.ones(1, dtype=torch.uint8, device=self.device)
+    def set_sources_at(self, sources_at):
+        sources_at[:] = 1
 
 
 ##############
@@ -68,5 +62,5 @@ class Detector(Term):
         --0
     """
 
-    def get_detectors_at(self):
-        return torch.ones(1, dtype=torch.uint8, device=self.device)
+    def set_detectors_at(self, detectors_at):
+        detectors_at[:] = 1

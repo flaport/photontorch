@@ -88,6 +88,7 @@ import torch
 import numpy as np
 
 ## Relative
+from ..torch_ext.nn import Buffer
 from ..components.component import Component
 from ..components.terms import Term
 from ..torch_ext.autograd import block_diag
@@ -124,6 +125,15 @@ class Network(Component):
     # dedicated plotting methods for plotting detected power
     from .visualize import plot, graph
 
+    # network properties
+    @property
+    def num_ports(self):
+        return sum(comp.num_ports for comp in self.components.values())
+
+    # Network creation methods
+    # ------------------------
+
+    # network initialization method
     def __init__(
         self, components=None, connections=None, name=None, copy_components=False
     ):
@@ -171,29 +181,12 @@ class Network(Component):
             self.connections += connections
             self._register_connections()  # add components tot he components dict
 
-    @property
-    def num_ports(self):
-        return sum(comp.num_ports for comp in self.components.values())
-
-    def __enter__(self):
-        """ enter the with block """
-        # and add to _current_networks, so the components and networks will
-        # be updated with the "link" function
-        _current_networks.appendleft(self)
-        return self
-
-    def __exit__(self, error, value, traceback):
-        """ exit the with block """
-        if error is not None:
-            raise  # raise the last error thrown
-        del _current_networks[0]
-        return self
-
+    # add a component to the network
     def add_component(self, name, comp):
-        """ Add a components to the network
+        """ Add a component to the network
 
         Pytorch requires submodules to be registered as attributes of a module.
-        This method registers all components in self.components as modules.
+        This method register a component as a torch modules in the _modules dictionary.
         """
         if self.components is None:
             raise RuntimeError("Network not yet initialized.")
@@ -215,57 +208,7 @@ class Network(Component):
         comp.name = name
         self.add_module(name, comp)
 
-    def terminate(self, term=None, name=None):
-        """
-        Terminate open conections with the term of your choice
-
-        Args:
-            term: Term | list | dict = None: A dictionary containing the terms to use
-                Which term to use. Defaults to Term. If a dictionary or list is specified,
-                then one needs to specify as many terms as there are open connections.
-        """
-        n = len(self.free_idxs)
-        if n == 0:
-            raise IndexError("no free ports for termination")
-        if term is None:
-            term = Term()
-        if isinstance(term, Term):
-            term = OrderedDict(
-                (term.__class__.__name__.lower() + "_%i" % i, deepcopy(term))
-                for i in range(n)
-            )
-        if isinstance(term, (list, tuple)):
-            term = OrderedDict((t.name, t) for t in term)
-        if self.is_cuda:
-            term = OrderedDict((name, t.cuda()) for name, t in term.items())
-        copied = copy(self)  # shallow copy so we can change name if necessary
-        if copied.name is None:
-            copied.name = copied.__class__.__name__.lower()
-        components = OrderedDict([(copied.name, copied)])
-        components.update(term)
-        connections = [
-            name + ":0:" + copied.name + ":%i" % i for i, name in enumerate(term)
-        ]
-        if name is None:
-            name = copied.name + "_terminated"
-        nw = Network(components, connections, name=name)
-        nw.base = self
-        return nw
-
-    def unterminate(self):
-        """ remove termination of network """
-        return self.base
-
-    def cuda(self, device=None):
-        """ move the parameters and buffers of the network to the gpu """
-        nw = super(Network, self).cuda(device=device)
-        return nw
-
-    def cpu(self):
-        """ move the parameters and buffers of the network to the cpu """
-        nw = super(Network, self).cpu()
-        return nw
-
+    # link components together
     def link(self, *ports):
         """ link components together
 
@@ -337,6 +280,32 @@ class Network(Component):
         # register connections made:
         self._register_connections()
 
+    # helper function to link components together
+    def _get_used_component_names(self):
+        """ Get which components are already used in a connection """
+
+        def is_int(s):
+            try:
+                int(s)
+                return True
+            except ValueError:
+                return False
+
+        used_components = [conn.split(":") for conn in self.connections]
+        # here we would like to use an ordered set, but this does not exist.
+        # therefore, we use an OrderedDict, for which we don't care about
+        # the values. [all for python 2 compatibility...]
+        used_components = OrderedDict(
+            [
+                (comp, None)
+                for tup in used_components
+                for comp in tup
+                if not is_int(comp)
+            ]
+        )
+        return used_components.keys()
+
+    # helper function to link components together:
     def _register_connections(self):
         # get the registered modules from the network:
         modules = self._modules
@@ -346,12 +315,60 @@ class Network(Component):
         for name in self._get_used_component_names():
             self.components[name] = modules[name]
 
-        ## reinitialize the network
-        super(Network, self).__init__(name=self.name)
+        # calculate buffers
+        o = self.order = self.get_order()
+        self.C = Buffer(self.get_C()[:, o, :][:, :, o])
+        self.sources_at = Buffer(self.get_sources_at()[o])
+        self.detectors_at = Buffer(self.get_detectors_at()[o])
+        self.actions_at = Buffer(self.get_actions_at()[o])
+        self.free_idxs = Buffer(self.get_free_idxs())
+        self.terminated = len(self.free_idxs) == 0
 
-        ## reinitialization removed the already registered modules
-        ## we add them to the network again:
-        self._modules = modules
+    # terminate a network
+    def terminate(self, term=None, name=None):
+        """
+        Terminate open conections with the term of your choice
+
+        Args:
+            term: Term | list | dict = None: A dictionary containing the terms to use
+                Which term to use. Defaults to Term. If a dictionary or list is specified,
+                then one needs to specify as many terms as there are open connections.
+        """
+        n = len(self.free_idxs)
+        if n == 0:
+            raise IndexError("no free ports for termination")
+        if term is None:
+            term = Term()
+        if isinstance(term, Term):
+            term = OrderedDict(
+                (term.__class__.__name__.lower() + "_%i" % i, deepcopy(term))
+                for i in range(n)
+            )
+        if isinstance(term, (list, tuple)):
+            term = OrderedDict((t.name, t) for t in term)
+        if self.is_cuda:
+            term = OrderedDict((name, t.cuda()) for name, t in term.items())
+        copied = copy(self)  # shallow copy so we can change name if necessary
+        if copied.name is None:
+            copied.name = copied.__class__.__name__.lower()
+        components = OrderedDict([(copied.name, copied)])
+        components.update(term)
+        connections = [
+            name + ":0:" + copied.name + ":%i" % i for i, name in enumerate(term)
+        ]
+        if name is None:
+            name = copied.name + "_terminated"
+        nw = Network(components, connections, name=name)
+        nw.base = self
+        return nw
+
+    # undo a termination of a network:
+    def unterminate(self):
+        """ remove termination of network """
+        return self.base
+
+    # Methods to prepare for simulation
+    # ---------------------------------
 
     def initialize(self):
         r""" Initialize
@@ -392,7 +409,7 @@ class Network(Component):
             fully initialized.
         """
 
-        ## get environment
+        ## get current environment
         self._env = env = current_environment()
 
         ## begin initialization:
@@ -405,9 +422,11 @@ class Network(Component):
         ## Initialize network
         super(Network, self).initialize()
 
+        self.delays = self.delays[self.order]
+        self.S = self.S[:,:,self.order,:][:,:,:,self.order]
+
         ## delays
-        # delays can be turned off for frequency calculations
-        # with constant input sources
+        # delays can be turned off for frequency domain calculations
         delays_in_seconds = self.delays * float(not self.env.frequency_domain)
         # resulting delays in terms of the simulation timestep:
         delays = (delays_in_seconds / self.env.dt + 0.5).long()
@@ -423,9 +442,8 @@ class Network(Component):
         self.nml = len(ml)
 
         if not self.terminated or self.nmc == 0:
-            return (
-                self
-            )  # break off initialization; network is probably part of a bigger network
+            # break off initialization; network is probably part of a bigger network
+            return self
 
         # Check if simulation timestep is too big:
         if (delays[delays_in_seconds.data > 0] < 1).any():
@@ -441,19 +459,16 @@ class Network(Component):
         actions_at = where(self.actions_at[mc])
         self.num_sources = len(sources_at)
         self.num_detectors = len(detectors_at)
-        self.num_functions = len(actions_at)
+        self.num_actions = len(actions_at)
 
         ## Create action for the network if necessary:
-        if self.num_functions > 0:
-            self.action = self._action
-            self.function_comps = [
-                comp for comp in self.components.values() if hasattr(comp, "action")
-            ]
-            self.function_idxs = np.cumsum(
-                [self.num_sources] + [comp.num_ports for comp in self.function_comps]
-            )
-        elif hasattr(self, "action"):
-            del self.action
+        self.components_with_action = [
+            comp for comp in self.components.values() if comp.actions_at.any()
+        ]
+        self.action_idxs = np.cumsum(
+            [self.num_sources]
+            + [comp.num_ports for comp in self.components_with_action]
+        )
 
         ## New port order
         others_at = where(
@@ -463,7 +478,7 @@ class Network(Component):
         self.mc = mc = mc[new_order]
         self._sources_at = where(self.sources_at[mc])
         self._detectors_at = where(self.detectors_at[mc])
-        self._functions_at = where(self.actions_at[mc])
+        self._actions_at = where(self.actions_at[mc])
 
         ## S-matrix subsets
 
@@ -549,22 +564,6 @@ class Network(Component):
         # finish initialization:
         return self
 
-    def require_initialization(func):
-        """ a decorator that checks if the network is properly initialized before
-        executing the method.
-        """
-
-        @functools.wraps(func)
-        def wrapped(self, *args, **kwargs):
-            if not self.initialized:
-                raise RuntimeError(
-                    "Network not fully initialized. Is the network fully terminated?"
-                )
-            return func(self, *args, **kwargs)
-
-        return wrapped
-
-    @require_initialization
     def simulation_buffer(self, num_batches):
         """ Create buffer to keep the hidden states of the Network (RNN)
 
@@ -589,7 +588,6 @@ class Network(Component):
         )
         return buffer
 
-    @require_initialization
     def handle_source(self, source, axes=None):
         """ bring a source in a usable form
 
@@ -784,6 +782,8 @@ class Network(Component):
                  or (2 = (real|imag), # time, # wavelengths, # detectors, # batches) if power==False
         """
 
+        # reinitialize the network if the current environment does not correspond
+        # to the previous environment
         if self.env is not current_environment() or torch.is_grad_enabled():
             self.initialize()
 
@@ -803,7 +803,7 @@ class Network(Component):
         if not power:
             detected = torch.stack([detected, detected], 0)
 
-        ## Get new buffer
+        ## Get new simulation buffer
         buffer = self.simulation_buffer(num_batches)
 
         # solve
@@ -843,7 +843,7 @@ class Network(Component):
         )
 
         # add sources
-        if self.num_functions == 0:
+        if self.num_actions == 0:
             rx = rx + srcvalue[0]
             ix = ix + srcvalue[1]
         else:
@@ -869,113 +869,38 @@ class Network(Component):
 
         return detected, buffer
 
-    def _action(self, t, x_in, x_out):
-        """ The action of the active components on the network
-
-        This function will be called as .action (without underscore) during self.step
-        if the network contains any active nodes.
-        """
+    def action(self, t, x_in, x_out):
+        """ The action of the active components on the network """
         x_out[:] = x_in[:]
 
-        idxs = self.function_idxs
-        for comp, i, j in zip(self.function_comps, idxs[:-1], idxs[1:]):
+        idxs = self.action_idxs
+        for comp, i, j in zip(self.components_with_action, idxs[:-1], idxs[1:]):
             _x_in = x_in[i:j]
-            _x_out = torch.zeros_like(_x_in)
+            _x_out = x_out[i:j]
+            _x_out[:] = 0
             comp.action(t, _x_in, _x_out)
-            x_out[i:j] = _x_out
-
-    def _get_used_component_names(self):
-        """ Get which components are already used in a connection """
-
-        def is_int(s):
-            try:
-                int(s)
-                return True
-            except ValueError:
-                return False
-
-        used_components = [conn.split(":") for conn in self.connections]
-        # here we would like to use an ordered set, but this does not exist.
-        # therefore, we use an OrderedDict, for which we don't care about
-        # the values. [all for python 2 compatibility...]
-        used_components = OrderedDict(
-            [
-                (comp, None)
-                for tup in used_components
-                for comp in tup
-                if not is_int(comp)
-            ]
-        )
-        return used_components.keys()
 
     def get_delays(self):
         """ get all the delays in the network """
-        return torch.cat([comp.delays for comp in self.components.values()])[self.order]
+        return torch.cat([comp.delays for comp in self.components.values()])
 
     def get_detectors_at(self):
         """ get the locations of the detectors in the network """
-        return torch.cat([comp.detectors_at for comp in self.components.values()])[
-            self.order
-        ]
+        return torch.cat([comp.detectors_at for comp in self.components.values()])
 
     def get_sources_at(self):
         """ get the locations of the sources in the network """
-        return torch.cat([comp.sources_at for comp in self.components.values()])[
-            self.order
-        ]
+        return torch.cat([comp.sources_at for comp in self.components.values()])
 
     def get_actions_at(self):
         """ get the locations of the functions in the network """
-        return torch.cat([comp.actions_at for comp in self.components.values()])[
-            self.order
-        ]
+        return torch.cat([comp.actions_at for comp in self.components.values()])
 
     def get_S(self):
         """ Get the combined S-matrix of all the components in the network """
-        rS = block_diag(*(comp.S[0] for comp in self.components.values()))[
-            :, self.order, :
-        ][:, :, self.order]
-
-        iS = block_diag(*(comp.S[1] for comp in self.components.values()))[
-            :, self.order, :
-        ][:, :, self.order]
+        rS = block_diag(*(comp.S[0] for comp in self.components.values()))
+        iS = block_diag(*(comp.S[1] for comp in self.components.values()))
         return torch.stack([rS, iS])
-
-    def get_order(self):
-        """ Get the reordering indices for the S matrix """
-        start_idxs = list(
-            np.cumsum([0] + [comp.num_ports for comp in self.components.values()])[:-1]
-        )
-        start_idxs = OrderedDict(zip(self.components.keys(), start_idxs))
-        free_idxs = [comp.free_idxs for comp in self.components.values()]
-        free_idxs = OrderedDict(zip(self.components.keys(), free_idxs))
-
-        def parse_connection(conn):
-            conn_list = conn.split(":")
-            if len(conn_list) == 4:
-                return None, None
-            comp, i, j = conn_list
-            i, j = int(i), int(j)
-            i = int(start_idxs[comp] + free_idxs[comp][i])
-            return i, j
-
-        order_dict = {}
-        for conn in self.connections:
-            i, j = parse_connection(conn)
-            if i is not None:
-                order_dict[j] = i
-
-        order = []
-        for j in range(len(order_dict)):
-            i = order_dict.get(j, None)
-            if i is not None:
-                order.append(i)
-
-        for i in range(self.num_ports):
-            if i not in order_dict.values():
-                order.append(i)
-
-        return order
 
     def get_C(self):
         """ Combined Connection matrix of all the components in the network
@@ -984,7 +909,7 @@ class Network(Component):
             torch.FloatTensor with only 1's and 0's.
 
         Note:
-            To create the connection matrix, the connection string is parsed.
+            To create the connection matrix, the connection strings are parsed.
         """
 
         rC = block_diag(*(comp.C[0] for comp in self.components.values()))
@@ -1021,13 +946,63 @@ class Network(Component):
             if i is not None:
                 C[0, i, j] = C[0, j, i] = 1.0
 
-        return C[:, self.order, :][:, :, self.order]
+        return C
+
+    def get_order(self):
+        """ Get the reordering indices for the ports of the network """
+        start_idxs = list(
+            np.cumsum([0] + [comp.num_ports for comp in self.components.values()])[:-1]
+        )
+        start_idxs = OrderedDict(zip(self.components.keys(), start_idxs))
+        free_idxs = [comp.free_idxs for comp in self.components.values()]
+        free_idxs = OrderedDict(zip(self.components.keys(), free_idxs))
+
+        def parse_connection(conn):
+            conn_list = conn.split(":")
+            if len(conn_list) == 4:
+                return None, None
+            comp, i, j = conn_list
+            i, j = int(i), int(j)
+            i = int(start_idxs[comp] + free_idxs[comp][i])
+            return i, j
+
+        order_dict = {}
+        for conn in self.connections:
+            i, j = parse_connection(conn)
+            if i is not None:
+                order_dict[j] = i
+
+        order = []
+        for j in range(len(order_dict)):
+            i = order_dict.get(j, None)
+            if i is not None:
+                order.append(i)
+
+        for i in range(self.num_ports):
+            if i not in order_dict.values():
+                order.append(i)
+
+        return order
 
     def __setattr__(self, name, attr):
         if isinstance(attr, Component):
             self.add_component(name, attr)
         else:
             super(Network, self).__setattr__(name, attr)
+
+    def __enter__(self):
+        """ enter the with block """
+        # and add to _current_networks, so the components and networks will
+        # be updated with the "link" function
+        _current_networks.appendleft(self)
+        return self
+
+    def __exit__(self, error, value, traceback):
+        """ exit the with block """
+        if error is not None:
+            raise  # raise the last error thrown
+        del _current_networks[0]
+        return self
 
 
 #####################

@@ -77,11 +77,10 @@ class Waveguide(Connection):
             torch.tensor(data=float(phase % (2 * np.pi)), dtype=torch.float64)
         )
 
-    def get_delays(self):
-        delay = self.ng * self.length / self.env.c
-        return delay * torch.ones(2, device=self.device)
+    def set_delays(self, delays):
+        delays[:] = self.ng * self.length / self.env.c
 
-    def get_S(self):
+    def set_S(self, S):
         wls = torch.tensor(self.env.wavelength, dtype=torch.float64, device=self.device)
 
         # neff depends on the wavelength:
@@ -96,11 +95,5 @@ class Waveguide(Connection):
         ie = loss * sin_phase
 
         # calculate real part and imag part
-        rS = re.view(-1, 1, 1) * torch.tensor(
-            [[[0.0, 1.0], [1.0, 0.0]]], device=self.device
-        )
-        iS = ie.view(-1, 1, 1) * torch.tensor(
-            [[[0.0, 1.0], [1.0, 0.0]]], device=self.device
-        )
-
-        return torch.stack([rS, iS])
+        S[0, :, 0, 1] = S[0, :, 1, 0] = re
+        S[1, :, 0, 1] = S[1, :, 1, 0] = ie

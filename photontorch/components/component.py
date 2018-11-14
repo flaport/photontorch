@@ -60,32 +60,88 @@ class Component(Module):
         """ Component
 
         Args:
-            name: str = None: the name of the component (default: lowercase classname)
+            name: str = None: the name of the component
         """
         Module.__init__(self)
         self.name = name
 
         # add component to current network if a component with that name does not yet exist
         nw = current_network()
-        if nw is not None and nw is not self:
-            if self.name is not None:
-                nw.add_component(self.name, self)
+        if nw is not None and nw is not self and self.name is not None:
+            nw.add_component(self.name, self)
 
         # set environment
         self._env = None
 
         # calculate buffers
         if _calculate_buffers:
-            self.order = self.get_order()
             self.C = Buffer(self.get_C())
-            self.free_idxs = Buffer(self.get_free_idxs())
             self.sources_at = Buffer(self.get_sources_at())
             self.detectors_at = Buffer(self.get_detectors_at())
             self.actions_at = Buffer(self.get_actions_at())
+            self.free_idxs = Buffer(self.get_free_idxs())
+            self.terminated = len(self.free_idxs) == 0
 
-            # check if component or network is terminated (no free ports left):
-            C = (self.C.detach() ** 2 > 0).sum(0)
-            self.terminated = ((C.sum(0) > 0) | (C.sum(1) > 0)).all()
+    ## The following methods should be overwritten by subclasses:
+
+    def set_S(self, S):
+        """ Calculate the scattering matrix of the component
+
+        Returns:
+            S: torch.Tensor[2, #wavelengths, #ports, #ports]: the scattering matrix for
+                each wavelength of the simulation.
+
+        Note:
+            S[0] is the real part, S[1] is the imaginary part.
+        """
+        pass
+
+    def set_C(self, C):
+        """ Calculate the connection matrix of the component.
+
+        Note:
+            C[0] is the real part, C[0] is the imaginary part
+        """
+        pass
+
+    def set_delays(self, delays):
+        """ Set the delays introduced by the component. """
+        pass
+
+    def set_sources_at(self, sources_at):
+        """ Set the locations of the sources in the component. """
+        pass
+
+    def set_detectors_at(self, detectors_at):
+        """ Set the locations of the detectors in the component. """
+        pass
+
+    def set_actions_at(self, actions_at):
+        """ Set the locations of the active nodes in the component. """
+        pass
+
+    def action(self, t, x_in, x_out):
+        """ Nonlinear action of the component on its active nodes
+
+        Args:
+            t: float: the current time in the simulation
+            x_in: torch.Tensor[#active nodes, 2, #wavelengths, #batches]: the input tensor
+                used to define the action
+            x_out: torch.Tensor[#active nodes, 2, #wavelengths, #batches]: the output
+                tensor. The result of the action should be stored in this tensor.
+
+        Returns:
+            None: (the result should be stored in the output tensor and should not be
+            returned)
+        """
+        pass
+
+    ## The following methods should be left alone:
+
+    @property
+    def env(self):
+        """ Get the environment object for which the component is initialized """
+        return self._env
 
     def initialize(self):
         """ Set the simulation initialization for the component.
@@ -114,13 +170,8 @@ class Component(Module):
 
         return self  # return the initialized component, so operations can be chained
 
-    @property
-    def env(self):
-        """ Get the environment object for which the component is initialized """
-        return self._env
-
     def get_S(self):
-        """ Calculate the scattering matrix of the component
+        """ get the scattering matrix of the component
 
         Returns:
             S: torch.Tensor[2, #wavelengths, #ports, #ports]: the scattering matrix for
@@ -129,13 +180,15 @@ class Component(Module):
         Note:
             S[0] is the real part, S[1] is the imaginary part.
         """
-        return torch.zeros(
+        S = torch.zeros(
             (2, self.env.num_wavelengths, self.num_ports, self.num_ports),
             device=self.device,
         )
+        self.set_S(S)
+        return S
 
     def get_C(self):
-        """ Calculate the connection matrix of the component.
+        """ get the connection matrix of the component.
 
         Returns:
             C: torch.Tensor[2, #ports, #ports]: the connection matrix.
@@ -143,7 +196,9 @@ class Component(Module):
         Note:
             C[0] is the real part, C[0] is the imaginary part
         """
-        return torch.zeros((2, self.num_ports, self.num_ports), device=self.device)
+        C = torch.zeros((2, self.num_ports, self.num_ports), device=self.device)
+        self.set_C(C)
+        return C
 
     def get_delays(self):
         """ Get the delays introduced by the component.
@@ -151,7 +206,9 @@ class Component(Module):
         Returns:
             delays: torch.Tensor[#ports]: The delays in each node of the component.
         """
-        return torch.zeros(self.num_ports, device=self.device)
+        delays = torch.zeros(self.num_ports, device=self.device)
+        self.set_delays(delays)
+        return delays
 
     def get_sources_at(self):
         """ Get the locations of the sources in the component.
@@ -160,7 +217,9 @@ class Component(Module):
             sources_at: torch.Tensor[#ports]: a uint8 tensor where the locations of the
                 sources are denoted by a 1.
         """
-        return torch.zeros(self.num_ports, device=self.device, dtype=torch.uint8)
+        sources_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.uint8)
+        self.set_sources_at(sources_at)
+        return sources_at
 
     def get_detectors_at(self):
         """ Get the locations of the detectors in the component.
@@ -169,7 +228,11 @@ class Component(Module):
             detectors_at: torch.Tensor[#ports]: a uint8 tensor where the locations of the
                 detectors are denoted by a 1.
         """
-        return torch.zeros(self.num_ports, device=self.device, dtype=torch.uint8)
+        detectors_at = torch.zeros(
+            self.num_ports, device=self.device, dtype=torch.uint8
+        )
+        self.set_detectors_at(detectors_at)
+        return detectors_at
 
     def get_actions_at(self):
         """ Get the locations of the active nodes in the component.
@@ -178,7 +241,9 @@ class Component(Module):
             actions_at: torch.Tensor[#ports]: a uint8 tensor where the locations of the
                 active nodes are denoted by a 1.
         """
-        return torch.zeros(self.num_ports, device=self.device, dtype=torch.uint8)
+        actions_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.uint8)
+        self.set_actions_at(actions_at)
+        return actions_at
 
     def get_free_idxs(self):
         """ Calculate locations of the free indices to make a connections to.
@@ -189,14 +254,6 @@ class Component(Module):
         """
         C = (abs(self.C) ** 2).sum(0)
         return where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1))
-
-    def get_order(self):
-        """ Get the reordering indices for the S matrix
-
-        Returns:
-            order: list: the order in which to reorder the ports
-        """
-        return slice(None)
 
     def __repr__(self):
         """ String Representation of the component """

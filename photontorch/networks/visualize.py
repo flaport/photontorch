@@ -60,6 +60,10 @@ def plot(network, detected, **kwargs):
     y = detected
     if torch.is_tensor(y):
         y = y.detach().cpu()
+
+    if len(y.shape) == 4 and y.shape[0] == 1 and y.shape[1] == 1:
+        raise ValueError("cannot plot for a single timestep and a single wavelength")
+
     y = np.squeeze(np.array(y, "float32"))
 
     # Handle x
