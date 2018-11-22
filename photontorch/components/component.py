@@ -68,7 +68,7 @@ class Component(Module):
         # add component to current network if a component with that name does not yet exist
         nw = current_network()
         if nw is not None and nw is not self and self.name is not None:
-            nw.add_component(self.name, self)
+            nw.add_component(self.name, self, copy=False)
 
         # set environment
         self._env = None

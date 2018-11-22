@@ -182,7 +182,7 @@ class Network(Component):
             self._register_connections()  # add components tot he components dict
 
     # add a component to the network
-    def add_component(self, name, comp):
+    def add_component(self, name, comp, copy=True):
         """ Add a component to the network
 
         Pytorch requires submodules to be registered as attributes of a module.
@@ -201,11 +201,8 @@ class Network(Component):
                 "network. The name will be inferred from the attributes name."
                 % (comp.name, name)
             )
-        if self.copy_components:
+        if copy and self.copy_components:
             comp = deepcopy(comp)
-        else:
-            comp = copy(comp)  # shallow copy of component so that name can be changed
-        comp.name = name
         self.add_module(name, comp)
 
     # link components together
@@ -221,9 +218,6 @@ class Network(Component):
             of the 'double port' type (i.e. "idx1:comp_name:idx2"). The first index will
             connect to the port before; the second index will connect to the port
             after.
-
-        Note:
-            This function can only be used inside a network-definition with-block.
 
         Example:
             >>> with pt.Network() as nw:
@@ -1014,3 +1008,31 @@ def current_network():
     """ get the current network being defined """
     if _current_networks:
         return _current_networks[0]
+
+def link(*ports):
+    """ link ports together in the current network
+
+    Args:
+        *ports: the ports to link together. The first and last port can be an integer
+        to specify the ordering of the network ports.
+
+    Note:
+        if more than two ports are specified, then the intermediate ports should be
+        of the 'double port' type (i.e. "idx1:comp_name:idx2"). The first index will
+        connect to the port before; the second index will connect to the port
+        after.
+
+    Note:
+        This function can only be used inside a network-definition with-block.
+
+    Example:
+        >>> with pt.Network() as nw:
+        >>>     nw.dc = pt.DirectionalCoupler()
+        >>>     nw.wg = pt.Waveguide()
+        >>>     nw.link(0, '0:dc:2','0:wg:1','3:dc:1', 1)
+
+
+    """
+    nw = current_network()
+    nw.link(*ports)
+
