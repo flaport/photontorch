@@ -71,6 +71,7 @@ from .components.directionalcouplers import DirectionalCouplerWithLength
 # Base Network
 from .networks.network import Network
 from .networks.network import current_network
+from .networks.network import link
 
 # Ring Networks
 from .networks.rings import AllPass
