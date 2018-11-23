@@ -12,7 +12,7 @@ neural network. This enables the use of native PyTorch optimizers to optimize th
 ## Installation
 Clone the photontorch repository:
 ```
-git clone http://github.ugent.be/fplaport/photontorch
+git clone http://github.com/flaport/photontorch
 ```
 and link it with `pip`:
 ```
@@ -59,4 +59,4 @@ pytest tests --cov-report html --cov photontorch
 
 
 ## Copyright
-© Floris Laporte
+© Floris Laporte - MIT License
