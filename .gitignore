@@ -1,39 +1,43 @@
-#############
-## Folders ##
-#############
-__pycache__
-.ipynb_checkpoints
+# Mac folders
 .DS_Store
-.vscode
+
+# python cache
+__pycache__
+
+# jupyter notebooks
+.ipynb_checkpoints
+
+# pytest
 .pytest_cache
 
-###########
-## Files ##
-###########
-
-## byte code
+# byte code
 *.pyc
 
-## logs
+# logs
 *.log
-log.txt
 
-## data
+# swap files
+*.swp
+
+# data
 *.data
-*.dat
 *.obj
 *.npy
 *.npz
+*.pkl
 *.gz
 
-## documentation src (latex)
-*.gz
-*.tex
-*.pdf
-*.aux
-*.log
-*.out
-*.toc
-*.tdo
-*.bbl
-*.blg
+# documentation
+*.html
+
+# VS Code
+.vscode
+tempCodeRunnerFile.py
+
+# pip
+*.egg-info
+
+# coverage reports
+htmlcov/*
+.coverage
+
