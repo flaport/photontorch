@@ -36,6 +36,8 @@ tempCodeRunnerFile.py
 
 # pip
 *.egg-info
+build/*
+dist/*
 
 # coverage reports
 htmlcov/*
