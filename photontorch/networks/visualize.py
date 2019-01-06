@@ -52,7 +52,7 @@ def plot(network, detected, **kwargs):
         if labels is not None and len(labels) > 1:
             # Shrink current axis by 10%
             box = plt.gca().get_position()
-            plt.gca().set_position([box.x0, box.y0, box.width * 0.9, box.height])
+            plt.gca().set_position([box.x0, box.y0, box.width * 0.85, box.height])
             plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
         return plots
 
