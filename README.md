@@ -14,12 +14,6 @@ circuit.
 
 ## Installation and dependencies
 
-### Stable version
-Install the package via pip:
-```
-pip install photontorch
-```
-
 ### Most recent version
 To have the most recent version, one can also clone this repository
 ```
