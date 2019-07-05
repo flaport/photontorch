@@ -521,7 +521,7 @@ class Network(Component):
             # 2. Calculate inv(P)@Cmlmc [using torch.gesv]
             M = torch.cat([torch.cat([rP, -iP], -1), torch.cat([iP, rP], -1)], -2)
             Cmlmc = ones * torch.cat([ones * rCmlmc[None], ones * iCmlmc[None]], -2)
-            x, _ = torch.gesv(Cmlmc, M)
+            x, _ = torch.solve(Cmlmc, M)
             rx, ix = torch.split(x, x.shape[-2] // 2, -2)
 
             # 3. Calculate Smlml@inv(P)@Cmlmc
