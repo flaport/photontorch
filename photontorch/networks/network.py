@@ -259,15 +259,19 @@ class Network(Component):
             self.connections.append(connection_string)
 
         # add input and output connection orders:
-        p = str(ports[0])
+        p = ports[0]
         q, name, _ = ports[1]
-        if p is not None and q is not None:
-            connection_string = "%s:%s:%s" % (name, q, p)
+        if p is not None:
+            if q is None:
+                raise RuntimeError("Error during linking: output port %s for %s specified, but no port to link to in subcomponent %s."%(p, self.__class__.__name__, name))
+            connection_string = "%s:%s:%s" % (name, q, str(p))
             self.connections.append(connection_string)
 
-        p = str(ports[-1])
+        p = ports[-1]
         _, name, q = ports[-2]
-        if p is not None and q is not None:
+        if p is not None:
+            if q is None:
+                raise RuntimeError("Error during linking: output port %s for %s specified, but no port to link to in subcomponent %s."%(p, self.__class__.__name__, name))
             connection_string = "%s:%s:%s" % (name, q, p)
             self.connections.append(connection_string)
 
