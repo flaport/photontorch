@@ -11,6 +11,9 @@ photontorch simulation) according to a realistic filtering model.
 ## Imports ##
 #############
 
+# standard library
+import warnings
+
 # Torch
 import torch
 
@@ -45,7 +48,7 @@ class Photodetector(Module):
     def __init__(
         self,
         bitrate=50e9,
-        dt=1e-12,
+        frequency=80e9,
         bandwidth=25e9,
         responsivity=1.0,
         dark_current=1e-10,
@@ -56,7 +59,7 @@ class Photodetector(Module):
         """
         Args:
             bitrate: float = 50e9: data rate of the signal to filter
-            dt: float = 1e-12: time step of the signal to filter
+            frequency: float = 80e9: highest frequency of the signal to filter
             bandwidth: float = 25e9: bandwidth of the photodector
             responsivity: float = 1.0: responsivity of the photodector
             dark_current: float = 1e-10: dark current adding to the noise
@@ -67,20 +70,19 @@ class Photodetector(Module):
         super(Photodetector, self).__init__()
         self.bitrate = bitrate  # bitrate of the input signal
         self.bandwidth = bandwidth  # Bandwidth
-        self.tau = 1.0 / bandwidth  # RC time constant
         self.responsivity = responsivity  # A/W
         self.dark_current = dark_current  # dark current
-        self.dt = dt  # sampling timestep
-        self.sampling_rate = 1.0 / dt  # sampling rate
+        self.frequency = frequency
         self.load_resistance = load_resistance  # load resistance
         self.filter_order = filter_order  # filter order of the butter filter
         self.seed = seed
 
-        nyq = 0.5 * self.sampling_rate
-        normal_cutoff = self.bandwidth / nyq
-        if normal_cutoff >= 1:
-            normal_cutoff = 0.99
-        b, a = butter(self.filter_order, normal_cutoff, btype="lowpass", analog=False)
+        self.normal_cutoff = self.bandwidth / self.frequency
+        if self.normal_cutoff > 1.0:
+            warnings.warn("bandwidth of the detector is bigger than its highest filter "
+                          "frequency. The detector will be disabled.")
+            return
+        b, a = butter(self.filter_order, self.normal_cutoff, btype="lowpass", analog=False)
 
         # we reverse the order of a for efficiency.
         # reversing it later is not possible, as pytorch does not allow negative step sizes.
@@ -111,8 +113,9 @@ class Photodetector(Module):
 
         # we prepend zeros to make sure the filtered signal and the original signal
         # will have the same shape [pytorch convolutions default to kind='valid']
-        zero = torch.zeros_like(signal[:, :, : (self.conv.weight.shape[-1] - 1)])
-        signal = torch.cat([zero, signal], -1)
+        if self.normal_cutoff <= 1:
+            zero = torch.zeros_like(signal[:, :, : (self.conv.weight.shape[-1] - 1)])
+            signal = torch.cat([zero, signal], -1)
 
         # Add random noise according to specified seed
         initial_random_state = torch.random.get_rng_state()
@@ -130,6 +133,9 @@ class Photodetector(Module):
             + self.responsivity * signal
         )
         torch.random.set_rng_state(initial_random_state)
+
+        if self.normal_cutoff > 1:
+            return signal.view(*signal_shape)
 
         # convolve with b [first part of filtering]
         signal = self.conv(signal)
