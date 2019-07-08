@@ -98,27 +98,27 @@ class BoundedParameter(torch.nn.Parameter):
                 "some of your data is outside the specified bounds: [%i, %i]" % (a, b)
             )
         new = torch.Tensor._make_subclass(
-            cls, cls._inverse_sigmoid(data.data, (a, b)), requires_grad
+            cls, cls._inverse_operation(data.data, (a, b)), requires_grad
         )
         new.bounds = (float(a), float(b))
         return new
 
     @staticmethod
-    def _sigmoid(weights, bounds):
+    def _operation(weights, bounds):
         a, b = bounds
-        scaled_data = torch.sigmoid(weights)
+        scaled_data = torch.cos(weights)
         data = (b - a) * scaled_data + a
         return data
 
     @staticmethod
-    def _inverse_sigmoid(data, bounds):
+    def _inverse_operation(data, bounds):
         a, b = bounds
         scaled_data = (data - a) / (b - a)
-        weights = -torch.log(1 / scaled_data - 1)
+        weights = torch.acos(scaled_data)
         return weights
 
     def __repr__(self):
-        tensor_repr = torch.Tensor.__repr__(self._sigmoid(self.data, self.bounds))
+        tensor_repr = torch.Tensor.__repr__(self._operation(self.data, self.bounds))
         return (
             "BoundedParameter in [%.2f, %.2f] representing:\n" % self.bounds
             + tensor_repr
@@ -166,7 +166,7 @@ class Module(_Module_):
 
             # register the class property returning the bounded value
             value_property = property(
-                lambda self: self._parameters[_attr]._sigmoid(
+                lambda self: self._parameters[_attr]._operation(
                     self._parameters[_attr], self._parameters[_attr].bounds
                 )
             )
