@@ -263,7 +263,10 @@ class Network(Component):
         q, name, _ = ports[1]
         if p is not None:
             if q is None:
-                raise RuntimeError("Error during linking: output port %s for %s specified, but no port to link to in subcomponent %s."%(p, self.__class__.__name__, name))
+                raise RuntimeError(
+                    "Error during linking: output port %s for %s specified, but no port to link to in subcomponent %s."
+                    % (p, self.__class__.__name__, name)
+                )
             connection_string = "%s:%s:%s" % (name, q, str(p))
             self.connections.append(connection_string)
 
@@ -271,7 +274,10 @@ class Network(Component):
         _, name, q = ports[-2]
         if p is not None:
             if q is None:
-                raise RuntimeError("Error during linking: output port %s for %s specified, but no port to link to in subcomponent %s."%(p, self.__class__.__name__, name))
+                raise RuntimeError(
+                    "Error during linking: output port %s for %s specified, but no port to link to in subcomponent %s."
+                    % (p, self.__class__.__name__, name)
+                )
             connection_string = "%s:%s:%s" % (name, q, p)
             self.connections.append(connection_string)
 
@@ -421,7 +427,7 @@ class Network(Component):
         super(Network, self).initialize()
 
         self.delays = self.delays[self.order]
-        self.S = self.S[:,:,self.order,:][:,:,:,self.order]
+        self.S = self.S[:, :, self.order, :][:, :, :, self.order]
 
         ## delays
         # delays can be turned off for frequency domain calculations
@@ -637,10 +643,20 @@ class Network(Component):
                 0,
             )
             stacked = True
-        elif source.shape == (2, self.env.num_timesteps, self.env.num_wavelengths, self.num_sources):
-            source = source[:,:,:,:,None]
+        elif source.shape == (
+            2,
+            self.env.num_timesteps,
+            self.env.num_wavelengths,
+            self.num_sources,
+        ):
+            source = source[:, :, :, :, None]
             stacked = True
-        elif source.shape[:-1] == (2, self.env.num_timesteps, self.env.num_wavelengths, self.num_sources):
+        elif source.shape[:-1] == (
+            2,
+            self.env.num_timesteps,
+            self.env.num_wavelengths,
+            self.num_sources,
+        ):
             stacked = True
 
         # The source should be a tensor with ndim > 0
@@ -1018,6 +1034,7 @@ def current_network():
     if _current_networks:
         return _current_networks[0]
 
+
 def link(*ports):
     """ link ports together in the current network
 
@@ -1044,4 +1061,3 @@ def link(*ports):
     """
     nw = current_network()
     nw.link(*ports)
-

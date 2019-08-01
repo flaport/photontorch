@@ -79,10 +79,14 @@ class Photodetector(Module):
 
         self.normal_cutoff = self.bandwidth / self.frequency
         if self.normal_cutoff > 1.0:
-            warnings.warn("bandwidth of the detector is bigger than its highest filter "
-                          "frequency. The detector will be disabled.")
+            warnings.warn(
+                "bandwidth of the detector is bigger than its highest filter "
+                "frequency. The detector will be disabled."
+            )
             return
-        b, a = butter(self.filter_order, self.normal_cutoff, btype="lowpass", analog=False)
+        b, a = butter(
+            self.filter_order, self.normal_cutoff, btype="lowpass", analog=False
+        )
 
         # we reverse the order of a for efficiency.
         # reversing it later is not possible, as pytorch does not allow negative step sizes.
