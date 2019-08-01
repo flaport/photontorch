@@ -637,6 +637,11 @@ class Network(Component):
                 0,
             )
             stacked = True
+        elif source.shape == (2, self.env.num_timesteps, self.env.num_wavelengths, self.num_sources):
+            source = source[:,:,:,:,None]
+            stacked = True
+        elif source.shape[:-1] == (2, self.env.num_timesteps, self.env.num_wavelengths, self.num_sources):
+            stacked = True
 
         # The source should be a tensor with ndim > 0
         if len(source.shape) == 0:
