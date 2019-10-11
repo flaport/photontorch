@@ -214,10 +214,10 @@ class Component(Module):
         """ Get the locations of the sources in the component.
 
         Returns:
-            sources_at: torch.Tensor[#ports]: a uint8 tensor where the locations of the
+            sources_at: torch.Tensor[#ports]: a bool tensor where the locations of the
                 sources are denoted by a 1.
         """
-        sources_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.uint8)
+        sources_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
         self.set_sources_at(sources_at)
         return sources_at
 
@@ -225,11 +225,11 @@ class Component(Module):
         """ Get the locations of the detectors in the component.
 
         Returns:
-            detectors_at: torch.Tensor[#ports]: a uint8 tensor where the locations of the
+            detectors_at: torch.Tensor[#ports]: a bool tensor where the locations of the
                 detectors are denoted by a 1.
         """
         detectors_at = torch.zeros(
-            self.num_ports, device=self.device, dtype=torch.uint8
+            self.num_ports, device=self.device, dtype=torch.bool
         )
         self.set_detectors_at(detectors_at)
         return detectors_at
@@ -238,10 +238,10 @@ class Component(Module):
         """ Get the locations of the active nodes in the component.
 
         Returns:
-            actions_at: torch.Tensor[#ports]: a uint8 tensor where the locations of the
+            actions_at: torch.Tensor[#ports]: a bool tensor where the locations of the
                 active nodes are denoted by a 1.
         """
-        actions_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.uint8)
+        actions_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
         self.set_actions_at(actions_at)
         return actions_at
 

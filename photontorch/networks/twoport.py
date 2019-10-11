@@ -89,17 +89,17 @@ class TwoPortNetwork(Network):
         self._num_ports = 2 * len(twoportcomponents) + len(self.terms)
 
         self.sources_at = Buffer(
-            torch.zeros(self.num_ports, dtype=torch.uint8, device=self.device)
+            torch.zeros(self.num_ports, dtype=torch.bool, device=self.device)
         )
         self.sources_at[-len(self.terms) :] = torch.tensor(sources_at)
 
         self.detectors_at = Buffer(
-            torch.zeros(self.num_ports, dtype=torch.uint8, device=self.device)
+            torch.zeros(self.num_ports, dtype=torch.bool, device=self.device)
         )
         self.detectors_at[-len(self.terms) :] = torch.tensor(detectors_at)
 
         self.actions_at = Buffer(
-            torch.zeros(self.num_ports, dtype=torch.uint8, device=self.device)
+            torch.zeros(self.num_ports, dtype=torch.bool, device=self.device)
         )
 
         self._node_delays = delays
