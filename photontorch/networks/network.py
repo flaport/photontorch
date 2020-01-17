@@ -242,10 +242,10 @@ class Network(Component):
 
         ports = [ports[0]] + [tuple(p.split(":")) for p in ports[1:-1]] + [ports[-1]]
 
-        if len(ports[1]) == 2:
+        if ports[0] is None and len(ports[1]) == 2:
             ports[1] = (None,) + ports[1]
 
-        if len(ports[-2]) == 2:
+        if ports[-1] is None and len(ports[-2]) == 2:
             ports[-2] = ports[-2] + (None,)
 
         self.links.append(tuple(ports))
