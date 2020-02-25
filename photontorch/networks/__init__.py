@@ -86,9 +86,6 @@ from .rings import AddDrop
 from .rings import RingMolecule
 from .rings import RingNetwork
 
-# Two Port Networks
-from .twoport import TwoPortNetwork
-
 # Reck Network
 from .reck import ReckMxN
 from .reck import ReckNxN
