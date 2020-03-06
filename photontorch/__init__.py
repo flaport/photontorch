@@ -9,7 +9,7 @@ neural network. This enables the use of native PyTorch optimizers to optimize th
 (physical) parameters of your circuit.
 """
 
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 
 # Test pytorch version
 import torch
