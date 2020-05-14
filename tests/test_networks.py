@@ -9,7 +9,7 @@ import pytest
 import numpy as np
 import photontorch as pt
 
-from fixtures import unw, nw, tenv, fenv, det, wg, twoportnw, rnw, reck, clements
+from fixtures import unw, nw, tenv, fenv, det, wg, rnw, reck, clements
 
 ###########
 ## Tests ##
@@ -163,36 +163,6 @@ def test_network_connection_with_equal_ports(wg):
 def test_network_connection_with_too_high_port_index(wg):
     with pytest.raises(ValueError):
         nw = pt.Network(components={"wg1": wg, "wg2": wg}, connections=["wg1:1:wg2:2"])
-
-
-def test_twoportnetwork_creation(twoportnw):
-    pass
-
-
-def test_twoportnetwork_with_delays():
-    C, _, _ = np.linalg.svd(
-        np.random.rand(5, 5) + 1j * np.random.rand(5, 5)
-    )  # random unitary matrix
-    C[range(5), range(5)] = 0  # no self connections
-    nw = pt.TwoPortNetwork(
-        twoportcomponents=[pt.Waveguide(loss=1000) for i in range(5)],
-        conn_matrix=C,
-        sources_at=[1, 0, 0, 0, 0],
-        detectors_at=[0, 0, 0, 0, 1],
-        delays=np.random.rand(5),
-    )
-
-
-def test_twoportnetwork_termination(twoportnw):
-    with pytest.raises(RuntimeError):
-        twoportnw.terminate()
-    with pytest.raises(RuntimeError):
-        twoportnw.unterminate()
-
-
-def test_twoportnetwork_initialiation(twoportnw, tenv):
-    with tenv:
-        twoportnw.initialize()
 
 
 def test_network_plot(tenv, fenv):

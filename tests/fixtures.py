@@ -96,22 +96,6 @@ def nw():
 
 
 @pytest.fixture
-def twoportnw():
-    """ default two-port network with random connection matrix """
-    C, _, _ = np.linalg.svd(
-        np.random.rand(5, 5) + 1j * np.random.rand(5, 5)
-    )  # random unitary matrix
-    C[range(5), range(5)] = 0  # no self connections
-    nw = pt.TwoPortNetwork(
-        twoportcomponents=[pt.Waveguide(length=1e-5, loss=1000) for i in range(5)],
-        conn_matrix=C,
-        sources_at=[1, 0, 0, 0, 0],
-        detectors_at=[0, 0, 0, 0, 1],
-    )
-    return nw
-
-
-@pytest.fixture
 def rnw():
     """ default ring network """
     return pt.RingNetwork(2, 6).terminate()
