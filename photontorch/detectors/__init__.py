@@ -6,3 +6,4 @@ fields.
 """
 
 from .photodetector import Photodetector
+from .photodetector import LowpassDetector

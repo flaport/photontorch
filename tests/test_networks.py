@@ -9,7 +9,7 @@ import pytest
 import numpy as np
 import photontorch as pt
 
-from fixtures import unw, nw, tenv, fenv, det, wg, rnw, reck, clements
+from fixtures import unw, nw, tenv, fenv, lpdet, wg, rnw, reck, clements
 
 ###########
 ## Tests ##
@@ -150,9 +150,9 @@ def test_forward_with_power_false(nw, tenv):
         nw(1, power=False)
 
 
-def test_forward_with_detector(nw, tenv, det):
+def test_forward_with_detector(nw, tenv, lpdet):
     with tenv:
-        nw(1, detector=det)
+        nw(1, detector=lpdet)
 
 
 def test_network_connection_with_equal_ports(wg):

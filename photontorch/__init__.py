@@ -9,7 +9,7 @@ neural network. This enables the use of native PyTorch optimizers to optimize th
 (physical) parameters of your circuit.
 """
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 
 # Test pytorch version
 import torch
@@ -96,6 +96,7 @@ from .environment.environment import current_environment
 ## Detectors
 
 from .detectors.photodetector import Photodetector
+from .detectors.photodetector import LowpassDetector
 
 
 ## PyTorch extensions

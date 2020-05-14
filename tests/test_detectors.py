@@ -6,9 +6,23 @@
 
 import torch
 import pytest
+import numpy as np
+from scipy.signal import lfilter, butter
+
 import photontorch as pt
 
-from fixtures import det
+from fixtures import lpdet
+
+
+#############
+## Helpers ##
+#############
+
+
+def scipy_detect(x, bitrate, samplerate, cutoff_frequency=20e9, filter_order=4):
+    normal_cutoff = cutoff_frequency / (0.5 * samplerate)
+    b, a = butter(N=filter_order, Wn=normal_cutoff, btype="lowpass", analog=False)
+    return lfilter(b, a, x, axis=0)
 
 
 ###########
@@ -16,24 +30,48 @@ from fixtures import det
 ###########
 
 
-def test_photodetector_creation(det):
-    pass
+def test_lowpass_detector_creation(lpdet):
+    pt.LowpassDetector(
+        bitrate=40e9, samplerate=160e9, cutoff_frequency=20e9, filter_order=4,
+    )
 
 
-def test_photodetector_a_parameter(det):
-    a = det.a
-    assert a in det._buffers.values()
-    assert a.shape[0] == det.filter_order + 1
+def test_photodetector_creation(lpdet):
+    pt.Photodetector(
+        bitrate=40e9,
+        samplerate=160e9,
+        cutoff_frequency=20e9,
+        responsivity=1.0,
+        dark_current=1e-10,
+        load_resistance=1e6,
+        filter_order=4,
+        seed=9,
+    )
 
 
-def test_photodetector_forward(det):
+def test_photodetector_a_parameter(lpdet):
+    a = lpdet.a
+    assert a in lpdet._buffers.values()
+    assert a.shape[0] == lpdet.filter_order + 1
+
+
+def test_photodetector_forward(lpdet):
+    num_bits = 20
+    num_samples_per_bit = int(lpdet.samplerate / lpdet.bitrate + 0.5)
     with torch.no_grad():
-        num_bits = 10
-        bits = torch.rand(num_bits) > 0.5
-        det = pt.Photodetector(bitrate=50e9, frequency=5 * 50e9)
-        timesteps_per_bit = int(det.frequency / det.bitrate + 0.5)
-        bitstream = torch.stack([bits] * timesteps_per_bit, -1).flatten().float()
-        detected_bitstream = det(bitstream)
+        stream = (
+            torch.stack([torch.rand(num_bits) > 0.5] * num_samples_per_bit, 1)
+            .view(-1)
+            .to(torch.get_default_dtype())
+        )
+        detected = lpdet(stream).detach().cpu().numpy()
+        detected_scipy = scipy_detect(
+            stream.detach().cpu().numpy(),
+            bitrate=lpdet.bitrate,
+            samplerate=lpdet.samplerate,
+            filter_order=lpdet.filter_order,
+        )
+        assert np.allclose(detected, detected_scipy, atol=1e-6)
 
 
 ###############

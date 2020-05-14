@@ -117,9 +117,24 @@ def clements():
 
 
 @pytest.fixture
-def det():
-    """ default detector """
-    return pt.Photodetector(bitrate=50e9)
+def lpdet():
+    return pt.LowpassDetector(
+        bitrate=40e9, samplerate=160e9, cutoff_frequency=20e9, filter_order=4,
+    )
+
+
+@pytest.fixture
+def photodet():
+    return pt.Photodetector(
+        bitrate=40e9,
+        samplerate=160e9,
+        cutoff_frequency=20e9,
+        responsivity=1.0,
+        dark_current=1e-10,
+        load_resistance=1e6,
+        filter_order=4,
+        seed=9,
+    )
 
 
 ## Connectors

@@ -11,7 +11,7 @@ import numpy as np
 import photontorch as pt
 from photontorch.networks.rings import _RingAtom
 
-from fixtures import unw, nw, tenv, fenv, det
+from fixtures import unw, nw, tenv, fenv, lpdet
 
 ###########
 ## Tests ##
