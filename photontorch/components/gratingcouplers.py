@@ -65,7 +65,7 @@ class GratingCoupler(Component):
             self.env.wavelength, device=self.device, dtype=torch.get_default_dtype()
         )
         loss = torch.sqrt(
-            self.Tmax * torch.exp(-(self.wl0 - wls) ** 2 / (2 * sigma ** 2))
+            self.Tmax * torch.exp(-((self.wl0 - wls) ** 2) / (2 * sigma ** 2))
         )
 
         S[0, :, 0, 1] = S[0, :, 1, 0] = loss

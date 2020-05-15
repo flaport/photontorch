@@ -228,9 +228,7 @@ class Component(Module):
             detectors_at: torch.Tensor[#ports]: a bool tensor where the locations of the
                 detectors are denoted by a 1.
         """
-        detectors_at = torch.zeros(
-            self.num_ports, device=self.device, dtype=torch.bool
-        )
+        detectors_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
         self.set_detectors_at(detectors_at)
         return detectors_at
 
