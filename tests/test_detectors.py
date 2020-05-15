@@ -49,18 +49,25 @@ def test_photodetector_creation(lpdet):
     )
 
 
-def test_photodetector_a_parameter(lpdet):
+def test_lowpass_detector_a_parameter(lpdet):
     a = lpdet.a
-    assert a in lpdet._buffers.values()
-    assert a.shape[0] == lpdet.filter_order + 1
+    assert a.shape[0] == lpdet.filter_order
 
 
-def test_photodetector_forward(lpdet):
-    num_bits = 20
+def test_lowpass_detector_b_parameter(lpdet):
+    b = lpdet.b
+    assert b.shape[0] == lpdet.filter_order + 1
+
+
+def test_lowpass_detector_forward(lpdet):
+    num_bits = 24
     num_samples_per_bit = int(lpdet.samplerate / lpdet.bitrate + 0.5)
     with torch.no_grad():
+        gen = torch.Generator().manual_seed(23)
         stream = (
-            torch.stack([torch.rand(num_bits) > 0.5] * num_samples_per_bit, 1)
+            torch.stack(
+                [torch.rand(num_bits, generator=gen) > 0.5] * num_samples_per_bit, 1
+            )
             .view(-1)
             .to(torch.get_default_dtype())
         )
@@ -72,6 +79,8 @@ def test_photodetector_forward(lpdet):
             filter_order=lpdet.filter_order,
         )
         assert np.allclose(detected, detected_scipy, atol=1e-6)
+        detected2 = lpdet(stream, num_splits=3).detach().cpu().numpy()
+        assert np.allclose(detected2, detected_scipy, atol=1e-2)
 
 
 ###############

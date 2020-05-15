@@ -96,7 +96,7 @@ from .environment.environment import current_environment
 ## Detectors
 
 from .detectors.photodetector import Photodetector
-from .detectors.photodetector import LowpassDetector
+from .detectors.lowpassdetector import LowpassDetector
 
 
 ## PyTorch extensions
