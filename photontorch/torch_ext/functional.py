@@ -22,6 +22,91 @@ from scipy.signal import butter, lfilter
 ###############
 
 
+class BitStreamGenerator:
+    """BitStreamGenerator: Generate a bitstream from a sequence of bits (or from a random seed)"""
+
+    def __init__(
+        self,
+        bitrate=40e9,
+        samplerate=160e9,
+        cutoff_frequency=None,
+        filter_order=4,
+        seed=None,
+        dtype=None,
+        device=None,
+    ):
+        """
+        Args:
+            bitrate: float = 40e9: [1/s] data rate of the bitstream
+            samplerate: float = 160e9: [1/s] sample rate of the bitstream
+            cutoff_frequency: float = None: [1/s] cutoff frequency of the bitstream. If None: no lowpass filtering.
+            filter_order: int = 4: filter order to enforce cutoff frequency
+            seed: int = None: seed used to generate bits (if needed)
+            dtype: torch.dtype: None: dtype to generate the bits for. None -> "torch.get_default_dtype()"
+            device: torch.device: None: device to generate the bits on. None -> "cpu"
+
+        """
+        self.bitrate = float(bitrate)
+        self.samplerate = float(samplerate)
+        self.cutoff_frequency = (
+            None if cutoff_frequency is None else float(cutoff_frequency)
+        )
+        self.filter_order = None if cutoff_frequency is None else int(filter_order)
+        self.seed = None if seed is None else int(seed)
+        self.device = torch.device("cpu") if device is None else torch.device(device)
+        self.dtype = torch.get_default_dtype() if dtype is None else dtype
+        self._rng = np.random.RandomState(seed=self.seed)
+
+    def __call__(self, bits=100):
+        """BitStreamGenerator: Generate a bitstream from a sequence of bits (or from a random seed)
+
+        Args:
+            bits = 100: int or sequence.
+                * if int: generate that number of bits, then create stream.
+                * if sequence: interpret the sequence as bits, then create stream.
+        """
+        try:
+            if len(bits.shape) == 0:
+                bits = int(bits.item())
+        except:
+            pass
+
+        if torch.is_tensor(bits):
+            bits = bits.detach().cpu().numpy()
+
+        if isinstance(bits, int):
+            bits = self._rng.rand(bits) > 0.5
+
+        bits = np.array(bits, dtype=np.float64)
+        num_samples_per_n_bits = int(self.samplerate) // np.gcd(
+            int(self.samplerate), int(self.bitrate)
+        )
+        n_bits = int(self.bitrate) // np.gcd(int(self.samplerate), int(self.bitrate))
+        stream = (
+            np.stack([bits] * num_samples_per_n_bits, 1)
+            .reshape(-1, *bits.shape[1:])[::n_bits]
+            .copy()
+        )
+
+        if self.cutoff_frequency is not None:
+            normal_cutoff = self.cutoff_frequency / (0.5 * self.samplerate)
+            if normal_cutoff > 1.0:
+                raise ValueError(
+                    "The samplerate of the signal is smaller than the nyquist "
+                    "frequency [=2 x cutoff_frequency]\n"
+                    "%.2e > %.2e" % (self.samplerate, 2 * self.cutoff_frequency)
+                )
+            if normal_cutoff < 1.0:
+                b, a = butter(
+                    N=self.filter_order, Wn=normal_cutoff, btype="lowpass", analog=False
+                )
+                stream = lfilter(b, a, stream, axis=0)
+
+        stream = torch.tensor(stream, dtype=self.dtype, device=self.device)
+
+        return stream
+
+
 class MSELoss(torch.nn.Module):
     """ Mean Squared Error for bitstreams """
 
