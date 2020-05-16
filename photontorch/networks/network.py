@@ -561,7 +561,9 @@ class Network(Component):
         self.buffermask = torch.zeros(
             (2, int(self._delays.max()) + 1, 1, self.nmc, 1), device=self.device
         )
-        self.buffermask[:, self._delays - 1, :, range(self.nmc), :] = 1.0 # delay == 1 -> index 0
+        self.buffermask[
+            :, self._delays - 1, :, range(self.nmc), :
+        ] = 1.0  # delay == 1 -> index 0
 
         self.initialized = True
 

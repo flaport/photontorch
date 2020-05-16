@@ -40,3 +40,8 @@ from .autograd import block_diag
 
 ## Custom Tensor Functions
 from .tensor import where
+
+# custom functional additions
+from .functional import BERLoss
+from .functional import MSELoss
+from .functional import BitStreamGenerator

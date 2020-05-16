@@ -62,8 +62,8 @@ class LowpassDetector(torch.nn.Module):
     ):
         """
         Args:
-            bitrate: float = 50e9: [1/s] data rate of the signal to filter
-            samplerate: float = 80e9: [1/s] sample rate of the signal to filter
+            bitrate: float = 40e9: [1/s] data rate of the signal to filter
+            samplerate: float = 160e9: [1/s] sample rate of the signal to filter
             cutoff_frequency: float = 25e9: [1/s] cutoff frequency of the detector
             filter_order: int = 4: filter order of the butter filter
         """
@@ -72,26 +72,23 @@ class LowpassDetector(torch.nn.Module):
         self.samplerate = float(samplerate)
         self.cutoff_frequency = float(cutoff_frequency)
         self.filter_order = int(filter_order + 0.5)
-        normal_cutoff = 2 * self.cutoff_frequency / self.samplerate
-        if normal_cutoff > 1.0:
+        self.normal_cutoff = 2 * self.cutoff_frequency / self.samplerate
+
+        if self.normal_cutoff == 1.0:
+            return
+
+        if self.normal_cutoff > 1.0:
             raise ValueError(
-                "The samplerate of the photodetector is smaller than the nyquist "
+                "The samplerate of the signal is smaller than the nyquist "
                 "frequency [=2 x cutoff_frequency]\n"
                 "%.2e > %.2e" % (self.samplerate, 2 * self.cutoff_frequency)
             )
 
         # set filter parameters:
-        b, a = butter(self.filter_order, normal_cutoff, btype="lowpass", analog=False)
-        self.register_buffer(
-            "a",
-            torch.tensor(a[::-1, None].copy()[:-1], dtype=torch.get_default_dtype()),
-        )
-        self.register_buffer(
-            "b", torch.tensor(b[::-1, None].copy(), dtype=torch.get_default_dtype())
-        )
-        # get filter parameters:
         dtype = torch.get_default_dtype()
-        b, a = butter(self.filter_order, normal_cutoff, btype="lowpass", analog=False)
+        b, a = butter(
+            self.filter_order, self.normal_cutoff, btype="lowpass", analog=False
+        )
         self.register_buffer("a", torch.tensor(a[::-1, None].copy()[:-1], dtype=dtype))
         self.register_buffer("b", torch.tensor(b[::-1, None].copy(), dtype=dtype))
 
@@ -116,6 +113,9 @@ class LowpassDetector(torch.nn.Module):
         """
         if signal.shape[0] == 2:  # complex valued signal (photontorch convention)
             signal = signal[0] ** 2 + signal[1] ** 2  # amplitude -> power
+
+        if self.normal_cutoff == 1.0:
+            return signal
 
         # reshape to (# detected streams, # timesteps)
         original_shape = signal.shape  #

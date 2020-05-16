@@ -109,3 +109,8 @@ from .torch_ext import nn
 
 # tensor
 from .torch_ext.tensor import where
+
+# custom functional additions
+from .torch_ext.functional import BERLoss
+from .torch_ext.functional import MSELoss
+from .torch_ext.functional import BitStreamGenerator
