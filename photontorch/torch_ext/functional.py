@@ -109,8 +109,36 @@ class BitStreamGenerator:
         return stream
 
 
-class MSELoss(torch.nn.Module):
-    """ Mean Squared Error for bitstreams """
+def _broadcast_prediction_target(prediction, target):
+    """ broadcast prediction and target in identical shapes
+
+    Args:
+        prediction (Tensor): prediction
+        target (Tensor): target
+
+    Returns:
+        prediction and target in the same shape
+
+    """
+    if not torch.is_tensor(prediction):
+        prediction = torch.tensor(prediction)
+    if not torch.is_tensor(target):
+        target = torch.tensor(target, dtype=prediction.dtype, device=prediction.device)
+    target = target.to(dtype=prediction.dtype, device=prediction.device)
+
+    while len(prediction.shape) < 4:
+        prediction = prediction[:, None]
+    while len(target.shape) < 4:
+        target = target[:, None]
+    try:
+        prediction, target = torch.broadcast_tensors(prediction.clone(), target.clone())
+    except RuntimeError:
+        raise RuntimeError("failed to broadcast target in the same shape as prediction")
+    return prediction, target
+
+
+class _Loss(torch.nn.Module):
+    """ Base class for loss function extensions. """
 
     def __init__(self, latency=0.0, warmup=0, bitrate=40e9, samplerate=160e9):
         """
@@ -120,7 +148,7 @@ class MSELoss(torch.nn.Module):
             bitrate (float): the bit rate of the signal [in Hz]
             samplerate (float): the sample rate of the signal [in Hz]
         """
-        super(MSELoss, self).__init__()
+        super(_Loss, self).__init__()
         self.bitrate = float(bitrate)
         self.samplerate = float(samplerate)
         self.latency = float(latency)
@@ -135,39 +163,82 @@ class MSELoss(torch.nn.Module):
         bitrate=None,
         samplerate=None,
     ):
-        """ Mean Squared Error for bitstreams
+        """ Calculate loss
         Args:
-            prediction (Tensor): 4D output power tensor with shape (# timesteps, # wavelengths, # readouts, # batches)
+            prediction (Tensor): prediction power tensor. Should be broadcastable to tensor with shape (# timesteps, # wavelengths, # readouts, # batches)
             target (Tensor): target power tensor. Should be broadcastable to the same shape as prediction.
-            **kwargs: all keyword arguments can be used to temporary override values given during the MSEloss initialization.
+            latency (optional, float): override fractional latency [in bit lengths]. This value can be a floating point number bigger than 1.
+            warmup (optional, int): override integer number of warmup bits. warmup bits are disregarded during the loss calculation.
+            bitrate (optional, float): override the bit rate of the signal [in Hz]
+            samplerate (optional, float): override the sample rate of the signal [in Hz]
         """
+        raise NotImplementedError(
+            "Implement forward function for your loss by subclassing."
+        )
+
+    def plot(
+        self,
+        x,
+        latency=None,
+        warmup=None,
+        bitrate=None,
+        samplerate=None,
+        unit="ns",
+        show=False,
+        **kwargs
+    ):
+        """ Plot prediction and target
+        Args:
+            x (Tensor): Should be broadcastable to tensor with shape (# timesteps, # wavelengths, # readouts, # batches)
+            warmup (optional, int): override integer number of warmup bits. warmup bits are not shown on the plot.
+            bitrate (optional, float): override the bit rate of the signal [in Hz]
+            samplerate (optional, float): override the sample rate of the signal [in Hz]
+            unit (str): unit to use for time array (time values will be multiplied accordingly)
+            show (bool): run plt.show at the end of this method.
+            **kwargs: keyword arguments given to plt.plot.
+        """
+        import matplotlib.pyplot as plt
+
         bitrate = self.bitrate if bitrate is None else float(bitrate)
         samplerate = self.samplerate if samplerate is None else float(samplerate)
         latency = self.latency if latency is None else float(latency)
         warmup = self.warmup if warmup is None else int(warmup + 0.5)
+        x, _ = _broadcast_prediction_target(x, x)
+        x = x.view(x.shape[0], -1)
 
-        if not torch.is_tensor(prediction):
-            prediction = torch.tensor(prediction)
-        if not torch.is_tensor(target):
-            target = torch.tensor(
-                target, dtype=prediction.dtype, device=prediction.device
-            )
-        target = target.to(dtype=prediction.dtype, device=prediction.device)
+        # delay sequences with warmup and latency
+        l = int(latency * samplerate / bitrate + 0.5)  # latency sample points
+        w = int(int(warmup + 0.5) * samplerate / bitrate + 0.5)  # warmup sample points
+        x = x[w + l : :]
 
-        while len(prediction.shape) < 4:
-            prediction = prediction[:, None]
-        while len(target.shape) < 4:
-            target = target[:, None]
-        try:
-            prediction, target = torch.broadcast_tensors(
-                prediction.clone(), target.clone()
-            )
-        except RuntimeError:
-            raise RuntimeError(
-                "failed to broadcast target in the same shape as prediction"
-            )
+        time = np.arange(x.shape[0]) / samplerate
+        units = {"s": 0, "ms": 3, "μs": 6, "ns": 9, "ps": 12, "fs": 15}
+        unit = unit.replace("u", "μ")
+        if unit not in units:
+            unit = "ns"
+        factor = 10 ** units[unit]
+        p = plt.plot(time * factor, x.data.cpu().numpy(), **kwargs)
+        plt.xlabel("t [%s]" % unit)
+        return p
 
-        nt, _, _, _ = prediction.shape
+
+class MSELoss(_Loss):
+    """ Mean Squared Error for bitstreams """
+
+    def forward(
+        self,
+        prediction,
+        target,
+        latency=None,
+        warmup=None,
+        bitrate=None,
+        samplerate=None,
+    ):
+        bitrate = self.bitrate if bitrate is None else float(bitrate)
+        samplerate = self.samplerate if samplerate is None else float(samplerate)
+        latency = self.latency if latency is None else float(latency)
+        warmup = self.warmup if warmup is None else int(warmup + 0.5)
+        prediction, target = _broadcast_prediction_target(prediction, target)
 
         # delay sequences with warmup and latency
         l = int(latency * samplerate / bitrate + 0.5)  # latency sample points
@@ -186,7 +257,7 @@ class MSELoss(torch.nn.Module):
         return error
 
 
-class BERLoss(torch.nn.Module):
+class BERLoss(_Loss):
     """ Bit Error Rate (non-differentiable)"""
 
     def __init__(
@@ -200,12 +271,10 @@ class BERLoss(torch.nn.Module):
             bitrate (float): the bit rate of the signal [in Hz]
             samplerate (float): the sample rate of the signal [in Hz]
         """
-        super(BERLoss, self).__init__()
+        super(BERLoss, self).__init__(
+            latency=latency, warmup=warmup, bitrate=bitrate, samplerate=samplerate
+        )
         self.threshold = float(threshold)
-        self.bitrate = float(bitrate)
-        self.samplerate = float(samplerate)
-        self.latency = float(latency)
-        self.warmup = int(warmup + 0.5)
 
     def forward(
         self,
@@ -217,41 +286,25 @@ class BERLoss(torch.nn.Module):
         bitrate=None,
         samplerate=None,
     ):
-        """ Bit Error Rate (non-differentiable)
+        """ Calculate loss
         Args:
-            prediction (Tensor): 4D output power tensor with shape (# timesteps, # wavelengths, # readouts, # batches)
+            prediction (Tensor): prediction power tensor. Should be broadcastable to tensor with shape (# timesteps, # wavelengths, # readouts, # batches)
             target (Tensor): target power tensor. Should be broadcastable to the same shape as prediction.
-            **kwargs: all keyword arguments can be used to temporary override values given during the BERLoss initialization.
+            threshold (optional, float): override threshold value (where to place the 0/1 threshold)
+            latency (optional, float): override fractional latency [in bit lengths]. This value can be a floating point number bigger than 1.
+            warmup (optional, int): override integer number of warmup bits. warmup bits are disregarded during the loss calculation.
+            bitrate (optional, float): override the bit rate of the signal [in Hz]
+            samplerate (optional, float): override the sample rate of the signal [in Hz]
         """
-        threshold = self.threshold if threshold is None else float(threshold)
-        bitrate = self.bitrate if bitrate is None else float(bitrate)
-        samplerate = self.samplerate if samplerate is None else float(samplerate)
-        latency = self.latency if latency is None else float(latency)
-        warmup = self.warmup if warmup is None else int(warmup + 0.5)
-
-        if not torch.is_tensor(prediction):
-            prediction = torch.tensor(prediction)
-        if not torch.is_tensor(target):
-            target = torch.tensor(
-                target, dtype=prediction.dtype, device=prediction.device
-            )
-        target = target.to(dtype=prediction.dtype, device=prediction.device)
-
         with torch.no_grad():
-            while len(prediction.shape) < 4:
-                prediction = prediction[:, None]
-            while len(target.shape) < 4:
-                target = target[:, None]
-            try:
-                prediction, target = torch.broadcast_tensors(
-                    prediction.clone(), target.clone()
-                )
-            except RuntimeError:
-                raise RuntimeError(
-                    "failed to broadcast target in the same shape as prediction"
-                )
+            threshold = self.threshold if threshold is None else float(threshold)
+            bitrate = self.bitrate if bitrate is None else float(bitrate)
+            samplerate = self.samplerate if samplerate is None else float(samplerate)
+            latency = self.latency if latency is None else float(latency)
+            warmup = self.warmup if warmup is None else int(warmup + 0.5)
+            prediction, target = _broadcast_prediction_target(prediction, target)
 
-            nt, nw, nd, nb = prediction.shape
+            _, nw, nd, nb = prediction.shape
 
             # always normalize target around 0 (this way we don't need to care about how the target bits are defined [0,1] or [-1, 1] or smth else)
             target -= target.mean(0)
