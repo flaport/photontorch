@@ -1,6 +1,4 @@
-"""
-
-The clements module implements a unitary matrix network based on the Clements network
+""" unitary matrix network based on the Clements network
 
 
 Reference:
@@ -41,6 +39,17 @@ class _MixingPhaseArray(Network):
         trainable=True,
         name=None,
     ):
+        """
+        Args:
+            phases: array of phases to implement with photonic components.
+            length (float): length of the waveguides in the network in meters.
+            loss (float): loss in the ring (dB/m).
+            neff (float): effective index of the waveguides
+            ng (float): group index of the waveguides
+            wl0 (flota): center wavelength for th effective index in the waveguides
+            trainable (bool): make parameters in the network trainable
+            name (str): name of the component
+        """
         N = phases.shape[0]
         num_mzis = N // 2
         components = {}
@@ -76,7 +85,7 @@ class _MixingPhaseArray(Network):
 
 
 class _Capacity2ClemensNxN(Network):
-    r""" Helper network for ClementsNxN
+    r""" Helper network for ClementsNxN::
 
         <- cap==2 ->
         0__  ______0
@@ -100,6 +109,17 @@ class _Capacity2ClemensNxN(Network):
         trainable=True,
         name=None,
     ):
+        """
+        Args:
+            N (int): number of input waveguides (= number of output waveguides)
+            length (float): length of the waveguides in the network in meters.
+            loss (float): loss in the ring (dB/m).
+            neff (float): effective index of the waveguides
+            ng (float): group index of the waveguides
+            wl0 (flota): center wavelength for th effective index in the waveguides
+            trainable (bool): make parameters in the network trainable
+            name (str): name of the component
+        """
         num_mzis = N - 1
 
         # define components
@@ -160,9 +180,10 @@ class _Capacity2ClemensNxN(Network):
 
 
 class ClementsNxN(Network):
-    r""" A unitary matrix network based on the Clements network.
+    r""" A unitary matrix network based on the Clements architecture.
 
-    Network:
+    Network::
+
          <--- capacity --->
         0__  ______  ______[]__0
            \/      \/
@@ -196,14 +217,15 @@ class ClementsNxN(Network):
         name=None,
     ):
         """
-        N: int = 2: number of input / output ports (the network represents an NxN matrix)
-        length: float = 1e-5: length of the waveguides in the network,
-        loss: float = 0: loss of the waveguides in the network,
-        neff: float = 2.34: effective index of the waveguides in the network,
-        ng: float = None: group index of the waveguides in the network,
-        wl0: float = 1.55e-6: center wavelength of the waveguides in the network,
-        trainable: bool = True: makes the MZIs in the network trainable
-        name: str = None: the name of the network (default: lowercase classname)
+        Args:
+            N (int): number of input / output ports (the network represents an NxN matrix)
+            length (float): length of the waveguides in the network,
+            loss (float): loss of the waveguides in the network,
+            neff (float): effective index of the waveguides in the network,
+            ng (float): group index of the waveguides in the network,
+            wl0 (float): center wavelength of the waveguides in the network,
+            trainable (bool): makes the MZIs in the network trainable
+            name (str): the name of the network (default: lowercase classname)
         """
         if capacity is None:
             capacity = N
@@ -251,11 +273,15 @@ class ClementsNxN(Network):
         super(ClementsNxN, self).__init__(components, connections, name=name)
 
     def terminate(self, term=None):
-        """ add sources to input nodes and detectors to output nodes
+        """ Terminate open conections with the term of your choice
 
         Args:
-            term: Term = None. Term to use for termination. Defaults to sources for
-                input nodes, detectors for output nodes
+            term: (Term|list|dict): Which term to use. Defaults to Term. If a
+                dictionary or list is specified, then one needs to specify as
+                many terms as there are open connections.
+
+        Returns:
+            terminated network with sources on the left and detectors on the right.
         """
         if term is None:
             term = [Source(name="s%i" % i) for i in range(self.N)]

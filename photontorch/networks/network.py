@@ -1,75 +1,21 @@
-r"""
-# PhotonTorch Network
+""" Photontorch network
 
-The Network is the core of Photontorch. This is where everything comes together.
-The Network is a special kind of torch.nn.Module, where all subcomponents are
-automatically initialized and connected in the right way.
+The Network is the core of Photontorch: it is where everything comes together.
 
-## A note on the S- and C-matrix reduction performed during Network.initialize:
-Each component can be described in terms of it's S matrix. For such a component,
-we have that the output fields \(\bf x_{\rm out}\) are connected to the input fields
-\(x_{\rm in}\) through a scattering matrix:
-```math
-x_{\rm out} = S \cdot x_{\rm in}
-```
-For a network of components, the field vectors \(x\) will just be stacked on top of each other,
-and the S-matrix will just be the block-diagonal matrix of the S-matrices of the
-individual components. However, to connect the output fields to each other, we need
-a connection matrix, which connects the output fields of the individual components
-to input fields of other components in the fields vector \(x\):
-```math
-x_{\rm in} = C \cdot x_{\rm out}
-```
-a simulation (without delays) can thus simply be described by:
-```math
-x(t+1) = C\cdot S\cdot x(t)
-```
-However, when delays come in the picture, the situation is a bit more complex. We then
-split the fields vector \(x\) in a memory_containing part (mc) and a memory-less part (ml):
-```math
-\begin{pmatrix}x^{\rm mc} \\x^{\rm ml} \end{pmatrix}(t+1) =
-\begin{pmatrix} C^{\rm mcmc} & C^{\rm mcml} \\ C^{\rm mlmc} & C^{\rm mlml} \end{pmatrix}
-\begin{pmatrix} S^{\rm mcmc} & S^{\rm mcml} \\ S^{\rm mlmc} & S^{\rm mlml} \end{pmatrix}
-\cdot\begin{pmatrix}x^{\rm mc} \\x^{\rm ml} \end{pmatrix}(t)
-```
-Usually, we are only interested in the memory-containing nodes, as memory-less nodes
-should be connected together and act all at once. After some matrix algebra we arrive at
-```math
-\begin{align}
-x^{\rm mc}(t+1) &= \left( C^{\rm mcmc} + C^{\rm mcml}\cdot S^{\rm mlml}\cdot
-\left(1-C^{\rm mlml}S^{\rm mlml}\right)^{-1} C^{\rm mlmc}\right)S^{\rm mcmc} x^{\rm mc}(t) \\
-&= C^{\rm red} x^{\rm mc}(t),
-\end{align}
-```
-Which defines the reduced connection matrix used in the simulations.
-
-## A note on complex matrix inverse
-
-PyTorch still does not allow complex valued Tensors. Therefore, the above equation was
-completely rewritten with matrices containing the real and imaginary parts.
-This would be fairly straightforward if it were not for the matrix inverse in the
-reduced connection matrix:
-```math
-P^{-1} = \left(1-C^{\rm mlml}S^{\rm mlml}\right)^{-1}
-```
-
-unfortunately for complex matrices \(P^{-1} \neq {\rm real}(P)^{-1} + i{\rm imag}(P)^{-1}\),
-the actual case is a bit more complicated.
-
-It is however, pretty clear from the equations that the \({\rm real}(P)^{-1}\) will always
-exist, and thus we can write for the real and imaginary part of \(P^{-1}\):
+A network is created by subclassing it and linking its components together,
+like so: ::
 
 
-```math
-\begin{align}
-{\rm real}(P^{-1}) &= \left({\rm real}(P) + {\rm imag}(P)\cdot {\rm real}(P)^{-1}
-\cdot {\rm imag}(P)\right)^{-1}\\
-{\rm real}(P^{-1}) &= -{\rm real}(P^{-1})\cdot {\rm imag}(P) \cdot {\rm real}(P)^{-1}
-\end{align}
-```
-This equation is valid, even if \({\rm imag}(P)^{-1}\) does not exist.
+    class Circuit(Network):
+        def __init__(self):
+            self.src = pt.Source()
+            self.det = pt.Detector()
+            self.wg = pt.Waveguide()
+            self.link("src:0", "0:wg:1", "0:det")
+    circuit = Circuit()
 
 """
+
 
 #############
 ## Imports ##
@@ -100,6 +46,7 @@ from ..environment import current_environment
 ## Globals ##
 #############
 _current_networks = deque()
+""" a deque of networks currently being defined with a with-block """
 
 
 #############
@@ -110,17 +57,18 @@ _current_networks = deque()
 class Network(Component):
     """ a Network (circuit) of Components
 
-    The Network is the core of Photontorch. This is where everything comes together.
-    The Network is a special kind of torch.nn.Module, where all subcomponents are
-    automatically initialized and connected in the right way.
-
-    It's two core method's are `initialize` and `forward`.
+    The Network is the core of Photontorch. This is where everything comes
+    together.  The Network is a special kind of torch.nn.Module, where all
+    subcomponents are automatically initialized and connected in the right way.
 
     """
 
     # components and connections are defined here for easy subclassing
     components = None
+    """ dictionary containing all the components of the network """
+
     connections = None
+    """ list containing all the connection of the network """
 
     # dedicated plotting methods for plotting detected power
     from .visualize import plot, graph
@@ -128,6 +76,7 @@ class Network(Component):
     # network properties
     @property
     def num_ports(self):
+        """ number of ports in the network """
         return sum(comp.num_ports for comp in self.components.values())
 
     # Network creation methods
@@ -140,23 +89,43 @@ class Network(Component):
         """ Network initialization
 
         Args:
-            components: dict = {}: a dictionary containing the components of the network.
+            components (dict): a dictionary containing the components of the network.
                 keys: str: new names for the components (will override the component name)
                 values: Component: the component
-            connections: list = []: a list containing the connections of the network.
-                the connection string can have two formats:
-                    1. "comp1:port1:comp2:port2": signifying a connection between ports
-                       (always reflexive)
-                    2. "comp:port:output_port": signifying a connection to an output port index
-            name: str = None: name of the network
-            deepcopy: bool = False: if a deepcopy of the components should be taken
+            connections (list): a list containing the connections of the network.
+                the connection string can have two formats: 1. "comp1:port1:comp2:port2": signifying a connection between ports
+                (always reflexive) 2. "comp:port:output_port": signifying a connection to an output port index
+            name (str): name of the network
+            deepcopy (bool): if a deepcopy of the components should be taken
                 before the components are registered to the network.
 
         Note:
-            be careful not to repeat keys in your component dictionary.
+            Although it's possible to initialize the network with a list of
+            components and a list of connections. It's a lot easier to create a
+            network with subclassing. For example::
+
+                class Circuit(Network):
+                    def __init__(self):
+                        self.src = pt.Source()
+                        self.det = pt.Detector()
+                        self.wg = pt.Waveguide()
+                        self.link("src:0", "0:wg:1", "0:det")
+                circuit = Circuit()
 
         Note:
-            the final order of the components is determined by the order of the connections
+            If quick creation of a network is desired, a network can also be
+            created with a with-block::
+
+                with pt.Network() as circuit:
+                    circuit.src = pt.Source()
+                    circuit.det = pt.Detector()
+                    circuit.wg = pt.Waveguide()
+                    circuit.link("src:0", "0:wg:1", "0:det")
+
+            However, creating networks by subclassing is often preferred as
+            multiple instances of the network can easily be created after the
+            network class is defined.
+
         """
 
         # initial network initialization without calculating the necessary buffers
@@ -186,7 +155,21 @@ class Network(Component):
         """ Add a component to the network
 
         Pytorch requires submodules to be registered as attributes of a module.
-        This method register a component as a torch modules in the _modules dictionary.
+        This method register a component as a torch module in the _modules
+        dictionary.
+
+        Args:
+            name (str): name of the component to add to the network
+            copy (bool): copy the component before adding.
+
+        Note:
+            the following two lines are equivalent::
+
+                nw.wg = pt.Waveguide()
+                nw.add_component("wg", pt.Waveguide())
+
+            The first one is often preferred for simple networks, whereas the
+            latter can be useful when components are created in a loop.
         """
         if self.components is None:
             raise RuntimeError("Network not yet initialized.")
@@ -211,20 +194,19 @@ class Network(Component):
 
         Args:
             *ports: the ports to link together. The first and last port can be an integer
-            to specify the ordering of the network ports.
+                to specify the ordering of the network ports.
 
         Note:
-            if more than two ports are specified, then the intermediate ports should be
-            of the 'double port' type (i.e. "idx1:comp_name:idx2"). The first index will
-            connect to the port before; the second index will connect to the port
-            after.
+            if more than two ports are specified, then the intermediate ports
+            should be of the 'double port' type (i.e. ``idx1:comp_name:idx2``).
+            The first index will connect to the port before; the second index
+            will connect to the port after.
 
         Example:
             >>> with pt.Network() as nw:
             >>>     nw.dc = pt.DirectionalCoupler()
             >>>     nw.wg = pt.Waveguide()
             >>>     nw.link(0, '0:dc:2','0:wg:1','3:dc:1', 1)
-
 
         """
 
@@ -286,7 +268,7 @@ class Network(Component):
 
     # helper function to link components together
     def _get_used_component_names(self):
-        """ Get which components are already used in a connection """
+        """ get names of components that are actually used in the network's connections """
 
         def is_int(s):
             try:
@@ -311,6 +293,7 @@ class Network(Component):
 
     # helper function to link components together:
     def _register_connections(self):
+        """ create connection matrix from the network's list of connections """
         # get the registered modules from the network:
         modules = self._modules
 
@@ -330,13 +313,19 @@ class Network(Component):
 
     # terminate a network
     def terminate(self, term=None, name=None):
-        """
-        Terminate open conections with the term of your choice
+        """ Terminate open conections with the term of your choice
 
         Args:
-            term: Term | list | dict = None: A dictionary containing the terms to use
-                Which term to use. Defaults to Term. If a dictionary or list is specified,
-                then one needs to specify as many terms as there are open connections.
+            term: (Term|list|dict): Which term to use. Defaults to Term. If a
+                dictionary or list is specified, then one needs to specify as
+                many terms as there are open connections.
+
+        Returns:
+            terminated network.
+
+        Note:
+            the original (unterminated) network is always available with the
+            ``.base`` attribute of the terminated network.
         """
         n = len(self.free_idxs)
         if n == 0:
@@ -368,49 +357,55 @@ class Network(Component):
 
     # undo a termination of a network:
     def unterminate(self):
-        """ remove termination of network """
+        """ remove termination of network
+
+        Returns:
+            unterminated network.
+        """
         return self.base
 
     # Methods to prepare for simulation
     # ---------------------------------
 
     def initialize(self):
-        r""" Initialize
-        Initializer of the network. The initializer should be called before
-        doing any simulation (forward pass through the network). It creates all the
-        internal variables necessary.
+        r""" Initializer of the network.
 
-        Args:
-            env (Environment): Simulation environment.
+        The goal of this initialization is to split the network into
+        memory-containing nodes (nodes that introduce delay, sources,
+        detectors, active components...) and memory-less nodes.  A matrix
+        reduction method is then applied to remove the memory-less nodes from
+        the S-matrix and C-matrix. It is with these reduced matrices that the
+        simulation will then be performed.
 
-        The Initializer should in principle also be called after every training Epoch to
-        update the parameters of the network.
-
-        The goal of this initialization is to split the network into memory-containing nodes
-        (nodes that introduce delay, sources, detectors, ...) and memory-less nodes.
-        A matrix reduction method is then applied to remove the memory-less nodes from the
-        S-matrix and C-matrix. It is with these reduced matrices that the simulation will
-        then be performed.
-
-        The resulting reduced matrices will also be reordered, such that source nodes
-        will be the first nodes and detector nodes will be the last nodes. This is done
-        purely for ease of access afterwards.
+        The resulting reduced matrices will also be reordered, such that source
+        nodes will be the first nodes of the network and detector nodes will be
+        the last nodes. This is done for performance reasons during simulation,
+        but has the added benefit of easier access to the results afterwards.
 
         Note:
-            during initialization, the reduced connection matrix is calculated for all
-            batches and for all wavelengths. This is a quite lengthy calculation, because
-            the matrices need to be (batch) multiplied in the right way. Below, you can find
-            the equation for the reduced connection matrix if you get lost:
-            ```math
-            C^{\rm red} = \left(1-C^{\rm mlml}S^{\rm mlml}\right)^{-1} C^{\rm mlmc}
-            ```
+            during initialization, the reduced connection matrix is calculated
+            for all batches and for all wavelengths. This is a quite lengthy
+            calculation, because the matrices need to be (batch) multiplied in
+            the right way. Below, you can find the equation for the reduced
+            connection matrix if you get lost:
+
+            .. math::
+
+                C^{\rm red} = \left(1-C^{\rm mlml}S^{\rm mlml}\right)^{-1} C^{\rm mlmc}
 
         Note:
-            During initialization, it will be checked if the network is fully connected.
-            If the network is not fully connected, the initialization will not be finalized.
-            (and the self.initialized flag will remain False). This is to speed up
-            the initialization of nested networks, where only the top level needs to be
-            fully initialized.
+            Before any initialization can happen, all the ports of the
+            comonents of the network need to be interconnected: the network
+            needs to be fully connected (terminated). If the network is not
+            fully connected, the initialization will silently fail.  This is to
+            speed up the initialization of nested networks, where only the top
+            level needs to be fully initialized.
+
+        Note:
+            Usually, calling ``initialize`` directly is not necessary.
+            ``Network.forward`` calls ``initialize`` automatically. It could however
+            be useful to call ``initialize`` if you want access to the reduced
+            matrices (without needing the response of the network to an input signal).
         """
 
         ## get current environment
@@ -571,16 +566,14 @@ class Network(Component):
         return self
 
     def simulation_buffer(self, num_batches):
-        """ Create buffer to keep the hidden states of the Network (RNN)
+        """ Create cyclic buffer to keep the time-delayed states of the network.
 
         Args:
-            num_batches: int: number of batches to create the buffer for
+            num_batches (int): number of batches to create the buffer for
 
         Returns:
-            buffer: torch.Tensor[2, #timesteps, #wavelengths, #mc nodes, num_batches]
+            torch.Tensor[2, #timesteps, #wavelengths, #mc nodes, num_batches]
 
-        Note:
-            obviously, this is a different buffer than a Model Buffer.
         """
         buffer = torch.zeros(
             (
@@ -595,7 +588,7 @@ class Network(Component):
         return buffer
 
     def handle_source(self, source, axes=None):
-        """ bring a source in a usable form
+        """ bring a source tensor in a usable form.
 
         the .forward method ideally expects an input source of shape
         source.shape == (2, #timesteps, #wavelengths, #mc nodes, #batches)
@@ -605,23 +598,25 @@ class Network(Component):
         expected format.
 
         Args:
-            source: torch.Tensor: the input tensor to be brought in the expected format
+            source (Tensor): the input tensor to be brought in the expected format
                 for the forward pass
-            axes: str = None: the "priority" order of the axes. If a certain input
-                array has to be expanded to more dimensions, it is often ambiguous which
+            axes (str): the "priority" order of the axes. If a certain input
+                tensor has to be expanded to more dimensions, it is often ambiguous which
                 dimensions (axes) are already present. You can override the default
                 priority (which can change with the type of environment used) by specifying
-                a list of axes present. Allowed characters to use are:
-                    t: time axis
-                    w: wavelength axis
-                    s: source axis
-                    b: batch axis
+                a list of axes present. Allowed characters to use are: - t:
+                time axis; - w: wavelength axis; - s: source axis; - b: batch axis
 
         Example:
             >>> src = torch.random.randn(num_batches, num_timesteps)
             >>> new_src = nw.handle_source(src, axes="bt")
             >>> new_src.shape == (2, num_timesteps, num_wavelengths, num_mc_nodes, num_batches)
             True
+
+        Note:
+            Usually, calling ``handle_source`` directly is not necessary.
+            ``Network.forward`` calls ``handle_source`` and accepts the same
+            keyword arguments.
 
         """
         stacked = False
@@ -781,26 +776,31 @@ class Network(Component):
         return source
 
     def forward(self, source=1.0, power=True, detector=None, axes=None):
-        """
-        Forward pass of the network.
+        """ Forward pass of the network.
 
         Args:
-            source: torch.Tensor: should ideally be a float tensor of shape
+            source (Tensor): should ideally be a float tensor of shape
                 (2 = (real|imag), #time, #wavelength, #sources, #batches)
-                if the tensor shape does not match the ideal shape, photontorch will try
-                to be smart enough to cast the tensor in the right shape.
-
-            power: bool = True: choose to return the power as output or the complex
+                if the tensor shape does not match the ideal shape, photontorch will attempt
+                to infer the intended shape. This might fail.
+            axes (str): the "priority" order of the axes. If a certain input
+                tensor has to be expanded to more dimensions, it is often ambiguous which
+                dimensions (axes) are already present. You can override the default
+                priority (which can change with the type of environment used) by specifying
+                a list of axes present. Allowed characters to use are: - t:
+                time axis; - w: wavelength axis; - s: source axis; - b: batch axis
+            power (bool): choose to return the power as output or the complex
                 valued fields. In the latter case, the complex components will be stacked
                 along the first dimension (PyTorch does not support complex tensors (yet))
-
-            detector: Detector = None: pass an extra detector instance to detect the fields
+            detector (Detector|callable): pass an extra detector instance to detect the fields
 
         Returns:
-            detected: torch.Tensor: a tensor containin the the detected fields. This
-                tensor has shape
-                    (# time, # wavelengths, # detectors, # batches) if power==True
-                 or (2 = (real|imag), # time, # wavelengths, # detectors, # batches) if power==False
+            a tensor containing the the detected fields. This tensor has shape
+            ``(# time, # wavelengths, # detectors, # batches)``
+            if ``power==True`` or
+            ``(2 = (real|imag), # time, # wavelengths, # detectors, # batches)``
+            if ``power==False``
+
         """
 
         # reinitialize the network if the current environment does not correspond
@@ -846,12 +846,12 @@ class Network(Component):
 
         Args:
             t (float): the time of the simulation
-            srcvalue (torch.tensor): The source value at the next timestep
-            buffer (torch.tensor): The internal state of the network
+            srcvalue (Tensor): The source value at the next timestep
+            buffer (Tensor): The internal state of the network
 
         Returns:
-            detected (torch.tensor): The detected fields
-            buffer (torch.tensor): The internal state of the network after the step
+            detected (Tensor): The detected fields
+            buffer (Tensor): The internal state of the network after the step
         """
         # get state
         rx, ix = torch.sum(self.buffermask * buffer, dim=1)
@@ -891,7 +891,7 @@ class Network(Component):
         return detected, buffer
 
     def action(self, t, x_in, x_out):
-        """ The action of the active components on the network """
+        """ Perform the action of an active components in the network """
         x_out[:] = x_in[:]
 
         idxs = self.action_idxs
@@ -918,16 +918,16 @@ class Network(Component):
         return torch.cat([comp.actions_at for comp in self.components.values()])
 
     def get_S(self):
-        """ Get the combined S-matrix of all the components in the network """
+        """ get the combined S-matrix of all the components in the network """
         rS = block_diag(*(comp.S[0] for comp in self.components.values()))
         iS = block_diag(*(comp.S[1] for comp in self.components.values()))
         return torch.stack([rS, iS])
 
     def get_C(self):
-        """ Combined Connection matrix of all the components in the network
+        """ get the combined connection matrix of all the components in the network
 
         Returns:
-            torch.FloatTensor with only 1's and 0's.
+            binary tensor with only 1's and 0's.
 
         Note:
             To create the connection matrix, the connection strings are parsed.
@@ -1006,6 +1006,7 @@ class Network(Component):
         return order
 
     def __setattr__(self, name, attr):
+        """ set attributes of the network """
         if isinstance(attr, Component):
             self.add_component(name, attr)
         else:
@@ -1038,20 +1039,17 @@ def current_network():
 
 
 def link(*ports):
-    """ link ports together in the current network
+    """ link components together
 
     Args:
         *ports: the ports to link together. The first and last port can be an integer
-        to specify the ordering of the network ports.
+            to specify the ordering of the network ports.
 
     Note:
-        if more than two ports are specified, then the intermediate ports should be
-        of the 'double port' type (i.e. "idx1:comp_name:idx2"). The first index will
-        connect to the port before; the second index will connect to the port
-        after.
-
-    Note:
-        This function can only be used inside a network-definition with-block.
+        if more than two ports are specified, then the intermediate ports
+        should be of the 'double port' type (i.e. ``idx1:comp_name:idx2``).
+        The first index will connect to the port before; the second index
+        will connect to the port after.
 
     Example:
         >>> with pt.Network() as nw:
@@ -1059,7 +1057,7 @@ def link(*ports):
         >>>     nw.wg = pt.Waveguide()
         >>>     nw.link(0, '0:dc:2','0:wg:1','3:dc:1', 1)
 
-
     """
     nw = current_network()
     nw.link(*ports)
+

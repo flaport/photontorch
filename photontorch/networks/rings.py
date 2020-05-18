@@ -34,13 +34,16 @@ from ..torch_ext import block_diag
 class AllPass(Network):
     r""" All Pass Filter
 
-    An AllPass filter is a memory-containing component with one input and one output.
+    An AllPass filter is a memory-containing component with one input and one
+    output.
 
-    Terms:
+    Terms::
+
              ___
             /   \
             \___/
         0-----------1
+
     """
 
     def __init__(self, **kwargs):
@@ -86,11 +89,13 @@ class AddDrop(Network):
 
     An AddDrop filter is a memory-containing component with one input and one output.
 
-    Terms:
+    Terms::
+
         3----===----2
             /   \
             \___/
         0-----------1
+
     """
 
     def __init__(self, **kwargs):
@@ -150,6 +155,17 @@ class _MixingPhaseArray(Network):
         trainable=True,
         name=None,
     ):
+        """
+        Args:
+            phases: array of phases to implement with photonic components.
+            length (float): length of the waveguides in the network in meters.
+            loss (float): loss in the ring (dB/m).
+            neff (float): effective index of the waveguides
+            ng (float): group index of the waveguides
+            wl0 (flota): center wavelength for th effective index in the waveguides
+            trainable (bool): make parameters in the network trainable
+            name (str): name of the component
+        """
         N = phases.shape[0]
         if N % 2:
             raise ValueError("the number of output phases should be even")
@@ -186,7 +202,7 @@ class _MixingPhaseArray(Network):
 
 
 class _UnclosedRingArray(Network):
-    r""" Helper Class for RingNetwork
+    r""" Helper network for RingNetwork::
 
         <- cap==2 ->
         0__  ______0
@@ -210,6 +226,17 @@ class _UnclosedRingArray(Network):
         trainable=True,
         name=None,
     ):
+        """
+        Args:
+            N (int): number of input waveguides (= number of output waveguides)
+            length (float): length of the waveguides in the network in meters.
+            loss (float): loss in the ring (dB/m).
+            neff (float): effective index of the waveguides
+            ng (float): group index of the waveguides
+            wl0 (flota): center wavelength for th effective index in the waveguides
+            trainable (bool): make parameters in the network trainable
+            name (str): name of the component
+        """
         if N % 2:
             raise ValueError("hidden size should be even")
 
@@ -271,7 +298,8 @@ class RingNetwork(Network):
     By changing the orientation of some of the MZIs in the Clements Network, a ring
     network can be obtained.
 
-    Network:
+    Network::
+
          <--- capacity --->
         0__  ______  ______[]__0
            \/      \/
@@ -301,6 +329,18 @@ class RingNetwork(Network):
         trainable=True,
         name=None,
     ):
+        """
+        Args:
+            N (int): number of input waveguides (= number of output waveguides)
+            capacity (int): number of layers of mixing units (e.g. directional couplers)
+            ring_length (float): length of the rings in the network in meters.
+            loss (float): loss in the ring (dB/m).
+            neff (float): effective index of the waveguides
+            ng (float): group index of the waveguides
+            wl0 (flota): center wavelength for th effective index in the waveguides
+            trainable (bool): make parameters in the network trainable
+            name (str): name of the component
+        """
         if N % 2:
             raise ValueError(
                 "the number of inputs/outputs of a ring network should be even"
@@ -343,6 +383,16 @@ class RingNetwork(Network):
         super(RingNetwork, self).__init__(components, connections, name=name)
 
     def terminate(self, term=None):
+        """ Terminate open conections with the term of your choice
+
+        Args:
+            term: (Term|list|dict): Which term to use. Defaults to Term. If a
+                dictionary or list is specified, then one needs to specify as
+                many terms as there are open connections.
+
+        Returns:
+            terminated network with sources on the left and detectors on the right.
+        """
         if term is None:
             term = [Source(name="s%i" % i) for i in range(self.N)]
             term += [Detector(name="d%i" % i) for i in range(self.N)]
@@ -360,6 +410,12 @@ class _RingAtom(Network):
     """ A Ring Atom is a part of a ring Molecule and should not be used seperately """
 
     def __init__(self, wg, num_segments=4, name=None):
+        """
+        Args:
+            wg (Waveguide): waveguide to use to create the ring atom.
+            num_segments (int): number of segments in the ring atom.
+            name (str): name of the ring atom
+        """
         self.num_segments = num_segments
         segment = Waveguide(
             length=wg.length / num_segments,
@@ -387,26 +443,26 @@ class RingMolecule(Network):
     """ A Ring Molecule is a network of rings."""
 
     def __init__(
-        self, map, rings, coupling=None, type="square", copy_rings=False, name=None
+        self, map, rings, coupling=None, type="square", copy_rings=True, name=None
     ):
         """ ring Molecule __init__
 
         Args:
-            map: str : a string map of the rings, [e.g. '@oOx@']. This map can contain multiple
+            map (str): a string map of the rings, [e.g. '@oOx@']. This map can contain multiple
                 lines. Each character of the map corresponds to a different kind of ring.
                 Special characters are '.' [signifying an empty space in the map] and
                 '@' [signifying an outward connection in the map].
-            rings: dict: a dictionary containing the different ring types. The keys should be
+            rings (dict): a dictionary containing the different ring types. The keys should be
                 the characters used in the map, and the values should be waveguides.
                 e.g. rings = {'a': Waveguide(...), 'b': Waveguide(...)}
-            coupling: dict = None: The coupling between the different rings. A single value will default
+            coupling (dict): The coupling between the different rings. A single value will default
                 to same coupling everywhere, while a dictionary with two-character strings
                 as keys signifies the coupling between those ring types.
                 e.g. coupling = {'aa':0.5, 'ab':0.4, 'bb':0.2}
-            type: str= "square:: The lattice type of the map. For now, only square lattices are supported
-            copy_rings: bool = False: If the rings are copied, then the phase of each ring can be
+            type (str): The lattice type of the map. For now, only square lattices are supported
+            copy_rings (bool): If the rings are copied, then the phase of each ring can be
                 trained seperately. Obviously, this uses more RAM.
-            name: str = None: the name of the network (default: lowercase classname)
+            name (str): the name of the network (default: lowercase classname)
 
         """
         try:
@@ -483,6 +539,7 @@ class RingMolecule(Network):
         )
 
     def get_C(self):
+        """ get connection matrix """
         rC = block_diag(*(comp.C[0] for comp in self.components.values()))
         iC = block_diag(*(comp.C[1] for comp in self.components.values()))
         C = torch.stack([rC, iC])

@@ -1,10 +1,8 @@
-"""
-# Connection Module
+""" A Connection connects two ports without reflection.
 
-A Connection is a special kind of component that connects two ports without reflection.
-
-It is generally recommended to make connections with the connection matrix, but if it's
-not possible to do so directly, a Connection object can be used.
+It is generally recommended to make direct connections in a network.
+But if for some reason, you're unable to do so, a Connection object can
+be used.
 
 """
 
@@ -27,13 +25,14 @@ from .component import Component
 class Connection(Component):
     """ A connection connects two ports without delays and without reflection.
 
-    Terms:
+    Terms::
 
         0---1
 
     Note:
-        It is generally recommended to make connections with the connection matrix, but if it's
-        not possible to do so directly, ac Connection object can be used.
+        It is generally recommended to make direct connections in a network.
+        But if for some reason, you're unable to do so, a Connection object can
+        be used.
 
     """
 

@@ -1,13 +1,4 @@
-"""
-# Torch Autograd Extensions
-
-The autograd extensions supplies a single extra function:
-
-  * `block_diag`: a differentiable implementation of a block diagonal matrix
-performed over a batch of matrices.
-
-
-"""
+""" Torch Autograd Extensions """
 
 #############
 ## Imports ##
@@ -31,11 +22,11 @@ def block_diag(*inputs):
     Create a block diagonal matrix from provided input tensors.
 
     Args:
-        *inputs: *torch.Tensor: n-dimensional tensors for which the last two indices are
-            equal (square).
+        *inputs (Tensors): n-dimensional tensors for which the last two
+            indices are equal (square).
 
     Returns:
-        M: torch.Tensor: n-dimensional tensor for which the last two dimensions are the sum
+        Tensor: n-dimensional tensor for which the last two dimensions are the sum
             of the last two dimensions of the input tensor.
 
     Example:

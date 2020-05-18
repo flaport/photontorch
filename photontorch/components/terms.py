@@ -1,12 +1,14 @@
-"""
-# Terminations
+""" Terminations
 
-In order to be able to simulate a Network, the connection matrix should be fully connected.
+In order to be able to simulate a Network, the connection matrix should be
+fully connected.
 
-Ports that are not connected to other components, should be connected to a Term.
+Ports that are not connected to other components, should be connected to a
+Term.
 
-Network terminations can be absorbing (Term), injecting (Source) or absorbing and
-detecting (Detector)
+Network terminations can be absorbing (Term), injecting (Source) or absorbing
+and detecting (Detector)
+
 """
 
 #############
@@ -28,7 +30,8 @@ class Term(Component):
 
     It terminates an unconnected node.
 
-    Terms:
+    Terms::
+
         --0
 
     """
@@ -43,8 +46,10 @@ class Source(Term):
     """
     A source is a special kind of Term where power is injected in the system
 
-    Terms:
+    Terms::
+
         --0
+
     """
 
     def set_sources_at(self, sources_at):
@@ -58,8 +63,9 @@ class Detector(Term):
     """
     A detector is a Term where the power is saved
 
-    Terms:
+    Terms::
         --0
+
     """
 
     def set_detectors_at(self, detectors_at):

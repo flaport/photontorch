@@ -27,7 +27,7 @@ from ..components.terms import Source, Detector, Term
 
 
 class _ReckNxN(Network):
-    """ A helper class for ReckMxN """
+    """ A helper network for ReckMxN """
 
     def __init__(
         self,
@@ -40,6 +40,17 @@ class _ReckNxN(Network):
         trainable=True,
         name=None,
     ):
+        """
+        Args:
+            N (int): number of input waveguides (= number of output waveguides)
+            length (float): length of the waveguides in the network in meters.
+            loss (float): loss in the ring (dB/m).
+            neff (float): effective index of the waveguides
+            ng (float): group index of the waveguides
+            wl0 (flota): center wavelength for th effective index in the waveguides
+            trainable (bool): make parameters in the network trainable
+            name (str): name of the component
+        """
         num_mzis = N - 1
 
         # define components
@@ -77,30 +88,31 @@ class _ReckNxN(Network):
 class ReckMxN(Network):
     """ A unitary matrix network based on the Reck Network.
 
-    Network:
-                        .--- : 9
-                        |
-                        |
-                        2
-                   .---3 1-- : 8
-                   |    0
-                   |    |
-                   2    2
-              .---3 1--3 1-- : 7       M
-              |    0    0
-              |    |    |
-              2    2    2
-         .---3 1--3 1--3 1-- : 6
-         |    0    0    0
-         |    |    |    |
-         2    2    2    2
-    .---3 1--3 1--3 1--3 1-- : 5
-    |    0    0    0    0
-    |    |    |    |    |
-   ..   ..   ..   ..   ..
-    4    3    2    1    0
+    Network::
 
-             N
+                                .--- : 9
+                                |
+                                |
+                                2
+                           .---3 1-- : 8
+                           |    0
+                           |    |
+                           2    2
+                      .---3 1--3 1-- : 7       M
+                      |    0    0
+                      |    |    |
+                      2    2    2
+                 .---3 1--3 1--3 1-- : 6
+                 |    0    0    0
+                 |    |    |    |
+                 2    2    2    2
+            .---3 1--3 1--3 1--3 1-- : 5
+            |    0    0    0    0
+            |    |    |    |    |
+           ..   ..   ..   ..   ..
+            4    3    2    1    0
+
+                     N
 
     Reference:
         https://journals.aps.org/prl/abstract/10.1103/NhysRevLett.73.58
@@ -121,16 +133,17 @@ class ReckMxN(Network):
         name=None,
     ):
         """
-        N: int = 2: number of output (the network represents an MxN matrix)
-        M: int = None: number of input ports (the network represents an MxN matrix).
-            by default, M will be the same as N
-        length: float = 1e-5: length of the waveguides in the network,
-        loss: float = 0: loss of the waveguides in the network,
-        neff: float = 2.34: effective index of the waveguides in the network,
-        ng: float = 3.40: group index of the waveguides in the network,
-        wl0: float = 1.55e-6: center wavelength of the waveguides in the network,
-        trainable: bool = True: makes the MZIs in the network trainable
-        name: str = None: the name of the network (default: lowercase classname)
+        Args:
+            N (int): number of output (the network represents an MxN matrix)
+            M (int): number of input ports (the network represents an MxN matrix).
+                by default, M will be the same as N
+            length (float): length of the waveguides in the network in meters.
+            loss (float): loss in the ring (dB/m).
+            neff (float): effective index of the waveguides
+            ng (float): group index of the waveguides
+            wl0 (flota): center wavelength for th effective index in the waveguides
+            trainable (bool): make parameters in the network trainable
+            name (str): name of the component
         """
         if M is None:
             M = N
@@ -175,14 +188,15 @@ class ReckMxN(Network):
         super(ReckMxN, self).__init__(components, connections, name=name)
 
     def terminate(self, term=None, transposed=False):
-        """ add sources to input nodes, detectors to output nodes and terms to unused
-        nodes
+        """ Terminate open conections with the term of your choice
 
         Args:
-            term: Term = None. Term to use for termination. Defaults to sources for
-                input nodes, detectors for output nodes and terms for unused nodes
-            transposed (bool) = False. Switch sources and detectors around, so the
-                input nodes become the output nodes and vice versa
+            term: (Term|list|dict): Which term to use. Defaults to Term. If a
+                dictionary or list is specified, then one needs to specify as
+                many terms as there are open connections.
+
+        Returns:
+            terminated network with sources on the left and detectors on the right.
         """
 
         def _term(i):
@@ -213,30 +227,31 @@ class ReckMxN(Network):
 class ReckNxN(ReckMxN):
     """ A unitary matrix network based on the Reck Network.
 
-    Network:
-                        .--- : 9
-                        |
-                        |
-                        2
-                   .---3 1-- : 8
-                   |    0
-                   |    |
-                   2    2
-              .---3 1--3 1-- : 7       M
-              |    0    0
-              |    |    |
-              2    2    2
-         .---3 1--3 1--3 1-- : 6
-         |    0    0    0
-         |    |    |    |
-         2    2    2    2
-    .---3 1--3 1--3 1--3 1-- : 5
-    |    0    0    0    0
-    |    |    |    |    |
-   ..   ..   ..   ..   ..
-    4    3    2    1    0
+    Network::
 
-             N
+                                .--- : 9
+                                |
+                                |
+                                2
+                           .---3 1-- : 8
+                           |    0
+                           |    |
+                           2    2
+                      .---3 1--3 1-- : 7       M
+                      |    0    0
+                      |    |    |
+                      2    2    2
+                 .---3 1--3 1--3 1-- : 6
+                 |    0    0    0
+                 |    |    |    |
+                 2    2    2    2
+            .---3 1--3 1--3 1--3 1-- : 5
+            |    0    0    0    0
+            |    |    |    |    |
+           ..   ..   ..   ..   ..
+            4    3    2    1    0
+
+                     N
 
     Reference:
         https://journals.aps.org/prl/abstract/10.1103/NhysRevLett.73.58
@@ -284,28 +299,29 @@ class ReckMmi(ReckMxN):
     This unitary matrix implementation is based on The paper of M. Reck:
     https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.73.58
 
-    Network:
-                        .--- : 9
-                        |
-                        |
-                        2
-                   .---3 1-- : 8
-                   |    0
-                   |    |
-                   2    2
-              .---3 1--3 1-- : 7
-              |    0    0
-              |    |    |
-              2    2    2
-         .---3 1--3 1--3 1-- : 6
-         |    0    0    0
-         |    |    |    |
-         2    2    2    2
-    .---3 1--3 1--3 1--3 1-- : 5
-    |    0    0    0    0
-    |    |    |    |    |
-   ..   ..   ..   ..   ..
-    4    3    2    1    0
+    Network::
+
+                                .--- : 9
+                                |
+                                |
+                                2
+                           .---3 1-- : 8
+                           |    0
+                           |    |
+                           2    2
+                      .---3 1--3 1-- : 7
+                      |    0    0
+                      |    |    |
+                      2    2    2
+                 .---3 1--3 1--3 1-- : 6
+                 |    0    0    0
+                 |    |    |    |
+                 2    2    2    2
+            .---3 1--3 1--3 1--3 1-- : 5
+            |    0    0    0    0
+            |    |    |    |    |
+           ..   ..   ..   ..   ..
+            4    3    2    1    0
 
     """
 

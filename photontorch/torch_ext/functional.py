@@ -1,5 +1,4 @@
-"""
-# Photontorch Functional
+""" Photontorch Functional
 
 Mostly for error metrics not found in PyTorch itself.
 
@@ -23,7 +22,11 @@ from scipy.signal import butter, lfilter
 
 
 class BitStreamGenerator:
-    """BitStreamGenerator: Generate a bitstream from a sequence of bits (or from a random seed)"""
+    """BitStreamGenerator
+
+    Generate a bitstream from a sequence of bits (or from a random seed)
+
+    """
 
     def __init__(
         self,
@@ -37,13 +40,13 @@ class BitStreamGenerator:
     ):
         """
         Args:
-            bitrate: float = 40e9: [1/s] data rate of the bitstream
-            samplerate: float = 160e9: [1/s] sample rate of the bitstream
-            cutoff_frequency: float = None: [1/s] cutoff frequency of the bitstream. If None: no lowpass filtering.
-            filter_order: int = 4: filter order to enforce cutoff frequency
-            seed: int = None: seed used to generate bits (if needed)
-            dtype: torch.dtype: None: dtype to generate the bits for. None -> "torch.get_default_dtype()"
-            device: torch.device: None: device to generate the bits on. None -> "cpu"
+            bitrate (float): [1/s] data rate of the bitstream
+            samplerate (float): [1/s] sample rate of the bitstream
+            cutoff_frequency (float): [1/s] cutoff frequency of the bitstream. If None: no lowpass filtering.
+            filter_order (int): filter order to enforce cutoff frequency
+            seed (int): seed used to generate bits (if needed)
+            dtype (torch.dtype):: dtype to generate the bits for. None -> "torch.get_default_dtype()"
+            device (torch.device):: device to generate the bits on. None -> "cpu"
 
         """
         self.bitrate = float(bitrate)
@@ -58,12 +61,11 @@ class BitStreamGenerator:
         self._rng = np.random.RandomState(seed=self.seed)
 
     def __call__(self, bits=100):
-        """BitStreamGenerator: Generate a bitstream from a sequence of bits (or from a random seed)
+        """generate a bitstream from a sequence of bits (or from a random seed)
 
         Args:
-            bits = 100: int or sequence.
-                * if int: generate that number of bits, then create stream.
-                * if sequence: interpret the sequence as bits, then create stream.
+            bits (int|sequence): - if int: generate that number of bits, then create stream.
+                - if sequence: interpret the sequence as bits, then create stream.
         """
         try:
             if len(bits.shape) == 0:
@@ -113,10 +115,10 @@ class MSELoss(torch.nn.Module):
     def __init__(self, latency=0.0, warmup=0, bitrate=40e9, samplerate=160e9):
         """
         Args:
-            latency = 0.5: fractional latency [in bit lengths]. This value can be a floating point number bigger than 1.
-            warmup = 0: integer number of warmup bits. warmup bits are disregarded during the loss calculation.
-            bitrate = 40e9: the bit rate of the signal [in Hz]
-            samplerate = 160e9: the sample rate of the signal [in Hz]
+            latency (float): fractional latency [in bit lengths]. This value can be a floating point number bigger than 1.
+            warmup (int): integer number of warmup bits. warmup bits are disregarded during the loss calculation.
+            bitrate (float): the bit rate of the signal [in Hz]
+            samplerate (float): the sample rate of the signal [in Hz]
         """
         super(MSELoss, self).__init__()
         self.bitrate = float(bitrate)
@@ -135,8 +137,8 @@ class MSELoss(torch.nn.Module):
     ):
         """ Mean Squared Error for bitstreams
         Args:
-            prediction: torch.Tensor: 4D output power tensor with shape (# timesteps, # wavelengths, # readouts, # batches)
-            target: torch.Tensor: target power tensor. Should be broadcastable to the same shape as prediction.
+            prediction (Tensor): 4D output power tensor with shape (# timesteps, # wavelengths, # readouts, # batches)
+            target (Tensor): target power tensor. Should be broadcastable to the same shape as prediction.
             **kwargs: all keyword arguments can be used to temporary override values given during the MSEloss initialization.
         """
         bitrate = self.bitrate if bitrate is None else float(bitrate)
@@ -192,11 +194,11 @@ class BERLoss(torch.nn.Module):
     ):
         """
         Args:
-            threshold = 0.5: where to place the 0 / 1 threshold on the output power.
-            latency = 0.5: fractional latency [in bit lengths]. This value can be a floating point number bigger than 1.
-            warmup = 0: integer number of warmup bits. warmup bits are disregarded during the loss calculation.
-            bitrate = 40e9: the bit rate of the signal [in Hz]
-            samplerate = 160e9: the sample rate of the signal [in Hz]
+            threshold (float): where to place the 0 / 1 threshold on the output power.
+            latency (float): fractional latency [in bit lengths]. This value can be a floating point number bigger than 1.
+            warmup (int): integer number of warmup bits. warmup bits are disregarded during the loss calculation.
+            bitrate (float): the bit rate of the signal [in Hz]
+            samplerate (float): the sample rate of the signal [in Hz]
         """
         super(BERLoss, self).__init__()
         self.threshold = float(threshold)
@@ -217,8 +219,8 @@ class BERLoss(torch.nn.Module):
     ):
         """ Bit Error Rate (non-differentiable)
         Args:
-            prediction: torch.Tensor: 4D output power tensor with shape (# timesteps, # wavelengths, # readouts, # batches)
-            target: torch.Tensor: target power tensor. Should be broadcastable to the same shape as prediction.
+            prediction (Tensor): 4D output power tensor with shape (# timesteps, # wavelengths, # readouts, # batches)
+            target (Tensor): target power tensor. Should be broadcastable to the same shape as prediction.
             **kwargs: all keyword arguments can be used to temporary override values given during the BERLoss initialization.
         """
         threshold = self.threshold if threshold is None else float(threshold)

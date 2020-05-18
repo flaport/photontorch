@@ -1,9 +1,9 @@
-"""
-# PhotonTorch Simulation Environment
+""" PhotonTorch Simulation Environment
 
-The simulation environment module contains a single class: Environment
+The simulation environment module contains a single class: ``Environment``
 
-This class contains all the necessary parameters to initialize a network for a simulation.
+This class contains all the necessary parameters to initialize a network for a
+simulation.
 
 """
 
@@ -44,13 +44,6 @@ class Environment(dict):
     It is able to initialize parameters that depend on each other correctly.
     Changing a parameter that depends on another, changes both.
 
-
-    Attributes:
-        c: float: speed of light
-        t: np.ndarray: array with the times of the simulation
-        wls: np.ndarray: array with all the wavelengths of the simulation
-        use_delays: bool: boolean signifying to use the component delays or not
-        cuda: bool: boolean signifying to use cuda for the simulations or not
     """
 
     _initialized = False
@@ -59,29 +52,31 @@ class Environment(dict):
 
         """
         Args:
-            dt: float = 1e-14: timestep of the simulation
-            t_start: float = 0: start time of the simulation in seconds
-            t_end: float = 1000*dt: end time of the simulation in seconds
-            num_timesteps: int = 1000: number of timesteps in the simulation (use this
+            dt (float=1e-14): timestep of the simulation
+            t_start (float=0): start time of the simulation in seconds
+            t_end (float=1000*dt): end time of the simulation in seconds
+            num_timesteps (int=1000): number of timesteps in the simulation (use this
                 in stead of t_end.)
-            t: np.ndarray = np.arange(0, 1000*dt, dt): array with the times of the
+            t (np.ndarray=np.arange(0, 1000*dt, dt)): array with the times of the
                 simulation (use this in stead of dt, t_start, t_end and num_timesteps)
 
-            wavelength: float or np.ndarray = np.array([1.55e-6]): wavelength(s) of the
+            wavelength (float|np.ndarray=np.array([1.55e-6])): wavelength(s) of the
                 simulation
-            num_wavelengths: int = 1: number of wavelengths in the simulation
-            wavelength_start: float = 1.5e-6: starting wavelength of the simulation
-            wavelength_end: float = 1.6e-6: ending wavelength of the simulation
+            num_wavelengths (int=1): number of wavelengths in the simulation
+            wavelength_start (float=1.5e-6): starting wavelength of the simulation
+            wavelength_end (float=1.6e-6): ending wavelength of the simulation
 
-            frequency_domain: bool = True: ignore the delays in the network to
+            frequency_domain (bool=True): ignore the delays in the network to
                 perform a frequency domain simulation.
 
-            device: str = None: which device to do the simulation on. If `None`, the
+            device (str=None): which device to do the simulation on. If `None`, the
                 default of the network is used.
 
-            c: float = 299792458.0: speed of light used for the simulations
+            c (float=299792458.0): speed of light used for the simulations
 
-            name: str = "env": the name of the environment
+            enable_grad (bool=False): do not track gradients (disable/enable training).
+
+            name (str="env"): the name of the environment
 
         Note:
             The environment can take unlimited extra keyword arguments, which will be
@@ -184,8 +179,9 @@ class Environment(dict):
         """ Create a (deep) copy of the environment
 
         Note:
-            You can optionally change the copied environment attributes by specifying
-            keyword arguments.
+            You can optionally change the copied environment attributes by
+            specifying keyword arguments.
+
         """
         new = deepcopy(dict(self))
         del new["_initialized"]
@@ -211,21 +207,23 @@ class Environment(dict):
         return self.__class__(**new)
 
     def close(self):
+        """ close the current environment """
         if _current_environments[0] is self:
             del _current_environments[0]
         self.grad_manager.__exit__()
 
     def _set(self):
+        """ set the current environment """
         _current_environments.appendleft(self)
         self.grad_manager.__enter__()
         return self
 
     def __enter__(self):
-        """ enter the with block """
+        """ enter the with block (set the current environment) """
         return self._set()
 
     def __exit__(self, error, value, traceback):
-        """ exit the with block """
+        """ exit the with block (close the current environment) """
         self.close()
         if error is not None:
             raise  # raise the last error thrown
@@ -319,25 +317,27 @@ def current_environment():
 
 
 def set_environment(*args, **kwargs):
-    """ set the current environment
+    """ set the environment globally
 
     Args:
-        env: Environment: The environment to set globally.
-
-    Kwargs:
-        **kwargs: The keyword arguments to create a new environment to set globally
+        env (Environment): The environment to set globally.
+        **kwargs: keyword arguments to define a new environment.
 
     Note:
-        It is recommended to set the Environment using a with-block. However, if you
-        would like to set the environment globally, this can be done with this function.
+        It is recommended to set the Environment using a with-block. However,
+        if you would like to set the environment globally, this can be done
+        with this function.
+
     """
     if len(args) > 2:
         raise ValueError("Only one positional argument allowed")
     elif len(args) == 1:
-        env = args[0]
+        env = args[0].copy(**kwargs)
     elif "env" in kwargs:
-        env = kwargs["env"]
+        env = kwargs.pop("env")
+        env = env.copy(**kargs)
     else:
         env = Environment(**kwargs)
 
     env._set()
+

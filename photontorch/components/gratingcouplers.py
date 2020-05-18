@@ -1,5 +1,4 @@
-"""
-# Grating Couplers
+""" Grating Couplers
 
 Grating couplers are a special kind of 2-port component that simulate the behavior of
 coupling light from a fiber onto the chip.
@@ -24,9 +23,9 @@ from .component import Component
 
 
 class GratingCoupler(Component):
-    r""" A Grating Coupler is a memory-less component with one input and one output.
+    r""" Grating couplers are partly reflecting and partly transmitting connections.
 
-    Terms:
+    Terms::
 
           0
            \
@@ -44,12 +43,12 @@ class GratingCoupler(Component):
     ):
         """
         Args:
-            R: float = 0.0: reflection of the grating coupler (between 0 and 1)
-            R_in: float = 0.0: incoupling reflection for the grating coupler
-            Tmax: float = 1.0: maximum transmission at center wavelength
-            bandwidth: float = 0.06e-6: 3dB Bandwidth of the grating coupler
-            wl0: float = 1.55e-6: Center wavelength of the grating coupler
-            name: str = None: the name of the component (default: lowercase classname)
+            R (float): reflection of the grating coupler (between 0 and 1)
+            R_in (float): incoupling reflection for the grating coupler
+            Tmax (float): maximum transmission at center wavelength
+            bandwidth (float): 3dB Bandwidth of the grating coupler
+            wl0 (float): Center wavelength of the grating coupler
+            name (str): the name of the component (default: lowercase classname)
         """
         super(GratingCoupler, self).__init__(name=name)
         self.R = R

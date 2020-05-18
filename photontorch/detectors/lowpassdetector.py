@@ -1,16 +1,13 @@
-"""
-# LowpassDetector
+""" A simple detector based on low-pass filtering the signal.
 
-This detector performs the (differentiable) PyTorch equivalent of the
-following numpy/scipy function:
+The ``LospassDetector`` performs the (differentiable) PyTorch equivalent of the
+following numpy/scipy function: ::
 
-```
-from scipy.signal import butter, lfilter
-def detect(x, bitrate, samplerate, cutoff_frequency, filter_order):
-    normal_cutoff = cutoff_frequency / ( 0.5 * samplerate)
-    b, a = butter(N=filter_order, Wn=normal_cutoff, btype='lowpass', analog=False)
-    return lfilter(b, a, x, axis=0)
-```
+    from scipy.signal import butter, lfilter
+    def detect(x, bitrate, samplerate, cutoff_frequency, filter_order):
+        normal_cutoff = cutoff_frequency / ( 0.5 * samplerate)
+        b, a = butter(N=filter_order, Wn=normal_cutoff, btype='lowpass', analog=False)
+        return lfilter(b, a, x, axis=0)
 
 """
 
@@ -42,30 +39,17 @@ T = 300  # [K] room temperature
 
 
 class LowpassDetector(torch.nn.Module):
-    """ LowpassDetector: Detect by lowpass filtering the signal.
-
-    This detector performs the (differentiable) PyTorch equivalent of the
-    following numpy/scipy function:
-
-    ```
-    from scipy.signal import butter, lfilter
-    def detect(x, bitrate, samplerate, cutoff_frequency, filter_order):
-        normal_cutoff = cutoff_frequency / ( 0.5 * samplerate)
-        b, a = butter(N=filter_order, Wn=normal_cutoff, btype='lowpass', analog=False)
-        return lfilter(b, a, x, axis=0)
-    ```
-
-    """
+    """ LowpassDetector: Detect by lowpass filtering the signal. """
 
     def __init__(
         self, bitrate=40e9, samplerate=160e9, cutoff_frequency=20e9, filter_order=4,
     ):
         """
         Args:
-            bitrate: float = 40e9: [1/s] data rate of the signal to filter
-            samplerate: float = 160e9: [1/s] sample rate of the signal to filter
-            cutoff_frequency: float = 25e9: [1/s] cutoff frequency of the detector
-            filter_order: int = 4: filter order of the butter filter
+            bitrate (float): [1/s] data rate of the signal to filter
+            samplerate (float): [1/s] sample rate of the signal to filter
+            cutoff_frequency (float): [1/s] cutoff frequency of the detector
+            filter_order (int): filter order of the butter filter
         """
         super(LowpassDetector, self).__init__()
         self.bitrate = float(bitrate)
@@ -96,9 +80,9 @@ class LowpassDetector(torch.nn.Module):
         """ detect a bitstream by low-pass filtering
 
         Args:
-            signal: torch.Tensor: signal to detect.
-            num_splits: int: number of parallel parts to split the timestream in
-            split_padding: int: number of bits padding when splitting the timstream in parts.
+            signal (Tensor): signal to detect.
+            num_splits (int): number of parallel parts to split the timestream in
+            split_padding (int): number of bits padding when splitting the timstream in parts.
 
         Note:
             Splitting the signal in parts to be processed in parallel can considerably

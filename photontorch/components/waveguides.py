@@ -1,9 +1,4 @@
-"""
-# Waveguides
-
-Waveguides are a special kind of Connection with delay.
-
-"""
+""" Waveguides connect two ports with a delay and a phase. """
 
 #############
 ## Imports ##
@@ -25,15 +20,12 @@ from ..torch_ext.nn import Parameter, Buffer
 
 
 class Waveguide(Connection):
-    """
+    """ Waveguides connect two ports with a delay and a phase.
+
     A waveguide is a Component where each of the two nodes
     introduces a delay corresponding to the length of the waveguide.
 
-    For a waveguide, only its phase change can be trained. If phase==None then
-    the phase will be derived from the length of the waveguide and will thus be
-    untrainable (phase==None overrules the trainable flag).
-
-    Terms:
+    Terms::
 
         0 ---- 1
 
@@ -52,16 +44,16 @@ class Waveguide(Connection):
     ):
         """
         Args:
-            length: float = 1e-5: length of the waveguide in meter.
-            loss: float = 0: loss in the waveguide [dB/m]
-            neff: float = 2.34: effective index of the waveguide
-            ng: float = 3.40: group index of the waveguide
-            wl0: float = 1.55e-6: the center wavelength for which neff is defined.
-            phase: float = 0: additional phase correction added to the phase introduced
+            length (float): length of the waveguide in meter.
+            loss (float): loss in the waveguide [dB/m]
+            neff (float): effective index of the waveguide
+            ng (float): group index of the waveguide
+            wl0 (float): the center wavelength for which neff is defined.
+            phase (float): additional phase correction added to the phase introduced
                 by the length of the waveguide. Adding this can be useful for training
                 purposes.
-            trainable: bool = True: makes the phase trainable
-            name: str = None: the name of the component (default: lowercase classname)
+            trainable (bool): makes the phase parameter trainable
+            name (str): the name of the component (default: lowercase classname)
         """
         Connection.__init__(self, name=name)
         # Handle inputs

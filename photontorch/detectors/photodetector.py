@@ -1,6 +1,4 @@
-"""
-# Photodetector
-
+""" Photodetector
 
 The photodetector transforms the raw output power (for example the result of a
 photontorch simulation) according to a realistic filtering model.
@@ -52,14 +50,14 @@ class Photodetector(LowpassDetector):
     ):
         """
         Args:
-            bitrate: float = 50e9: [1/s] data rate of the signal to filter
-            samplerate: float = 80e9: [1/s] sample rate of the signal to filter
-            cutoff_frequency: float = 25e9: [1/s] cutoff frequency of the detector
-            responsivity: float = 1.0: [A/W] responsivity of the photodector
-            dark_current: float = 1e-10: [A] dark current adding to the noise
-            load_resistance: float = 1e6: [Ohm] load resistance of the detector
-            filter_order: int = 4: filter order of the butter filter
-            seed: int = 0: random seed for the detector noise
+            bitrate (float): [1/s] data rate of the signal to filter
+            samplerate (float): [1/s] sample rate of the signal to filter
+            cutoff_frequency (float): [1/s] cutoff frequency of the detector
+            responsivity (float): [A/W] responsivity of the photodector
+            dark_current (float): [A] dark current adding to the noise
+            load_resistance (float): [Ohm] load resistance of the detector
+            filter_order (int): filter order of the butter filter
+            seed (int): random seed for the detector noise
         """
         super(Photodetector, self).__init__(
             bitrate=bitrate,
@@ -81,9 +79,9 @@ class Photodetector(LowpassDetector):
         """ detect a bitstream by first adding physical noise and then low-pass filtering.
 
         Args:
-            signal: torch.Tensor: signal to detect.
-            num_splits: int: number of parallel parts to split the timestream in
-            split_padding: int: number of bits padding when splitting the timstream in parts.
+            signal (Tensor): signal to detect.
+            num_splits (int): number of parallel parts to split the timestream in
+            split_padding (int): number of bits padding when splitting the timstream in parts.
 
         Note:
             Splitting the signal in parts to be processed in parallel can considerably

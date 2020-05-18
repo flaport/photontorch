@@ -1,9 +1,4 @@
-"""
-# Directional Couplers
-
-Directional Couplers are 4-port components coupling two waveguides together.
-
-"""
+""" Directional Couplers are 4-port components coupling two waveguides together.  """
 
 #############
 ## Imports ##
@@ -32,14 +27,13 @@ class DirectionalCoupler(Component):
 
     A directional coupler has one trainable parameter: the squared coupling coupling.
 
-    Terms:
+    Terms::
+
        3        2
         \______/
         /------\
        0        1
 
-    Note:
-        a directional coupler introduces no delays (for now)
     """
 
     num_ports = 4
@@ -47,10 +41,10 @@ class DirectionalCoupler(Component):
     def __init__(self, coupling=0.5, trainable=True, name=None):
         """
         Args:
-            coupling: float = 0.5: power coupling of the directional coupler (between 0
-                and 1)
-            trainable: bool = True: makes the coupling trainable
-            name: str = None: the name of the component (default: lowercase classname)
+            coupling (float): power coupling of the directional coupler
+                (between 0 and 1)
+            trainable (bool): makes the coupling trainable
+            name (str): the name of the component (default: lowercase classname)
         """
         super(DirectionalCoupler, self).__init__(name=name)
 
@@ -87,15 +81,17 @@ class DirectionalCouplerWithLength(Component):
     It is merely a holder of a directional coupler and a waveguide, and combines both
     in a 4-port component.
 
-    Terms:
+    Terms::
+
         3        2
-        \______/
-        /------\
+         \______/
+         /------\
         0        1
 
     Note:
         This version of a directional coupler is prefered over a wg-wg-wg-wg-dc network
         becuase it only has 4 ports in stead of 12.
+
     """
 
     num_ports = 4
@@ -103,10 +99,10 @@ class DirectionalCouplerWithLength(Component):
     def __init__(self, dc=None, wg=None, name=None):
         """
         Args:
-            dc: DirectionalCoupler = None: directional coupler to add a length to
-            wg: Waveguide = None: the waveguide containing the phase and delay information
+            dc (DirectionalCoupler): directional coupler to add a length to
+            wg (Waveguide): the waveguide containing the phase and delay information
                 of the directional coupler.
-            name: str = None: the name of the component (default: lowercase classname)
+            name (str): the name of the component (default: lowercase classname)
         """
         super(DirectionalCouplerWithLength, self).__init__(name=name)
         self.wg = wg if wg is not None else Waveguide()
@@ -158,11 +154,12 @@ class DirectionalCouplerWithLength(Component):
 class RealisticDirectionalCoupler(Component):
     r""" A directional coupler is a memory-less component with 4 ports.
 
-    Terms:
-        3       2
-        \______/
-        /------\
-        0       1
+    Terms::
+
+        3        2
+         \______/
+         /------\
+        0        1
 
     Notes:
      - This directional coupler introduces no delays (for now)
@@ -186,22 +183,22 @@ class RealisticDirectionalCoupler(Component):
     ):
         """
         Args:
-            length: float = 12.8e-6: the length
-            k0: float = 0.2332: the bend coupling
-            n0: float = 0.0208: effective index difference between even and odd mode
-            de1_k0: float = 1.2435: first derivative of k0 w.r.t. wavelength
-            de1_n0: float = 0.1169: first derivative of n0 w.r.t. wavelength
-            de2_k0: float = 5.3022: second derivative of k0 w.r.t. wavelength
-            de2_n0: float = 0.4821: second derivative of n0 w.r.t. wavelength
-            wl0: float = 1.55e-6: the center wavelength for which the parameters are
-                defined
-            name: str = None: the name of the component (default: lowercase classname)
+            length (float): the length
+            k0 (float): the bend coupling
+            n0 (float): effective index difference between even and odd mode
+            de1_k0 (float): first derivative of k0 w.r.t. wavelength
+            de1_n0 (float): first derivative of n0 w.r.t. wavelength
+            de2_k0 (float): second derivative of k0 w.r.t. wavelength
+            de2_n0 (float): second derivative of n0 w.r.t. wavelength
+            wl0 (float): the center wavelength for which the parameters are defined
+            name (str): the name of the component (default: lowercase classname)
 
         Note:
             The default parameters are based on a directional coupler with
              - bend radius : 5um
              - adiabatic angle : 10 degrees
              - gap distance : 250 nm
+
         """
 
         super(RealisticDirectionalCoupler, self).__init__(name=name)

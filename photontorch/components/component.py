@@ -1,28 +1,6 @@
-"""
-# Photontorch base component
+""" The base component is a parent class meant for subclassing.
 
-The base component is a parent class meant for subclassing. It should not be used
-directly.
-
-Each Component is generally defined by several key attributes defining the behavior
-of the component in a network.
-
-    `num_ports`: The number of ports of the components.
-
-    `S`: The scattering matrix of the component.
-
-    `C`: The connection matrix for the component (usually all zero for base components)
-
-    `sources_at`: The location of the sources in the component (usually all zero for
-        base components)
-
-    `detectors_at`: The location of the detectors in the component (usually all zero
-        for base components)
-
-    `actions_at`: The location of the active nodes in the component (usually all zero
-        for passive components)
-
-    `delays`: delays introduced by the nodes of the component.
+It should not be used directly.
 
 """
 
@@ -48,13 +26,15 @@ from ..environment import current_environment
 class Component(Module):
     """ Generic base component.
 
-        The base component is a parent class meant for subclassing; it should not be
-        used directly.
+        The base component is a parent class meant for subclassing;
+        it should not be used directly.
 
-        To define your own component, overwrite the __init__ method and the get_* methods.
+        To define your own component, subclass Component and overwrite the
+        __init__ and the get_* methods.
     """
 
-    num_ports = 0  # Number of ports of the component
+    num_ports = 0
+    """ Number of ports of the component. """
 
     def __init__(self, name=None, _calculate_buffers=True):
         """ Component
@@ -62,7 +42,7 @@ class Component(Module):
         Args:
             name: str = None: the name of the component
         """
-        Module.__init__(self)
+        super(Component, self).__init__()
         self.name = name
 
         # add component to current network if a component with that name does not yet exist
@@ -85,58 +65,88 @@ class Component(Module):
     ## The following methods should be overwritten by subclasses:
 
     def set_S(self, S):
-        """ Calculate the scattering matrix of the component
+        """ Set the elements of the scattering matrix.
 
-        Returns:
-            S: torch.Tensor[2, #wavelengths, #ports, #ports]: the scattering matrix for
-                each wavelength of the simulation.
+        Args:
+            S (Tensor[2, #wavelengths, #ports, #ports]): the empty scattering
+                matrix of the component to set the elements for (defined for each
+                wavelength of the simulation).  The first dimension of size two
+                denotes the stacked real and imaginary part.
 
-        Note:
-            S[0] is the real part, S[1] is the imaginary part.
         """
         pass
 
     def set_C(self, C):
-        """ Calculate the connection matrix of the component.
+        """ Set the connection matrix of the component.
+
+        Args:
+            C (Tensor[2, #ports, #ports]): the empty connection matrix for the
+                component to set the elements for. The first dimension of size
+                two denotes the stacked real and imaginary part.
 
         Note:
-            C[0] is the real part, C[0] is the imaginary part
+            For most base components the connection matrix should stay empty.
+            Only for composite components, like ``Network``, the connection
+            matrix will be non-empty.
+
         """
         pass
 
     def set_delays(self, delays):
-        """ Set the delays introduced by the component. """
+        """ Set the delays introduced by the component.
+
+        Args:
+            delays (Tensor[#ports]): the empty delay tensor for the component to
+                set the elements for. The delay tensor signifies the delay each
+                port of the component introduces.
+        """
         pass
 
     def set_sources_at(self, sources_at):
-        """ Set the locations of the sources in the component. """
+        """ Set the locations of the source ports in the component.
+
+        Args:
+            sources_at (Tensor[#ports]): the empty boolean tensor for the component to
+                set the elements for. The ``sources_at`` tensor signifies which
+                ports of the component act as a source.
+        """
         pass
 
     def set_detectors_at(self, detectors_at):
-        """ Set the locations of the detectors in the component. """
+        """ Set the locations of the detector ports in the component.
+
+        Args:
+            detectors_at (Tensor[#ports]): the empty boolean tensor for the component to
+                set the elements for. The ``detectors_at`` tensor signifies which
+                ports of the component act as a detector.
+        """
         pass
 
     def set_actions_at(self, actions_at):
-        """ Set the locations of the active nodes in the component. """
+        """ Set the locations of the active ports in the component.
+
+        Args:
+            actions_at (Tensor[#ports]): the empty boolean tensor for the component to
+                set the elements for. The ``actions_at`` tensor signifies which
+                ports of the component act actively.
+        """
         pass
 
     def action(self, t, x_in, x_out):
         """ Nonlinear action of the component on its active nodes
 
         Args:
-            t: float: the current time in the simulation
-            x_in: torch.Tensor[#active nodes, 2, #wavelengths, #batches]: the input tensor
+            t (float): the current time in the simulation
+            x_in (torch.Tensor[#active nodes, 2, #wavelengths, #batches]): the input tensor
                 used to define the action
-            x_out: torch.Tensor[#active nodes, 2, #wavelengths, #batches]: the output
-                tensor. The result of the action should be stored in this tensor.
+            x_out (torch.Tensor[#active nodes, 2, #wavelengths, #batches]): the output
+                tensor. The result of the action should be stored in the
+                elements of this tensor.
 
-        Returns:
-            None: (the result should be stored in the output tensor and should not be
-            returned)
         """
         pass
 
-    ## The following methods should be left alone:
+    ## The following methods should NOT be overwritten with subclassing:
 
     @property
     def env(self):
@@ -144,15 +154,11 @@ class Component(Module):
         return self._env
 
     def initialize(self):
-        """ Set the simulation initialization for the component.
+        """ initialize the component with the current simulation environment.
 
         Before a component can be used for simulation, it should be initialized with a
         simulation environment.
 
-        Args:
-            env: Environment = None: Simulation environment to initialize the component
-                with. If no environment is specified, the component will be initialized
-                with the last defined environment (the result of current_environment())
         """
         self._env = env = current_environment()
 
@@ -174,11 +180,10 @@ class Component(Module):
         """ get the scattering matrix of the component
 
         Returns:
-            S: torch.Tensor[2, #wavelengths, #ports, #ports]: the scattering matrix for
-                each wavelength of the simulation.
-
-        Note:
-            S[0] is the real part, S[1] is the imaginary part.
+            Tensor[2, #wavelengths, #ports, #ports]: the scattering
+                matrix of the component (defined for each
+                wavelength of the simulation). The first dimension of size two
+                denotes the stacked real and imaginary part.
         """
         S = torch.zeros(
             (2, self.env.num_wavelengths, self.num_ports, self.num_ports),
@@ -191,7 +196,9 @@ class Component(Module):
         """ get the connection matrix of the component.
 
         Returns:
-            C: torch.Tensor[2, #ports, #ports]: the connection matrix.
+            Tensor[2, #ports, #ports]: the connection matrix for the
+                component. The first dimension of size two denotes the stacked
+                real and imaginary part.
 
         Note:
             C[0] is the real part, C[0] is the imaginary part
@@ -204,7 +211,9 @@ class Component(Module):
         """ Get the delays introduced by the component.
 
         Returns:
-            delays: torch.Tensor[#ports]: The delays in each node of the component.
+            Tensor[#ports]: the delay tensor for the component.
+                The delay tensor signifies the delay each port of the component
+                introduces.
         """
         delays = torch.zeros(self.num_ports, device=self.device)
         self.set_delays(delays)
@@ -214,8 +223,8 @@ class Component(Module):
         """ Get the locations of the sources in the component.
 
         Returns:
-            sources_at: torch.Tensor[#ports]: a bool tensor where the locations of the
-                sources are denoted by a 1.
+            Tensor[#ports]: the boolean tensor for the component
+                which signifies which ports of the component act as a source.
         """
         sources_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
         self.set_sources_at(sources_at)
@@ -225,8 +234,8 @@ class Component(Module):
         """ Get the locations of the detectors in the component.
 
         Returns:
-            detectors_at: torch.Tensor[#ports]: a bool tensor where the locations of the
-                detectors are denoted by a 1.
+            Tensor[#ports]: the boolean tensor for the component
+                which signifies which ports of the component act as a detector.
         """
         detectors_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
         self.set_detectors_at(detectors_at)
@@ -236,8 +245,8 @@ class Component(Module):
         """ Get the locations of the active nodes in the component.
 
         Returns:
-            actions_at: torch.Tensor[#ports]: a bool tensor where the locations of the
-                active nodes are denoted by a 1.
+            Tensor[#ports]: the boolean tensor for the component
+                which signifies which ports of the component act actively.
         """
         actions_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
         self.set_actions_at(actions_at)
@@ -247,8 +256,8 @@ class Component(Module):
         """ Calculate locations of the free indices to make a connections to.
 
         Returns:
-            actions_at: torch.Tensor[#ports]: a int64 tensor containing the locations
-                of the open ports denoted by a 1.
+            Tensor: a int64 tensor containing the indices
+            of the open ports in the component.
         """
         C = (abs(self.C) ** 2).sum(0)
         return where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1))

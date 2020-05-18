@@ -1,5 +1,4 @@
-"""
-# MMIs
+""" An MMI performs a weighted transition from m waveguides to n waveguides
 
 The MMI implemented in this module performs an arbitrary splitting operation specified by
 a weight matrix
@@ -27,19 +26,18 @@ from ..torch_ext.nn import Buffer, Parameter
 
 
 class Mmi(Component):
-    r""" A MMI performs a weighted transition from m waveguides to n waveguides
+    r""" An MMI performs a weighted transition from m waveguides to n waveguides
 
-    Terms:
+    Terms::
+
               m+1
          0___/ m+2
          1____/
           :  :
          m____
               \
-               n
+               m+n
 
-    Note:
-        This MMI introduces no delays
     """
 
     num_ports = None  # not yet defined
@@ -49,11 +47,11 @@ class Mmi(Component):
         Mmi initialization
 
         Args:
-            weights: np.ndarray = None: interconnection weights between input
+            weights (np.ndarray): interconnection weights between input
                 wageguides and output waveguides. If no weights are specified, the
                 component defaults to a 1x2 splitter.
-            trainable: bool = True: makes the interconnection weights trainable
-            name: str = None: the name of the component
+            trainable (bool): makes the interconnection weights trainable
+            name (str): the name of the component (default: lowercase classname)
         """
 
         # validate weights
@@ -94,7 +92,8 @@ class Mmi(Component):
 class PhaseArray(Component):
     r""" A Phase Array adds a phase to n inputs
 
-    Terms:
+    Terms::
+
               n+1
          0___/ n+2
          1____/
@@ -113,10 +112,10 @@ class PhaseArray(Component):
     def __init__(self, phases=None, length=1e-5, ng=3.40, trainable=True, name=None):
         """
         Args:
-            length: float = 1e-5: Length of the waveguide in meter.
-            ng: float = 3.40: group index of the phase array
-            trainable: bool = True: makes the phases trainable
-            name: str = None: the name of the component (default: lowercase classname)
+            length (float): Length of the waveguide in meter.
+            ng (float): group index of the phase array
+            trainable (bool): makes the phases trainable
+            name (str): the name of the component (default: lowercase classname)
         """
         if phases is None:
             phases = np.zeros(2)

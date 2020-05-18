@@ -1,9 +1,4 @@
-"""
-# Mirrors
-
-Mirrors are partly reflecting and partly transmitting.
-
-"""
+""" Mirrors are partly reflecting and partly transmitting connections.  """
 
 #############
 ## Imports ##
@@ -23,25 +18,26 @@ from ..torch_ext.nn import BoundedParameter
 
 
 class Mirror(Component):
-    """ A mirror is a memory-less component with one input and one output.
+    """ Mirrors are partly reflecting and partly transmitting connections.
 
     A mirror has one trainable parameter: the reflectivity R.
 
-    Terms:
+    Terms::
+
             |
         0 --|-- 1
             |
+
     """
 
     num_ports = 2
 
     def __init__(self, R=0.5, trainable=True, name=None):
-        """ Mirror
-
+        """
         Args:
-            R: float = 0.5: reflectivity of the mirror (between 0 and 1)
-            trainable: bool = True: makes the coupling trainable
-            name: str = None: the name of the component (default: lowercase classname)
+            R (float): reflectivity of the mirror (between 0 and 1)
+            trainable (bool): makes the reflection trainable
+            name (str): the name of the component (default: lowercase classname)
         """
         super(Mirror, self).__init__(name=name)
 

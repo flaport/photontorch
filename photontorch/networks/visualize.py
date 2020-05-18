@@ -23,7 +23,7 @@ def plot(network, detected, **kwargs):
     """ Plot detected power versus time or wavelength
 
     Args:
-        detected (numpy array | torch tensor): detected power. Allowed shapes:
+        detected (np.ndarray|Tensor): detected power. Allowed shapes:
             * (#timesteps,)
             * (#timesteps, #detectors)
             * (#timesteps, #detectors, #batches)
@@ -33,11 +33,13 @@ def plot(network, detected, **kwargs):
             * (#wavelengths,)
             * (#wavelengths, #detectors)
             * (#wavelengths, #detectors, #batches)
-        the plot function is smart enough to figure out what to plot.
+            the plot function should be smart enough to figure out what to plot.
+        **kwargs: keyword arguments given to plt.plot
 
     Note:
         if #timesteps = #wavelengths, the plotting function will choose #timesteps
         as the first dimension
+
     """
 
     import matplotlib.pyplot as plt
@@ -184,8 +186,13 @@ def plot(network, detected, **kwargs):
     )
 
 
-def graph(network, draw=True, with_labels=True):
-    """ a simple network visualization method """
+def graph(network, draw=True):
+    """ create a graph visualization of the network
+
+    Args:
+        draw (bool): draw the graph with matplotlib
+
+    """
     import networkx as nx
     import matplotlib.pyplot as plt
 
@@ -203,6 +210,14 @@ def graph(network, draw=True, with_labels=True):
 
 
 def _draw_nodes(G, components, pos):
+    """ helper function: draw the nodes of a networkx graph of a photontorch network
+
+    Args:
+        G (graph): networkx graph to draw
+        components (list): list of Photontorch components in the graph.
+        pos (list): list of positions to draw the graph nodes on.
+
+    """
     import matplotlib.pyplot as plt
 
     nodelist = list(G)
@@ -252,6 +267,13 @@ def _draw_nodes(G, components, pos):
 
 
 def _draw_edges(G, pos):
+    """ helper function: draw the edges of a networkx graph of a photontorch network
+
+    Args:
+        G (graph): networkx graph to draw
+        pos (list): list of positions to draw the edges between.
+
+    """
     import matplotlib.pyplot as plt
     from matplotlib.collections import LineCollection
     from matplotlib.patches import FancyArrowPatch

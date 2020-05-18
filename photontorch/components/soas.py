@@ -1,11 +1,6 @@
-"""
-# SOAs
+""" Semiconductor Optical Amplifiers
 
 SOAs amplify your signal.
-
-
-All components here except LinearSoa act actively on the states and are thus active
-components
 
 """
 
@@ -37,7 +32,7 @@ class LinearSoa(Component):
 
     A simple SOA has one trainable parameter: the amplification.
 
-    Terms:
+    Terms::
 
         0 ---- 1
 
@@ -46,12 +41,11 @@ class LinearSoa(Component):
     num_ports = 2
 
     def __init__(self, amplification=2, trainable=True, name=None):
-        """ SOA
-
+        """
         Args:
-            amplification: float = 2. Amplification of the soa
-            trainable: bool = True: makes the amplification trainable
-            name: str = None: the name of the component (default: lowercase classname)
+            amplification (float): Amplification of the soa
+            trainable (bool): makes the amplification trainable
+            name (str): the name of the component (default: lowercase classname)
         """
         super(LinearSoa, self).__init__(name=name)
 
@@ -61,7 +55,6 @@ class LinearSoa(Component):
         )
 
     def set_S(self, S):
-        """ Scattering matrix with shape: (2, # wavelengths, # ports, # ports) """
         S[0, :, 0, 1] = self.amplification
         return S
 
@@ -69,10 +62,10 @@ class LinearSoa(Component):
 class BaseSoa(Component):
     """ The BaseSoa is a memory-containing component with one input and one output.
 
-    It amplifies a signal according to its internal state, which in turn is modified by
-    its rate equation.
+    It amplifies a signal according to its internal state, which in turn is
+    modified by its rate equation.
 
-    Terms:
+    Terms::
 
         0 ---- 1
 
@@ -84,15 +77,13 @@ class BaseSoa(Component):
         """ Nonlinear action of the component on its active nodes
 
         Args:
-            t:float: the current time in the simulation
-            x_in: torch.Tensor[#active nodes, 2, #wavelengths, #batches]: the input tensor
+            t (float): the current time in the simulation
+            x_in (torch.Tensor[#active nodes, 2, #wavelengths, #batches]): the input tensor
                 used to define the action
-            x_out: torch.Tensor[#active nodes, 2, #wavelengths, #batches]: the output
-                tensor. The result of the action should be stored in this tensor.
+            x_out (torch.Tensor[#active nodes, 2, #wavelengths, #batches]): the output
+                tensor. The result of the action should be stored in the
+                elements of this tensor.
 
-        Returns:
-            None: (the result should be stored in the output tensor and should not be
-            returned)
         """
         a_in, h, _ = x_in  # unpack the three active nodes
 
@@ -110,15 +101,15 @@ class BaseSoa(Component):
         """ Derivative of the internal state h with respect to time
 
         Args:
-            t: float: the current time in the simulation
-            h: torch.Tensor[2, #wavelengths, #batches]: the current internal state of
-                the SOA
-            a: torch.Tensor[2, #wavelengths, #batches]: the current input amplitude of
-                the SOA
+            t (float): the current time in the simulation
+            h (Tensor[2, #wavelengths, #batches]): the current internal state
+                of the SOA
+            a (Tensor[2, #wavelengths, #batches]): the current input amplitude
+                of the SOA
 
         Returns:
-            dhdt: torch.Tensor[2, #wavelengths, #batches]: the rate of change of the
-                internal state
+            Tensor[2, #wavelengths, #batches]: the rate of change of the
+            internal state
         """
 
         return 0.0
@@ -133,17 +124,16 @@ class BaseSoa(Component):
         return S
 
     def set_C(self, C):
-        # the internal state should be connected onto itself to keep track of it.
-        C[0, 1, 1] = 1.0
+        C[0, 1, 1] = 1.0 # the internal state should be connected onto itself.
 
 
 class Soa(BaseSoa):
     """ The Soa is a memory-containing component with one input and one output.
 
-    It amplifies a signal according to its internal state, which in turn is modified by
-    its rate equation.
+    It amplifies a signal according to its internal state, which in turn is
+    modified by its rate equation.
 
-    Terms:
+    Terms::
 
         0 ---- 1
 
@@ -152,13 +142,12 @@ class Soa(BaseSoa):
     def __init__(
         self, amplification=1.0, startup_time=100e-12, trainable=False, name=None
     ):
-        """ Soa
-
+        """
         Args:
             amplification (float): the maximum amplification of the soa
             startup_time (float): how long it takes before the soa reaches max amplification
-            trainable: bool = True: makes the amplification trainable
-            name: str = None: the name of the component (default: lowercase classname)
+            trainable (bool): makes the amplification trainable
+            name (str): the name of the component (default: lowercase classname)
         """
         super(Soa, self).__init__(name=name)
 
@@ -184,7 +173,7 @@ class AgrawalSoa(BaseSoa):
     It amplifies a signal according to its internal state, which in turn is modified by
     its rate equation defined by Agrawal et. al.
 
-    Terms:
+    Terms::
 
         0 ---- 1
 
@@ -192,6 +181,7 @@ class AgrawalSoa(BaseSoa):
         Agrawal, G.P. and Olsson, N.A., 1989. Self-phase modulation and spectral
         broadening of optical pulses in semiconductor laser amplifiers. IEEE Journal of
         Quantum Electronics, 25(11), pp.2297-2306.
+
     """
 
     def __init__(
@@ -210,23 +200,21 @@ class AgrawalSoa(BaseSoa):
         wl=1.55e-6,  # wavelength of the simulation
         name=None,
     ):
-        """ Agrawal Soa
-
+        """
         Args:
-            L:float = 500e-6: length of soa
-            W:float = 2e-6: width of soa
-            H:float = 0.2e-6: height of soa
-            N0:float = 1e24: transparency carrier density
-            a:float = 2.7e-20: differenctial gain coefficient
-            I:float = 0.56/3.0: current through soa
-            tc:float = 300e-12: lifetime of the carriers
-            gamma:float = 0.3: confinement factor
-            alpha:float = 5.0: linewidth enhancement
-            neff:float = 2.34: effective index used to calculate phase offset
-            ng:float = 3.75: group index used to calculate delay of soa
-            wl:float = 1.55e-6: wavelength of the simulation
-
-            name: str = None: the name of the component (default: lowercase classname)
+            L (loat): length of soa
+            W (loat): width of soa
+            H (loat): height of soa
+            N0 (loat): transparency carrier density
+            a (loat): differenctial gain coefficient
+            I (loat): current through soa
+            tc (loat): lifetime of the carriers
+            gamma (float): confinement factor
+            alpha (float): linewidth enhancement
+            neff (float): effective index used to calculate phase offset
+            ng (float): group index used to calculate delay of soa
+            wl (float): wavelength of the simulation
+            name (str): the name of the component (default: lowercase classname)
         """
 
         super(AgrawalSoa, self).__init__(name=name)

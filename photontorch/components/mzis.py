@@ -1,9 +1,4 @@
-"""
-# MZIs
-
-MZIs are 4-port components coupling two waveguides together.
-
-"""
+""" MZIs are 4-port components coupling two waveguides together. """
 
 #############
 ## Imports ##
@@ -28,10 +23,12 @@ from ..torch_ext.nn import Parameter, Buffer
 class Mzi(Component):
     r""" An MZI is a component with 4 ports.
 
-    An MZI has two trainable parameter: the input phase phi and the phase difference
+    An MZI has two trainable parameters: the input phase phi and the phase difference
     between the arms theta. .
 
-    Terms:          _[2*theta]_
+    Terms::
+
+                    _[2*theta]_
         3  ______  /           \  ___2
                  \/             \/
         0__[phi]_/\_____________/\___1
@@ -39,6 +36,7 @@ class Mzi(Component):
     Note:
         This MZI implementation assumes the armlength difference is too small to have
         a noticable delay difference between the arms, i.e. only the phase difference matters
+
     """
 
     num_ports = 4
@@ -57,15 +55,15 @@ class Mzi(Component):
     ):
         """
         Args:
-            phi: float = 0: input phase
-            theta: float=pi/4: phase difference between the arms
-            neff: float = 2.34: effective index of the waveguide
-            ng: float = 3.40: group index of the waveguide
-            wl0: float = 1.55e-6: the center wavelength for which neff is defined.
-            length: float = 1e-5: length of the waveguide in meter.
-            loss: float = 0: loss in the waveguide [dB/m]
+            phi (float): input phase
+            theta (float): phase difference between the arms
+            neff (float): effective index of the waveguide
+            ng (float): group index of the waveguide
+            wl0 (float): the center wavelength for which neff is defined.
+            length (float): length of the waveguide in meter.
+            loss (float): loss in the waveguide [dB/m]
             trainable (bool): whether phi and theta are trainable
-            name (str). name of this specific MZI
+            name (str): name of this specific MZI
         """
         super(Mzi, self).__init__(name=name)
 

@@ -1,8 +1,8 @@
 # Mac folders
 .DS_Store
 
-# development folder
-dev
+# documentation build
+docs/_build
 
 # python cache
 __pycache__

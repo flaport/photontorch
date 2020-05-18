@@ -1,22 +1,4 @@
-"""
-# Torch Neural Network Extensions
-
-The Neural Network Extensions Consist out of three main objects:
-
-  * `Buffer`: A special kind of tensor that automatically will
-be added to the `._buffers` attribute of the Module. Buffers are typically used as
-parameters of the model that do not require gradients.
-
-  * `Module`: Extends `torch.nn.Module`, with some extra features, such as
-automatically registering a `[Buffer](.nn.Buffer)` in its `._buffers` attribute, modified
-`.cuda()` calls and some extra functionalities.
-
-  * `BoundedParameter`: A bounded parameter is a special kind of
-`torch.nn.Parameter` that is bounded between a certain range. Under the hood it registers
-an unbounded weight in our torch_ext.nn.Module and a class property calculating the
-desired parameter on the fly when it is asked by performing a scaled sigmoid on the weight.
-
-"""
+""" Torch Neural Network Extensions """
 
 
 #############
@@ -47,6 +29,7 @@ class Buffer(torch.Tensor):
     Note:
         For the automatic registration of the Buffer to work, you need to use the torch_ext
         version of Module, which is a subclass of torch.nn.Module.
+
     """
 
     def __new__(cls, data=None, requires_grad=False):
@@ -73,6 +56,7 @@ class BoundedParameter(torch.nn.Parameter):
     Note:
         For the registration of the BoundedParameter to work, you need to use the torch_ext
         version of Module, which is a subclass of torch.nn.Module.
+
     """
 
     def __new__(cls, data=None, bounds=(0, 1), requires_grad=True):
@@ -137,19 +121,7 @@ class BoundedParameter(torch.nn.Parameter):
 
 
 class Module(_Module_):
-    """ Torch.nn Module extension with some extra features:
-
-    In PhotonTorch, often new variables need to be created on the fly. Therefore, three
-    new functions (`tensor`, `buffer`, `parameter`) were created to easily
-    create these, with the requested type and cuda flag.
-
-    Buffers are automatically registerd in the _buffers attribute
-
-    .cuda() calls perfom the cuda calls on all parameters, buffers and submodules.
-    (this is different from the default PyTorch behavior, where just Parameters are
-    converted to cuda.)
-
-    """
+    """ Torch.nn Module extension with some extra features. """
 
     def __init__(self):
         super(Module, self).__init__()
@@ -206,3 +178,4 @@ class Module(_Module_):
         elif isinstance(device, int):
             device = "cuda:%i" % device
         return self.to(device=device)
+
