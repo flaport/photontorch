@@ -1060,4 +1060,3 @@ def link(*ports):
     """
     nw = current_network()
     nw.link(*ports)
-

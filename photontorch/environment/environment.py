@@ -340,4 +340,3 @@ def set_environment(*args, **kwargs):
         env = Environment(**kwargs)
 
     env._set()
-

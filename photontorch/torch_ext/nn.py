@@ -178,4 +178,3 @@ class Module(_Module_):
         elif isinstance(device, int):
             device = "cuda:%i" % device
         return self.to(device=device)
-
