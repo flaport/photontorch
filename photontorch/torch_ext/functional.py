@@ -33,7 +33,7 @@ class BitStreamGenerator:
         bitrate=40e9,
         samplerate=160e9,
         cutoff_frequency=None,
-        filter_order=4,
+        filter_order=1,
         seed=None,
         dtype=None,
         device=None,
@@ -45,28 +45,60 @@ class BitStreamGenerator:
             cutoff_frequency (float): [1/s] cutoff frequency of the bitstream. If None: no lowpass filtering.
             filter_order (int): filter order to enforce cutoff frequency
             seed (int): seed used to generate bits (if needed)
-            dtype (torch.dtype):: dtype to generate the bits for. None -> "torch.get_default_dtype()"
-            device (torch.device):: device to generate the bits on. None -> "cpu"
-
+            dtype (torch.dtype): dtype to generate the bits for. None -> "torch.get_default_dtype()"
+            device (torch.device): device to generate the bits on. None -> "cpu"
         """
         self.bitrate = float(bitrate)
         self.samplerate = float(samplerate)
         self.cutoff_frequency = (
             None if cutoff_frequency is None else float(cutoff_frequency)
         )
-        self.filter_order = None if cutoff_frequency is None else int(filter_order)
-        self.seed = None if seed is None else int(seed)
+        self.filter_order = (
+            None if cutoff_frequency is None else int(filter_order + 0.5)
+        )
+        self.seed = None if seed is None else int(seed + 0.5)
         self.device = torch.device("cpu") if device is None else torch.device(device)
         self.dtype = torch.get_default_dtype() if dtype is None else dtype
         self._rng = np.random.RandomState(seed=self.seed)
 
-    def __call__(self, bits=100):
+    def __call__(
+        self,
+        bits=100,
+        bitrate=None,
+        samplerate=None,
+        cutoff_frequency=None,
+        filter_order=None,
+        seed=None,
+        dtype=None,
+        device=None,
+    ):
         """generate a bitstream from a sequence of bits (or from a random seed)
 
         Args:
             bits (int|sequence): - if int: generate that number of bits, then create stream.
                 - if sequence: interpret the sequence as bits, then create stream.
+            bitrate (optional, float): [1/s] override data rate of the bitstream
+            samplerate (optional, float): [1/s] override sample rate of the bitstream
+            cutoff_frequency (optional, float): [1/s] override cutoff frequency of the bitstream. If None: no lowpass filtering.
+            filter_order (optional, int): override filter order to enforce cutoff frequency
+            seed (optional, int): override seed used to generate bits (if needed)
+            dtype (optional, torch.dtype): override dtype to generate the bits for. None -> "torch.get_default_dtype()"
+            device (optional, torch.device): override device to generate the bits on. None -> "cpu"
         """
+        bitrate = self.bitrate if bitrate is None else float(bitrate)
+        samplerate = self.samplerate if samplerate is None else float(samplerate)
+        cutoff_frequency = (
+            self.cutoff_frequency
+            if cutoff_frequency is None
+            else float(cutoff_frequency)
+        )
+        filter_order = (
+            self.filter_order if filter_order is None else int(filter_order + 0.5)
+        )
+        seed = self.seed if seed is None else int(seed + 0.5)
+        device = self.device if device is None else torch.device(device)
+        dtype = self.dtype if dtype is None else dtype
+        rng = self._rng if seed == self.seed else np.random.RandomState(seed=seed)
         try:
             if len(bits.shape) == 0:
                 bits = int(bits.item())
@@ -77,34 +109,27 @@ class BitStreamGenerator:
             bits = bits.detach().cpu().numpy()
 
         if isinstance(bits, int):
-            bits = self._rng.rand(bits) > 0.5
+            bits = rng.rand(bits) > 0.5
 
-        bits = np.array(bits, dtype=np.float64)
-        num_samples_per_n_bits = int(self.samplerate) // np.gcd(
-            int(self.samplerate), int(self.bitrate)
+        # handle fractional sampling:
+        temp_samplerate = max(
+            int(8 * cutoff_frequency + 0.5) // int(samplerate + 0.5) * samplerate,
+            samplerate,
         )
-        n_bits = int(self.bitrate) // np.gcd(int(self.samplerate), int(self.bitrate))
-        stream = (
-            np.stack([bits] * num_samples_per_n_bits, 1)
-            .reshape(-1, *bits.shape[1:])[::n_bits]
-            .copy()
-        )
+        rc = int(temp_samplerate + 0.5) // int(samplerate + 0.5)
+        rates_gcd = np.gcd(int(temp_samplerate + 0.5), int(bitrate + 0.5))
+        rs = int(temp_samplerate + 0.5) // rates_gcd
+        rb = int(bitrate + 0.5) // rates_gcd
+        stream = np.stack([bits] * rs, 1).reshape(-1, *bits.shape[1:]).copy()
 
-        if self.cutoff_frequency is not None:
-            normal_cutoff = self.cutoff_frequency / (0.5 * self.samplerate)
-            if normal_cutoff > 1.0:
-                raise ValueError(
-                    "The samplerate of the signal is smaller than the nyquist "
-                    "frequency [=2 x cutoff_frequency]\n"
-                    "%.2e > %.2e" % (self.samplerate, 2 * self.cutoff_frequency)
-                )
-            if normal_cutoff < 1.0:
-                b, a = butter(
-                    N=self.filter_order, Wn=normal_cutoff, btype="lowpass", analog=False
-                )
-                stream = lfilter(b, a, stream, axis=0)
+        if cutoff_frequency is not None:
+            normal_cutoff = cutoff_frequency / (0.5 * temp_samplerate * rb)
+            b, a = butter(
+                N=filter_order, Wn=normal_cutoff, btype="lowpass", analog=False
+            )
+            stream = lfilter(b, a, stream, axis=0)
 
-        stream = torch.tensor(stream, dtype=self.dtype, device=self.device)
+        stream = torch.tensor(stream[:: rb * rc].copy(), dtype=dtype, device=device)
 
         return stream
 
@@ -143,10 +168,10 @@ class _Loss(torch.nn.Module):
     def __init__(self, latency=0.0, warmup=0, bitrate=40e9, samplerate=160e9):
         """
         Args:
-            latency (float): fractional latency [in bit lengths]. This value can be a floating point number bigger than 1.
-            warmup (int): integer number of warmup bits. warmup bits are disregarded during the loss calculation.
-            bitrate (float): the bit rate of the signal [in Hz]
-            samplerate (float): the sample rate of the signal [in Hz]
+            latency (float): [bits] fractional latency in bit lengths. This value can be a floating point number bigger than 1.
+            warmup (int): [bits] integer number of warmup bits. warmup bits are disregarded during the loss calculation.
+            bitrate (float): [1/s] data rate of the bitstream
+            samplerate (float): [1/s] sample rate of the bitstream
         """
         super(_Loss, self).__init__()
         self.bitrate = float(bitrate)
@@ -167,10 +192,10 @@ class _Loss(torch.nn.Module):
         Args:
             prediction (Tensor): prediction power tensor. Should be broadcastable to tensor with shape (# timesteps, # wavelengths, # readouts, # batches)
             target (Tensor): target power tensor. Should be broadcastable to the same shape as prediction.
-            latency (optional, float): override fractional latency [in bit lengths]. This value can be a floating point number bigger than 1.
-            warmup (optional, int): override integer number of warmup bits. warmup bits are disregarded during the loss calculation.
-            bitrate (optional, float): override the bit rate of the signal [in Hz]
-            samplerate (optional, float): override the sample rate of the signal [in Hz]
+            latency (optional, float): [bits] override fractional latency in bit lengths. This value can be a floating point number bigger than 1.
+            warmup (optional, int): [bits] override integer number of warmup bits. warmup bits are disregarded during the loss calculation.
+            bitrate (optional, float): [1/s] override data rate of the bitstream
+            samplerate (optional, float): [1/s] override sample rate of the bitstream
         """
         raise NotImplementedError(
             "Implement forward function for your loss by subclassing."
@@ -190,9 +215,10 @@ class _Loss(torch.nn.Module):
         """ Plot prediction and target
         Args:
             x (Tensor): Should be broadcastable to tensor with shape (# timesteps, # wavelengths, # readouts, # batches)
-            warmup (optional, int): override integer number of warmup bits. warmup bits are not shown on the plot.
-            bitrate (optional, float): override the bit rate of the signal [in Hz]
-            samplerate (optional, float): override the sample rate of the signal [in Hz]
+            latency (optional, float): [bits] override fractional latency in bit lengths. This value can be a floating point number bigger than 1.
+            warmup (optional, int): [bits] override integer number of warmup bits. warmup bits are disregarded during the loss calculation.
+            bitrate (optional, float): [1/s] override data rate of the bitstream
+            samplerate (optional, float): [1/s] override sample rate of the bitstream
             unit (str): unit to use for time array (time values will be multiplied accordingly)
             show (bool): run plt.show at the end of this method.
             **kwargs: keyword arguments given to plt.plot.
@@ -265,7 +291,7 @@ class BERLoss(_Loss):
     ):
         """
         Args:
-            threshold (float): where to place the 0 / 1 threshold on the output power.
+            threshold (float): threshold value (where to place the 0/1 threshold)
             latency (float): fractional latency [in bit lengths]. This value can be a floating point number bigger than 1.
             warmup (int): integer number of warmup bits. warmup bits are disregarded during the loss calculation.
             bitrate (float): the bit rate of the signal [in Hz]
@@ -291,9 +317,9 @@ class BERLoss(_Loss):
             prediction (Tensor): prediction power tensor. Should be broadcastable to tensor with shape (# timesteps, # wavelengths, # readouts, # batches)
             target (Tensor): target power tensor. Should be broadcastable to the same shape as prediction.
             threshold (optional, float): override threshold value (where to place the 0/1 threshold)
-            latency (optional, float): override fractional latency [in bit lengths]. This value can be a floating point number bigger than 1.
-            warmup (optional, int): override integer number of warmup bits. warmup bits are disregarded during the loss calculation.
-            bitrate (optional, float): override the bit rate of the signal [in Hz]
+            latency (optional, float): [bits] override fractional latency in bit lengths. This value can be a floating point number bigger than 1.
+            warmup (optional, int): [bits] override integer number of warmup bits. warmup bits are disregarded during the loss calculation.
+            bitrate (optional, float): [1/s] override data rate of the bitstream
             samplerate (optional, float): override the sample rate of the signal [in Hz]
         """
         with torch.no_grad():
@@ -307,12 +333,10 @@ class BERLoss(_Loss):
             _, nw, nd, nb = prediction.shape
 
             # always normalize target around 0 (this way we don't need to care about how the target bits are defined [0,1] or [-1, 1] or smth else)
-            target -= target.mean(0)
-            target /= target.std(0)
+            target = (target - target.mean(0)) / target.std()
 
             # handle fractional sampling:
-            rates_gcd = np.gcd(int(samplerate + 0.5), int(bitrate + 0.5))
-            rs, rb = int(samplerate + 0.5) // rates_gcd, int(bitrate + 0.5) // rates_gcd
+            rb = int(bitrate + 0.5) // np.gcd(int(samplerate + 0.5), int(bitrate + 0.5))
             samplerate = rb * samplerate
             prediction = torch.stack([prediction] * rb, 1).view(-1, nw, nd, nb)
             target = torch.stack([target] * rb, 1).view(-1, nw, nd, nb)
