@@ -54,7 +54,7 @@ class BitStreamGenerator:
             None if cutoff_frequency is None else float(cutoff_frequency)
         )
         self.filter_order = (
-            None if cutoff_frequency is None else int(filter_order + 0.5)
+            None if filter_order is None else int(filter_order + 0.5)
         )
         self.seed = None if seed is None else int(seed + 0.5)
         self.device = torch.device("cpu") if device is None else torch.device(device)
@@ -111,12 +111,15 @@ class BitStreamGenerator:
         if isinstance(bits, int):
             bits = rng.rand(bits) > 0.5
 
-        # handle fractional sampling:
-        temp_samplerate = max(
-            int(8 * cutoff_frequency + 0.5) // int(samplerate + 0.5) * samplerate,
-            samplerate,
-        )
-        rc = int(temp_samplerate + 0.5) // int(samplerate + 0.5)
+        rc = 1
+        temp_samplerate = samplerate
+        if cutoff_frequency is not None:
+            # handle fractional sampling:
+            temp_samplerate = max(
+                int(8 * cutoff_frequency + 0.5) // int(samplerate + 0.5) * samplerate,
+                samplerate,
+            )
+            rc = int(temp_samplerate + 0.5) // int(samplerate + 0.5)
         rates_gcd = np.gcd(int(temp_samplerate + 0.5), int(bitrate + 0.5))
         rs = int(temp_samplerate + 0.5) // rates_gcd
         rb = int(bitrate + 0.5) // rates_gcd

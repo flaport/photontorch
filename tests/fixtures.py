@@ -148,3 +148,4 @@ def conn():
     d = pt.Detector()
     conn = wg["ab"] * s["a"] * d["b"]
     return conn
+
