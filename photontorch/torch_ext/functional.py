@@ -238,8 +238,8 @@ class _Loss(torch.nn.Module):
         x = x[w + l : :]
 
         time = np.arange(x.shape[0]) / samplerate
-        units = {"s": 0, "ms": 3, "μs": 6, "ns": 9, "ps": 12, "fs": 15}
-        unit = unit.replace("u", "μ")
+        units = {"s": 0, "ms": 3, r"$\mu$s": 6, "ns": 9, "ps": 12, "fs": 15}
+        unit = unit.replace("u", r"$\mu$")
         if unit not in units:
             unit = "ns"
         factor = 10 ** units[unit]
