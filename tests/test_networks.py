@@ -166,12 +166,21 @@ def test_network_connection_with_too_high_port_index(wg):
 
 
 def test_network_plot(tenv, fenv):
-    tnw = pt.AddDrop(
-        term_in=pt.Source(),
-        term_pass=pt.Detector(),
-        term_add=pt.Detector(),
-        term_drop=pt.Detector(),
-    )
+    class AddDrop(pt.Network):
+        def __init__(self):
+            super(AddDrop, self).__init__()
+            self.term_in = pt.Source()
+            self.term_pass = pt.Detector()
+            self.term_add = pt.Detector()
+            self.term_drop = pt.Detector()
+            self.dc1 = pt.DirectionalCoupler()
+            self.dc2 = pt.DirectionalCoupler()
+            self.wg1 = pt.Waveguide()
+            self.wg2 = pt.Waveguide()
+            self.link("term_in:0", "0:dc1:2", "0:wg1:1", "1:dc2:3", "0:term_drop")
+            self.link("term_add:0", "2:dc2:0", "0:wg2:1", "3:dc1:1", "0:term_pass")
+
+    tnw = AddDrop()
 
     with tenv.copy(wls=np.array([1.5, 1.55, 1.6]) * 1e-6) as env:
         tnw.initialize()

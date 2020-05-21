@@ -44,7 +44,6 @@ from .soas import AgrawalSoa
 
 # MMIs
 from .mmis import Mmi
-from .mmis import PhaseArray
 
 # MZIs
 from .mzis import Mzi

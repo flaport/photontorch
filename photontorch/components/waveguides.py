@@ -39,7 +39,7 @@ class Waveguide(Connection):
         wl0=1.55e-6,
         ng=3.40,
         phase=0,
-        trainable=False,
+        trainable=True,
         name=None,
     ):
         """

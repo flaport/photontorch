@@ -140,7 +140,7 @@ class Soa(BaseSoa):
     """
 
     def __init__(
-        self, amplification=1.0, startup_time=100e-12, trainable=False, name=None
+        self, amplification=1.0, startup_time=100e-12, trainable=True, name=None
     ):
         """
         Args:

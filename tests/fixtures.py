@@ -104,7 +104,7 @@ def rnw():
 @pytest.fixture
 def reck():
     """ default reck network """
-    return pt.ReckMxN(3, 4).terminate()
+    return pt.ReckNxN(4).terminate()
 
 
 @pytest.fixture
@@ -148,4 +148,3 @@ def conn():
     d = pt.Detector()
     conn = wg["ab"] * s["a"] * d["b"]
     return conn
-

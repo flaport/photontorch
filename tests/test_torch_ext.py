@@ -93,21 +93,23 @@ def test_buffer_repr():
     s = repr(pt.nn.Buffer(data=torch.tensor([0.5])))
     assert s.startswith("Buffer")
 
+
 def test_ber():
-    berfunc = pt.BERLoss(bitrate=50e9, samplerate=160e9) # uneven sample rate
+    berfunc = pt.BERLoss(bitrate=50e9, samplerate=160e9)  # uneven sample rate
     streamgenerator = pt.BitStreamGenerator(bitrate=50e9, samplerate=160e9)
-    output_bits = np.array([1,0,0,1,1,0,0,1,0,1])
-    target_bits = np.array([1,0,1,1,1,0,0,1,0,1]) # one bit difference
+    output_bits = np.array([1, 0, 0, 1, 1, 0, 0, 1, 0, 1])
+    target_bits = np.array([1, 0, 1, 1, 1, 0, 0, 1, 0, 1])  # one bit difference
     output_stream = streamgenerator(output_bits)
     target_stream = streamgenerator(target_bits)
     ber = berfunc(output_stream, target_stream)
     assert ber == 0.1
 
+
 def test_mse():
-    msefunc = pt.MSELoss(bitrate=50e9, samplerate=160e9) # uneven sample rate
+    msefunc = pt.MSELoss(bitrate=50e9, samplerate=160e9)  # uneven sample rate
     streamgenerator = pt.BitStreamGenerator(bitrate=50e9, samplerate=160e9)
-    output_bits = np.array([1,0,0,1,1,0,0,1,0,1])
-    target_bits = np.array([1,0,1,1,1,0,0,1,0,1]) # one bit difference
+    output_bits = np.array([1, 0, 0, 1, 1, 0, 0, 1, 0, 1])
+    target_bits = np.array([1, 0, 1, 1, 1, 0, 0, 1, 0, 1])  # one bit difference
     output_stream = streamgenerator(output_bits).requires_grad_()
     target_stream = streamgenerator(target_bits)
     mse = msefunc(output_stream, target_stream)

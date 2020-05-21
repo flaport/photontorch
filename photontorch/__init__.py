@@ -46,7 +46,6 @@ from .components.soas import AgrawalSoa
 
 # MMIs
 from .components.mmis import Mmi
-from .components.mmis import PhaseArray
 
 # MZIs
 from .components.mzis import Mzi
@@ -72,15 +71,12 @@ from .networks.network import current_network
 from .networks.network import link
 
 # Ring Networks
-from .networks.rings import AllPass
-from .networks.rings import AddDrop
-from .networks.rings import RingMolecule
 from .networks.rings import RingNetwork
 
 # Reck Network
-from .networks.reck import ReckMxN
 from .networks.reck import ReckNxN
-from .networks.reck import ReckMmi
+
+# Clements Network
 from .networks.clements import ClementsNxN
 
 

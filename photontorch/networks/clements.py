@@ -14,9 +14,8 @@ import numpy as np
 
 # relative
 from .network import Network
-from ..components.waveguides import Waveguide
 from ..components.mzis import Mzi
-from ..components.mmis import PhaseArray
+from ..components.waveguides import Waveguide
 from ..components.terms import Source, Detector
 
 
@@ -25,66 +24,93 @@ from ..components.terms import Source, Detector
 #############
 
 
+def _wg_factory():
+    return Waveguide(phase=2 * np.pi * np.random.rand(), trainable=True)
+
+
+def _mzi_factory():
+    return Mzi(
+        phi=2 * np.pi * np.random.rand(),
+        theta=2 * np.pi * np.random.rand(),
+        trainable=True,
+    )
+
+
+class _PhaseArray(Network):
+    """ helper network for ClementsNxN """
+
+    def __init__(
+        self, N, wg_factory=_wg_factory, name=None,
+    ):
+        """
+        Args:
+            N (int): number of input / output ports (the network represents an NxN matrix)
+            wg_factory (callable): function without arguments which creates the waveguides.
+            name (str): name of the component
+        """
+        self.N = int(N + 0.5)
+        components = {}
+        connections = []
+
+        for i in range(self.N):
+            components["wg%i" % i] = wg_factory()
+
+        # input/output connections:
+        for i in range(self.N):
+            connections += ["wg%i:0:%i" % (i, i)]
+            connections += ["wg%i:1:%i" % (i, self.N + i)]
+
+        super(_PhaseArray, self).__init__(components, connections, name=name)
+
+
 class _MixingPhaseArray(Network):
     """ helper network for ClementsNxN """
 
     def __init__(
-        self,
-        phases,
-        length=1e-5,
-        loss=0,
-        neff=2.34,
-        ng=None,
-        wl0=1.55e-6,
-        trainable=True,
-        name=None,
+        self, N, wg_factory=_wg_factory, mzi_factory=_mzi_factory, name=None,
     ):
         """
         Args:
-            phases: array of phases to implement with photonic components.
-            length (float): length of the waveguides in the network in meters.
-            loss (float): loss in the ring (dB/m).
-            neff (float): effective index of the waveguides
-            ng (float): group index of the waveguides
-            wl0 (flota): center wavelength for th effective index in the waveguides
-            trainable (bool): make parameters in the network trainable
+            N (int): number of input / output ports (the network represents an NxN matrix)
+            wg_factory (callable): function without arguments which creates the waveguides.
+            mzi_factory (callable): function without arguments which creates the MZIs or any other general 
+                4-port component with  ports defined anti-clockwise.
             name (str): name of the component
         """
-        N = phases.shape[0]
-        num_mzis = N // 2
+        self.N = int(N + 0.5)
+        num_mzis = self.N // 2
         components = {}
-        components["pa"] = PhaseArray(
-            phases=phases, length=0, ng=0, trainable=trainable
-        )
+
+        for i in range(self.N):
+            components["wg%i" % i] = wg_factory()
 
         for i in range(num_mzis):
-            components["mzi%i" % i] = Mzi(
-                length=length,
-                phi=0,
-                theta=np.pi / 4,
-                loss=loss,
-                neff=neff,
-                ng=ng,
-                wl0=wl0,
-                trainable=trainable,
-            )
+            components["mzi%i" % i] = mzi_factory()
+        if self.N % 2:
+            components["wg_"] = wg_factory()
 
         connections = []
         for i in range(num_mzis):
-            connections += ["mzi%i:1:pa:%i" % (i, 2 * i)]
-            connections += ["mzi%i:2:pa:%i" % (i, 2 * i + 1)]
+            connections += ["mzi%i:1:wg%i:0" % (i, 2 * i)]
+            connections += ["mzi%i:2:wg%i:0" % (i, 2 * i + 1)]
+        if self.N % 2:
+            connections += ["wg_:1:wg%i:0" % (self.N - 1)]
 
         # input connections:
         for i in range(0, num_mzis):
             connections += ["mzi%i:0:%i" % (i, 2 * i)]
             connections += ["mzi%i:3:%i" % (i, 2 * i + 1)]
-        if N % 2:
-            connections += ["pa:%i:%i" % (N - 1, N - 1)]
+        if self.N % 2:
+            connections += ["wg_:0:%i" % (self.N - 1)]
+
+        # output connections:
+        for i in range(self.N):
+            connections += ["wg%i:1:%i" % (i, self.N + i)]
 
         super(_MixingPhaseArray, self).__init__(components, connections, name=name)
 
 
-class _Capacity2ClemensNxN(Network):
+class _Capacity2ClementsNxN(Network):
     r""" Helper network for ClementsNxN::
 
         <- cap==2 ->
@@ -99,25 +125,14 @@ class _Capacity2ClemensNxN(Network):
     """
 
     def __init__(
-        self,
-        N=2,
-        length=1e-5,
-        loss=0,
-        neff=2.34,
-        ng=None,
-        wl0=1.55e-6,
-        trainable=True,
-        name=None,
+        self, N=2, wg_factory=_wg_factory, mzi_factory=_mzi_factory, name=None,
     ):
         """
         Args:
             N (int): number of input waveguides (= number of output waveguides)
-            length (float): length of the waveguides in the network in meters.
-            loss (float): loss in the ring (dB/m).
-            neff (float): effective index of the waveguides
-            ng (float): group index of the waveguides
-            wl0 (flota): center wavelength for th effective index in the waveguides
-            trainable (bool): make parameters in the network trainable
+            wg_factory (callable): function without arguments which creates the waveguides.
+            mzi_factory (callable): function without arguments which creates the MZIs or any other general 
+                4-port component with  ports defined anti-clockwise.
             name (str): name of the component
         """
         num_mzis = N - 1
@@ -125,26 +140,9 @@ class _Capacity2ClemensNxN(Network):
         # define components
         components = {}
         for i in range(num_mzis):
-            components["mzi%i" % i] = Mzi(
-                length=length,
-                phi=0,
-                theta=np.pi / 4,
-                loss=loss,
-                neff=neff,
-                ng=ng,
-                wl0=wl0,
-                trainable=trainable,
-            )
+            components["mzi%i" % i] = mzi_factory()
 
-        components["wg0"] = components["wg1"] = Waveguide(
-            length=length,
-            phase=0,
-            loss=loss,
-            neff=neff,
-            ng=ng,
-            wl0=wl0,
-            trainable=False,
-        )
+        components["wg0"] = components["wg1"] = wg_factory()
 
         # connections between mzis:
         connections = []
@@ -176,7 +174,7 @@ class _Capacity2ClemensNxN(Network):
             connections += ["wg1:1:%i" % (2 * N - 1)]
 
         # initialize network
-        super(_Capacity2ClemensNxN, self).__init__(components, connections, name=name)
+        super(_Capacity2ClementsNxN, self).__init__(components, connections, name=name)
 
 
 class ClementsNxN(Network):
@@ -194,10 +192,12 @@ class ClementsNxN(Network):
         3__/\______/\______[]__3
 
         with:
-            __[]__ = phase shift
-            __  __
-              \/   =  MZI
-            __/\__
+        
+           0__[]__1 = phase shift
+           
+           3__  __2
+              \/    =  MZI
+           0__/\__1
 
     Reference:
         https://www.osapublishing.org/optica/abstract.cfm?uri=optica-3-12-1460
@@ -208,23 +208,17 @@ class ClementsNxN(Network):
         self,
         N=2,
         capacity=None,
-        length=1e-5,
-        loss=0,
-        neff=2.34,
-        ng=3.4,
-        wl0=1.55e-6,
-        trainable=True,
+        wg_factory=_wg_factory,
+        mzi_factory=_mzi_factory,
         name=None,
     ):
         """
         Args:
             N (int): number of input / output ports (the network represents an NxN matrix)
-            length (float): length of the waveguides in the network,
-            loss (float): loss of the waveguides in the network,
-            neff (float): effective index of the waveguides in the network,
-            ng (float): group index of the waveguides in the network,
-            wl0 (float): center wavelength of the waveguides in the network,
-            trainable (bool): makes the MZIs in the network trainable
+            capacity (int): number of consecutive MZI layers (to span the full unitary space one needs capacity >=N).
+            wg_factory (callable): function without arguments which creates the waveguides.
+            mzi_factory (callable): function without arguments which creates the MZIs or any other general 
+                4-port component with  ports defined anti-clockwise.
             name (str): the name of the network (default: lowercase classname)
         """
         if capacity is None:
@@ -236,31 +230,16 @@ class ClementsNxN(Network):
         # create components
         components = {}
         for i in range(capacity // 2):
-            components["layer%i" % i] = _Capacity2ClemensNxN(
-                N=N,
-                length=length,
-                loss=loss,
-                neff=neff,
-                ng=ng,
-                wl0=wl0,
-                trainable=trainable,
+            components["layer%i" % i] = _Capacity2ClementsNxN(
+                N=N, mzi_factory=mzi_factory, wg_factory=wg_factory,
             )
         if capacity % 2 == 0:
-            components["layer%i" % (capacity // 2)] = PhaseArray(
-                phases=2 * np.pi * np.random.rand(N),
-                length=0,
-                ng=0,
-                trainable=trainable,
+            components["layer%i" % (capacity // 2)] = _PhaseArray(
+                self.N, wg_factory=wg_factory
             )
         else:
             components["layer%i" % (capacity // 2)] = _MixingPhaseArray(
-                phases=2 * np.pi * np.random.rand(N),
-                length=length,
-                loss=loss,
-                neff=neff,
-                ng=ng,
-                wl0=wl0,
-                trainable=trainable,
+                self.N, mzi_factory=mzi_factory, wg_factory=wg_factory,
             )
 
         # create connections

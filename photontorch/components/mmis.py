@@ -42,7 +42,7 @@ class Mmi(Component):
 
     num_ports = None  # not yet defined
 
-    def __init__(self, weights=None, trainable=False, name=None):
+    def __init__(self, weights=None, trainable=True, name=None):
         """
         Mmi initialization
 
@@ -87,60 +87,3 @@ class Mmi(Component):
         _, _, m, n = weights.shape
         S[:, :, :m, m:] = weights
         S[:, :, m:, :m] = torch.transpose(weights, -1, -2)
-
-
-class PhaseArray(Component):
-    r""" A Phase Array adds a phase to n inputs
-
-    Terms::
-
-              n+1
-         0___/ n+2
-         1____/
-          :  :
-         n____
-              \
-               2*n
-
-    Note:
-        This component is used in bigger networks. On itself it's not immediately useful.
-
-    """
-
-    num_ports = None
-
-    def __init__(self, phases=None, length=1e-5, ng=3.40, trainable=True, name=None):
-        """
-        Args:
-            length (float): Length of the waveguide in meter.
-            ng (float): group index of the phase array
-            trainable (bool): makes the phases trainable
-            name (str): the name of the component (default: lowercase classname)
-        """
-        if phases is None:
-            phases = np.zeros(2)
-
-        if len(phases.shape) != 1:
-            raise ValueError("phases should be a 1D array or tensor")
-
-        self.num_ports = 2 * phases.shape[0]
-
-        super(PhaseArray, self).__init__(name=name)
-
-        self.ng = float(ng)
-        self.length = float(length)
-
-        parameter = Parameter if trainable else Buffer
-        phases = torch.tensor(phases, dtype=torch.float64, device=self.device)
-        self.phases = parameter(phases)
-
-    def set_delays(self, delays):
-        delays[:] = self.ng * self.length / self.env.c
-
-    def set_S(self, S):
-        n = self.num_ports // 2
-        cos_phase = torch.diag(torch.cos(self.phases).to(torch.get_default_dtype()))
-        sin_phase = torch.diag(torch.sin(self.phases).to(torch.get_default_dtype()))
-        phase = torch.stack([cos_phase, sin_phase], 0)[:, None, :, :]
-        S[:, :, :n, n:] = phase
-        S[:, :, n:, :n] = phase

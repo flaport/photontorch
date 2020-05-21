@@ -53,9 +53,7 @@ class BitStreamGenerator:
         self.cutoff_frequency = (
             None if cutoff_frequency is None else float(cutoff_frequency)
         )
-        self.filter_order = (
-            None if filter_order is None else int(filter_order + 0.5)
-        )
+        self.filter_order = None if filter_order is None else int(filter_order + 0.5)
         self.seed = None if seed is None else int(seed + 0.5)
         self.device = torch.device("cpu") if device is None else torch.device(device)
         self.dtype = torch.get_default_dtype() if dtype is None else dtype

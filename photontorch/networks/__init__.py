@@ -14,14 +14,10 @@ from .network import current_network
 from .network import link
 
 # Ring Networks
-from .rings import AllPass
-from .rings import AddDrop
-from .rings import RingMolecule
 from .rings import RingNetwork
 
 # Reck Network
-from .reck import ReckMxN
 from .reck import ReckNxN
-from .reck import ReckMmi
 
+# Clements Network
 from .clements import ClementsNxN
