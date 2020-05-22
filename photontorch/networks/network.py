@@ -129,7 +129,7 @@ class Network(Component):
         """
 
         # initial network initialization without calculating the necessary buffers
-        super(Network, self).__init__(name=name, _calculate_buffers=False)
+        super(Network, self).__init__(name=name)
 
         # flag to see if a deepcopy of the component should be
         # made before it's added to the network.
@@ -149,6 +149,9 @@ class Network(Component):
         if connections is not None:
             self.connections += connections
             self._register_connections()  # add components to the components dict
+
+    def _set_buffers(self):
+        pass # do not calculate buffers here.
 
     # add a component to the network
     def add_component(self, name, comp, copy=True):

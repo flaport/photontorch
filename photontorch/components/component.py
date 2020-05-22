@@ -36,11 +36,11 @@ class Component(Module):
     num_ports = 0
     """ Number of ports of the component. """
 
-    def __init__(self, name=None, _calculate_buffers=True):
+    def __init__(self, name=None):
         """ Component
 
         Args:
-            name: str = None: the name of the component
+            name (str): the name of the component
         """
         super(Component, self).__init__()
         self.name = name
@@ -53,14 +53,16 @@ class Component(Module):
         # set environment
         self._env = None
 
-        # calculate buffers
-        if _calculate_buffers:
-            self.C = Buffer(self.get_C())
-            self.sources_at = Buffer(self.get_sources_at())
-            self.detectors_at = Buffer(self.get_detectors_at())
-            self.actions_at = Buffer(self.get_actions_at())
-            self.free_idxs = Buffer(self.get_free_idxs())
-            self.terminated = len(self.free_idxs) == 0
+        # set buffers.
+        self._set_buffers()
+
+    def _set_buffers(self):
+        self.C = Buffer(self.get_C())
+        self.sources_at = Buffer(self.get_sources_at())
+        self.detectors_at = Buffer(self.get_detectors_at())
+        self.actions_at = Buffer(self.get_actions_at())
+        self.free_idxs = Buffer(self.get_free_idxs())
+        self.terminated = len(self.free_idxs) == 0
 
     ## The following methods should be overwritten by subclasses:
 
@@ -197,8 +199,6 @@ class Component(Module):
                 component. The first dimension of size two denotes the stacked
                 real and imaginary part.
 
-        Note:
-            C[0] is the real part, C[0] is the imaginary part
         """
         C = torch.zeros((2, self.num_ports, self.num_ports), device=self.device)
         self.set_C(C)
