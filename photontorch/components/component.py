@@ -40,7 +40,7 @@ class Component(Module):
         """ Component
 
         Args:
-            name (str): the name of the component
+            name (optional, str): the name of the component
         """
         super(Component, self).__init__()
         self.name = name
@@ -185,8 +185,7 @@ class Component(Module):
                 denotes the stacked real and imaginary part.
         """
         S = torch.zeros(
-            (2, self.env.num_wl, self.num_ports, self.num_ports),
-            device=self.device,
+            (2, self.env.num_wl, self.num_ports, self.num_ports), device=self.device,
         )
         self.set_S(S)
         return S

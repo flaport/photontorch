@@ -40,7 +40,7 @@ class _ReckNxN(Network):
             wg_factory (callable): function without arguments which creates the waveguides.
             mzi_factory (callable): function without arguments which creates the MZIs or
                 any other general 4-port component with  ports defined anti-clockwise.
-            name (str): name of the component
+            name (optional, str): name of the component
 
         """
         self.N = N
@@ -115,7 +115,7 @@ class ReckNxN(Network):
             wg_factory (callable): function without arguments which creates the waveguides.
             mzi_factory (callable): function without arguments which creates the MZIs or any other general
                 4-port component with  ports defined anti-clockwise.
-            name (str): name of the component
+            name (optional, str): name of the component
 
         Note:
             ``ReckMxN`` expects ``M >= N``. If M < N is desired, consider terminating with the ``transposed=True`` flag::

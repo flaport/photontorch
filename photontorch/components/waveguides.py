@@ -53,7 +53,7 @@ class Waveguide(Connection):
                 by the length of the waveguide. Adding this can be useful for training
                 purposes.
             trainable (bool): makes the phase parameter trainable
-            name (str): the name of the component (default: lowercase classname)
+            name (optional, str): the name of the component (default: lowercase classname)
         """
         Connection.__init__(self, name=name)
         # Handle inputs

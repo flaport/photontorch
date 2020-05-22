@@ -45,7 +45,7 @@ class LinearSoa(Component):
         Args:
             amplification (float): Amplification of the soa
             trainable (bool): makes the amplification trainable
-            name (str): the name of the component (default: lowercase classname)
+            name (optional, str): the name of the component (default: lowercase classname)
         """
         super(LinearSoa, self).__init__(name=name)
 
@@ -147,7 +147,7 @@ class Soa(BaseSoa):
             amplification (float): the maximum amplification of the soa
             startup_time (float): how long it takes before the soa reaches max amplification
             trainable (bool): makes the amplification trainable
-            name (str): the name of the component (default: lowercase classname)
+            name (optional, str): the name of the component (default: lowercase classname)
         """
         super(Soa, self).__init__(name=name)
 
@@ -202,19 +202,19 @@ class AgrawalSoa(BaseSoa):
     ):
         """
         Args:
-            L (loat): length of soa
-            W (loat): width of soa
-            H (loat): height of soa
-            N0 (loat): transparency carrier density
-            a (loat): differenctial gain coefficient
-            I (loat): current through soa
-            tc (loat): lifetime of the carriers
+            L (float): length of soa
+            W (float): width of soa
+            H (float): height of soa
+            N0 (float): transparency carrier density
+            a (float): differenctial gain coefficient
+            I (float): current through soa
+            tc (float): lifetime of the carriers
             gamma (float): confinement factor
             alpha (float): linewidth enhancement
             neff (float): effective index used to calculate phase offset
             ng (float): group index used to calculate delay of soa
             wl (float): wavelength of the simulation
-            name (str): the name of the component (default: lowercase classname)
+            name (optional, str): the name of the component (default: lowercase classname)
         """
 
         super(AgrawalSoa, self).__init__(name=name)
@@ -251,11 +251,7 @@ class AgrawalSoa(BaseSoa):
         )  # saturation power of the SOA
         self.delay = self.L * self.ng / env.c  # delay introduced by the soa
         self.phase = (
-            self.L
-            * self.neff
-            * 2
-            * np.pi
-            * np.mean(env.wl)  # TODO: make this an array
+            self.L * self.neff * 2 * np.pi * np.mean(env.wl)  # TODO: make this an array
         )  # phase introduced by the soa
 
         super(AgrawalSoa, self).initialize()

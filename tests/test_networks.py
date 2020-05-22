@@ -138,11 +138,7 @@ def test_forward_with_different_value_for_each_source(gen, nw, tenv):
 def test_forward_with_batch_weights(gen, nw, tenv):
     with tenv:
         nw.initialize()
-        nw(
-            torch.rand(
-                tenv.num_t, tenv.num_wl, nw.num_sources, 3
-            )
-        )
+        nw(torch.rand(tenv.num_t, tenv.num_wl, nw.num_sources, 3))
 
 
 def test_forward_with_power_false(nw, tenv):
@@ -203,9 +199,7 @@ def test_network_plot(gen, tenv, fenv):
         tnw.plot(detected)
 
         # test time mode 4
-        detected = torch.rand(
-            env.num_t, env.num_wl, tnw.num_detectors, generator=gen
-        )
+        detected = torch.rand(env.num_t, env.num_wl, tnw.num_detectors, generator=gen)
         tnw.plot(detected)
 
         # test time mode 5

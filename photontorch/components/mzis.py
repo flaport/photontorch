@@ -63,7 +63,7 @@ class Mzi(Component):
             length (float): length of the waveguide in meter.
             loss (float): loss in the waveguide [dB/m]
             trainable (bool): whether phi and theta are trainable
-            name (str): name of this specific MZI
+            name (optional, str): name of this specific MZI
         """
         super(Mzi, self).__init__(name=name)
 

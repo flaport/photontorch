@@ -35,6 +35,7 @@ def gen():
     """ default pytorch random generator """
     return torch.Generator(device="cpu").manual_seed(42)
 
+
 ## Environments
 
 

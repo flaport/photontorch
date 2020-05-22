@@ -51,7 +51,7 @@ class Mmi(Component):
                 wageguides and output waveguides. If no weights are specified, the
                 component defaults to a 1x2 splitter.
             trainable (bool): makes the interconnection weights trainable
-            name (str): the name of the component (default: lowercase classname)
+            name (optional, str): the name of the component (default: lowercase classname)
         """
 
         # validate weights

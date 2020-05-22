@@ -48,7 +48,7 @@ class GratingCoupler(Component):
             Tmax (float): maximum transmission at center wavelength
             bandwidth (float): 3dB Bandwidth of the grating coupler
             wl0 (float): Center wavelength of the grating coupler
-            name (str): the name of the component (default: lowercase classname)
+            name (optional, str): the name of the component (default: lowercase classname)
         """
         super(GratingCoupler, self).__init__(name=name)
         self.R = R

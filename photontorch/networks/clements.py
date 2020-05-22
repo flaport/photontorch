@@ -46,7 +46,7 @@ class _PhaseArray(Network):
         Args:
             N (int): number of input / output ports (the network represents an NxN matrix)
             wg_factory (callable): function without arguments which creates the waveguides.
-            name (str): name of the component
+            name (optional, str): name of the component
         """
         self.N = int(N + 0.5)
         components = {}
@@ -75,7 +75,7 @@ class _MixingPhaseArray(Network):
             wg_factory (callable): function without arguments which creates the waveguides.
             mzi_factory (callable): function without arguments which creates the MZIs or any other general 
                 4-port component with  ports defined anti-clockwise.
-            name (str): name of the component
+            name (optional, str): name of the component
         """
         self.N = int(N + 0.5)
         num_mzis = self.N // 2
@@ -133,7 +133,7 @@ class _Capacity2ClementsNxN(Network):
             wg_factory (callable): function without arguments which creates the waveguides.
             mzi_factory (callable): function without arguments which creates the MZIs or any other general 
                 4-port component with  ports defined anti-clockwise.
-            name (str): name of the component
+            name (optional, str): name of the component
         """
         num_mzis = N - 1
 
@@ -219,7 +219,7 @@ class ClementsNxN(Network):
             wg_factory (callable): function without arguments which creates the waveguides.
             mzi_factory (callable): function without arguments which creates the MZIs or any other general 
                 4-port component with  ports defined anti-clockwise.
-            name (str): the name of the network (default: lowercase classname)
+            name (optional, str): the name of the network (default: lowercase classname)
         """
         if capacity is None:
             capacity = N

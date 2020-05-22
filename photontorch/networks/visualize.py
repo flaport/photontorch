@@ -121,9 +121,7 @@ def plot(network, detected, **kwargs):
             labels = [
                 "%i | %s" % (i, det) for i in range(y.shape[1]) for det in detectors
             ]
-            return plotfunc(
-                x, y.reshape(network.env.num_wl, -1), labels, **kwargs
-            )
+            return plotfunc(x, y.reshape(network.env.num_wl, -1), labels, **kwargs)
         else:
             raise RuntimeError(
                 "When plotting in wavelength mode, the max dim of y should be < 4"
@@ -139,16 +137,12 @@ def plot(network, detected, **kwargs):
                 labels = ["batch %i" % i for i in range(y.shape[1])]
             return plotfunc(x, y, labels, **kwargs)
         elif y.ndim == 3:
-            if (
-                y.shape[1] == network.env.num_wl
-                and y.shape[2] == network.num_detectors
-            ):
+            if y.shape[1] == network.env.num_wl and y.shape[2] == network.num_detectors:
                 labels = [
                     "%s | %s" % (wl, det) for wl in wavelengths for det in detectors
                 ]
             elif (
-                y.shape[1] == network.env.num_wl
-                and y.shape[2] != network.num_detectors
+                y.shape[1] == network.env.num_wl and y.shape[2] != network.num_detectors
             ):
                 y = y.transpose(0, 2, 1)
                 labels = [
@@ -159,9 +153,7 @@ def plot(network, detected, **kwargs):
                 labels = [
                     "%i | %s" % (b, det) for b in range(y.shape[1]) for det in detectors
                 ]
-            return plotfunc(
-                x, y.reshape(network.env.num_t, -1), labels, **kwargs
-            )
+            return plotfunc(x, y.reshape(network.env.num_t, -1), labels, **kwargs)
         elif y.ndim == 4:
             y = y.transpose(0, 3, 1, 2)
             labels = [
@@ -170,9 +162,7 @@ def plot(network, detected, **kwargs):
                 for wl in wavelengths
                 for det in detectors
             ]
-            return plotfunc(
-                x, y.reshape(network.env.num_t, -1), labels, **kwargs
-            )
+            return plotfunc(x, y.reshape(network.env.num_t, -1), labels, **kwargs)
         else:
             raise RuntimeError(
                 "When plotting in time mode, the max dim of y should be < 5"

@@ -43,7 +43,7 @@ class DirectionalCoupler(Component):
         Args:
             coupling (float): power coupling of the directional coupler (between 0 and 1)
             trainable (bool): makes the coupling trainable
-            name (str): the name of the component (default: lowercase classname)
+            name (optional, str): the name of the component (default: lowercase classname)
         """
         super(DirectionalCoupler, self).__init__(name=name)
 
@@ -120,7 +120,7 @@ class DirectionalCouplerWithLength(Component):
                 purposes.
             trainable_phase (bool): makes the phase parameter trainable
             trainable_coupling (bool): makes the coupling parameter trainable
-            name (str): the name of the component (default: lowercase classname)
+            name (optional, str): the name of the component (default: lowercase classname)
         """
         super(DirectionalCouplerWithLength, self).__init__(name=name)
         # Handle inputs
@@ -213,7 +213,7 @@ class RealisticDirectionalCoupler(Component):
             de2_k0 (float): second derivative of k0 w.r.t. wavelength
             de2_n0 (float): second derivative of n0 w.r.t. wavelength
             wl0 (float): the center wavelength for which the parameters are defined
-            name (str): the name of the component (default: lowercase classname)
+            name (optional, str): the name of the component (default: lowercase classname)
 
         Note:
             The default parameters are based on a directional coupler with

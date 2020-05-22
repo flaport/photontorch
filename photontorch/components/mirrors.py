@@ -37,7 +37,7 @@ class Mirror(Component):
         Args:
             R (float): reflectivity of the mirror (between 0 and 1)
             trainable (bool): makes the reflection trainable
-            name (str): the name of the component (default: lowercase classname)
+            name (optional, str): the name of the component (default: lowercase classname)
         """
         super(Mirror, self).__init__(name=name)
 

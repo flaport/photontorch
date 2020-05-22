@@ -95,7 +95,7 @@ class Network(Component):
             connections (list): a list containing the connections of the network.
                 the connection string can have two formats: 1. "comp1:port1:comp2:port2": signifying a connection between ports
                 (always reflexive) 2. "comp:port:output_port": signifying a connection to an output port index
-            name (str): name of the network
+            name (optional, str): name of the network
             copy_components (bool): create a deepcopy of each component before
                 linking them together.
 
@@ -151,7 +151,7 @@ class Network(Component):
             self._register_connections()  # add components to the components dict
 
     def _set_buffers(self):
-        pass # do not calculate buffers here.
+        pass  # do not calculate buffers here.
 
     # add a component to the network
     def add_component(self, name, comp, copy=True):
@@ -162,7 +162,7 @@ class Network(Component):
         dictionary.
 
         Args:
-            name (str): name of the component to add to the network
+            name (optional, str): name of the component to add to the network
             copy (bool): copy the component before adding.
 
         Note:
@@ -579,13 +579,7 @@ class Network(Component):
 
         """
         buffer = torch.zeros(
-            (
-                2,
-                int(self._delays.max()) + 1,
-                self.env.num_wl,
-                self.nmc,
-                num_batches,
-            ),
+            (2, int(self._delays.max()) + 1, self.env.num_wl, self.nmc, num_batches,),
             device=self.device,
         )
         return buffer
@@ -659,7 +653,6 @@ class Network(Component):
                 )
             source = source.rename("c", "t", "w", "s", "b")
 
-
         for name in source.names:
             if name not in _possible_names:
                 raise ValueError(
@@ -684,8 +677,7 @@ class Network(Component):
                     [
                         source,
                         torch.zeros(
-                            (2, self.env.num_t - source.shape[0])
-                            + source.shape[2:],
+                            (2, self.env.num_t - source.shape[0]) + source.shape[2:],
                             dtype=torch.get_default_dtype(),
                             device=source.device,
                         ),
@@ -769,12 +761,7 @@ class Network(Component):
         num_batches = source.shape[-1]
 
         detected = torch.zeros(
-            (
-                self.env.num_t,
-                self.env.num_wl,
-                self.num_detectors,
-                num_batches,
-            ),
+            (self.env.num_t, self.env.num_wl, self.num_detectors, num_batches,),
             device=self.device,
         )
         if not power:

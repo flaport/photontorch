@@ -43,7 +43,7 @@ class _MixingPhaseArray(Network):
             wg_factory (callable): function without arguments which creates the waveguides.
             mzi_factory (callable): function without arguments which creates the MZIs or 
                 any other general 4-port component with  ports defined anti-clockwise.
-            name (str): name of the component
+            name (optional, str): name of the component
         """
         self.N = int(N + 0.5)
         if self.N % 2:
@@ -97,7 +97,7 @@ class _UnclosedRingArray(Network):
             wg_factory (callable): function without arguments which creates the waveguides.
             mzi_factory (callable): function without arguments which creates the MZIs or 
                 any other general 4-port component with  ports defined anti-clockwise.
-            name (str): name of the component
+            name (optional, str): name of the component
         """
 
         if N % 2:
@@ -178,7 +178,7 @@ class RingNetwork(Network):
             wg_factory (callable): function without arguments which creates the waveguides.
             mzi_factory (callable): function without arguments which creates the MZIs or 
                 any other general 4-port component with  ports defined anti-clockwise.
-            name (str): name of the component
+            name (optional, str): name of the component
         """
         self.N = N
         self.capacity = capacity

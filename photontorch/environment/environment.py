@@ -34,44 +34,59 @@ _current_environments = deque()
 ## Helpers ##
 #############
 
+
 class _DefaultArgument:
     """ wrap default function arguments in this class to figure out if argument
     was supplied manually or due to being there by defualt."""
+
     pass
+
 
 class _float(float, _DefaultArgument):
     """ wrap default float function arguments in this class to figure out if
     argument was supplied manually or due to being there by defualt."""
+
     def __repr__(self):
-        return "%.3e"%self
+        return "%.3e" % self
+
 
 class _int(int, _DefaultArgument):
     """ wrap default int function arguments in this class to figure out if
     argument was supplied manually or due to being there by defualt."""
+
     pass
+
 
 class _bool(int, _DefaultArgument):
     """ wrap default bool function arguments in this class to figure out if
     argument was supplied manually or due to being there by defualt."""
+
     pass
+
 
 class _str(str, _DefaultArgument):
     """ wrap default string function arguments in this class to figure out if
     argument was supplied manually or due to being there by defualt."""
+
     pass
+
 
 class _Array(np.ndarray):
     """ numpy array with more concise repr """
+
     def __repr__(self):
-        if self.ndim==1 and self.shape[0] > 4:
-            return "array([%.3e, %.3e, ..., %.3e])"%(self[0], self[1], self[-1])
+        if self.ndim == 1 and self.shape[0] > 4:
+            return "array([%.3e, %.3e, ..., %.3e])" % (self[0], self[1], self[-1])
         else:
-            return "array(%s)"%(str(["%.3e"%v for v in self]).replace("'", ""))
+            return "array(%s)" % (str(["%.3e" % v for v in self]).replace("'", ""))
+
 
 class _DefaultArray(_Array, _DefaultArgument):
     """ wrap default numpy array function arguments in this class to figure out
     if argument was supplied manually or due to being there by defualt."""
+
     pass
+
 
 def _array(arr, default_array=False):
     """ create either an _Array or a _DefaultArray. """
@@ -79,9 +94,11 @@ def _array(arr, default_array=False):
     arr.setflags(write=False)
     return arr
 
+
 def _is_default(arg):
     """ check if a certain value is a default argument """
     return isinstance(arg, _DefaultArgument) or arg is None
+
 
 def _convert_default(value):
     """ convert any value to a default argument """
@@ -131,15 +148,15 @@ class Environment(object):
         bitrate=None,
         bitlength=None,
         wl=_float(1.55e-6),
-        f=_float(299792458.0/1.55e-6),
+        f=_float(299792458.0 / 1.55e-6),
         dwl=_float(1e-9),
-        df=_float(299792458.0/1.550e-6 - 99792458.0/1.551e-6),
+        df=_float(299792458.0 / 1.550e-6 - 99792458.0 / 1.551e-6),
         num_wl=_int(1),
         num_f=_int(1),
         wl0=_float(1.5e-6),
-        f0=_float(299792458.0/1.6e-6),
+        f0=_float(299792458.0 / 1.6e-6),
         wl1=_float(1.6e-6),
-        f1=_float(299792458.0/1.5e-6),
+        f1=_float(299792458.0 / 1.5e-6),
         c=_float(299792458.0),
         freqdomain=_bool(False),
         grad=_bool(False),
@@ -169,7 +186,7 @@ class Environment(object):
             c (float): speed of light used during simulations.
             freqdomain (bool): only do frequency domain calculations.
             grad (bool): track gradients during the simulation (set this to True during training.)
-            name (str): name of the environment
+            name (optional, str): name of the environment
             **kwargs (optional): any number of extra keyword arguments will be stored as attributes to the environment.
         """
         c = float(c)
@@ -190,46 +207,72 @@ class Environment(object):
         grad = kwargs.pop("enable_grad", grad)
 
         if sum([not _is_default(v) for v in (dt, num_t, samplerate, t)]) > 1:
-            raise ValueError("Environment: too many arguments given to determine t array: arguments 'dt', 'num_t', 'samplerate' and 't' are mutually exclusive")
+            raise ValueError(
+                "Environment: too many arguments given to determine t array: arguments 'dt', 'num_t', 'samplerate' and 't' are mutually exclusive"
+            )
         if not _is_default(t0) and not _is_default(t):
-            raise ValueError("Environment: too many arguments given to determine t array: arguments 't0' and 't' are mutually exclusive")
+            raise ValueError(
+                "Environment: too many arguments given to determine t array: arguments 't0' and 't' are mutually exclusive"
+            )
         if not _is_default(t1) and not _is_default(t):
-            raise ValueError("Environment: too many arguments given to determine t array: arguments 't1' and 't' are mutually exclusive")
+            raise ValueError(
+                "Environment: too many arguments given to determine t array: arguments 't1' and 't' are mutually exclusive"
+            )
         if bitrate is not None and bitlength is not None:
-            raise ValueError("Environment: too many arguments given to determine bitrate: arguments 'bitrate' and 'bitlength' are mutually exclusive")
+            raise ValueError(
+                "Environment: too many arguments given to determine bitrate: arguments 'bitrate' and 'bitlength' are mutually exclusive"
+            )
         if not _is_default(wl) and not _is_default(f):
-            raise ValueError("Environment: too many arguments given to determine wavelength array: arguments 'wl' and 'f' are mutually exclusive")
+            raise ValueError(
+                "Environment: too many arguments given to determine wavelength array: arguments 'wl' and 'f' are mutually exclusive"
+            )
         if sum([not _is_default(v) for v in (dwl, df, num_wl, num_f, wl, f)]) > 1:
-            raise ValueError("Environment: too many arguments given to determine wavelength array: arguments 'dwl', 'df', 'num_wl', 'num_f', 'wl' and 'f' are mutually exclusive.")
+            raise ValueError(
+                "Environment: too many arguments given to determine wavelength array: arguments 'dwl', 'df', 'num_wl', 'num_f', 'wl' and 'f' are mutually exclusive."
+            )
         if sum([not _is_default(v) for v in (wl0, f0, wl, f)]) > 1:
-            raise ValueError("Environment: too many arguments given to determine wavelength array: arguments 'wl0', 'f0', 'wl' and 'f' are mutually exclusive.")
+            raise ValueError(
+                "Environment: too many arguments given to determine wavelength array: arguments 'wl0', 'f0', 'wl' and 'f' are mutually exclusive."
+            )
         if sum([not _is_default(v) for v in (wl1, f1, wl, f)]) > 1:
-            raise ValueError("Environment: too many arguments given to determine wavelength array: arguments 'wl1', 'f1', 'wl' and 'f' are mutually exclusive.")
+            raise ValueError(
+                "Environment: too many arguments given to determine wavelength array: arguments 'wl1', 'f1', 'wl' and 'f' are mutually exclusive."
+            )
 
         if not _is_default(bitlength):
-            bitrate = float(1/bitlength)
+            bitrate = float(1 / bitlength)
 
-        if not _is_default(t) or sum([not _is_default(v) for v in (dt, samplerate, num_t, t0, t1)]) == 0:
+        if (
+            not _is_default(t)
+            or sum([not _is_default(v) for v in (dt, samplerate, num_t, t0, t1)]) == 0
+        ):
             if not isinstance(t, np.ndarray):
                 t = np.array(t)
             if t.ndim == 0:
                 t = t[None]
             elif t.ndim > 1:
-                raise ValueError("Dimensionality of 't' array too high: expected 1D array, got %iD array."%t.ndim)
+                raise ValueError(
+                    "Dimensionality of 't' array too high: expected 1D array, got %iD array."
+                    % t.ndim
+                )
             t = _array(t)
         else:
             if not _is_default(samplerate):
-                dt = float(1/samplerate)
+                dt = float(1 / samplerate)
             elif not _is_default(num_t):
-                dt = float((t1-t0)/num_t)
+                dt = float((t1 - t0) / num_t)
             try:
                 t = _array(np.arange(min(t0, t1), max(t0, t1), abs(dt)))
             except ValueError:
-                raise ValueError("Cannot create time range. Are dt or num_t, t0 and t1 all specified?")
+                raise ValueError(
+                    "Cannot create time range. Are dt or num_t, t0 and t1 all specified?"
+                )
         if freqdomain:
             t = t[:1]
 
-        if (not _is_default(wl) or not _is_default(f)) or sum([not _is_default(v) for v in (num_wl, num_f, dwl, df, wl0, f0, wl1, f1)]) == 0:
+        if (not _is_default(wl) or not _is_default(f)) or sum(
+            [not _is_default(v) for v in (num_wl, num_f, dwl, df, wl0, f0, wl1, f1)]
+        ) == 0:
             if not _is_default(f):
                 wl = c / f
             if not isinstance(wl, np.ndarray):
@@ -237,7 +280,10 @@ class Environment(object):
             if wl.ndim == 0:
                 wl = wl[None]
             elif wl.ndim > 1:
-                raise ValueError("Dimensionality of 'wl' or 'f' array too high: expected 1D array, got %iD array."%wl.ndim)
+                raise ValueError(
+                    "Dimensionality of 'wl' or 'f' array too high: expected 1D array, got %iD array."
+                    % wl.ndim
+                )
         else:
             if not _is_default(df):
                 if not _is_default(wl0):
@@ -247,9 +293,11 @@ class Environment(object):
                     f0 = c / wl0
                 f0 = float(f0)
                 try:
-                    wl = c/np.arange(max(f0, f1), min(f0, f1), -abs(df))
+                    wl = c / np.arange(max(f0, f1), min(f0, f1), -abs(df))
                 except ValueError:
-                    raise ValueError("Cannot create frequency range. Are df or num_f, f0 and f1 all specified?")
+                    raise ValueError(
+                        "Cannot create frequency range. Are df or num_f, f0 and f1 all specified?"
+                    )
             else:
                 if not _is_default(f0):
                     wl1 = c / f0
@@ -258,35 +306,41 @@ class Environment(object):
                     wl0 = c / f1
                 wl0 = float(wl0)
                 if not _is_default(num_wl):
-                    dwl = float((wl1 - wl0)/num_wl)
+                    dwl = float((wl1 - wl0) / num_wl)
                 elif not _is_default(num_f):
-                    dwl = float((wl1 - wl0)/num_f)
+                    dwl = float((wl1 - wl0) / num_f)
                 dwl = float(dwl)
                 try:
                     wl = np.arange(min(wl0, wl1), max(wl0, wl1), abs(dwl))
                 except ValueError:
-                    raise ValueError("Cannot create frequency range. Are dwl or num_wl, wl0 and wl1 all specified?")
+                    raise ValueError(
+                        "Cannot create frequency range. Are dwl or num_wl, wl0 and wl1 all specified?"
+                    )
         if wl[0] > wl[-1]:
             wl = wl[::-1].copy()
 
         self.dt = self.timestep = np.inf if t.shape[0] < 2 else float(t[1] - t[0])
-        self.samplerate = 0 if t.shape[0] < 2 else float(1/self.dt)
+        self.samplerate = 0 if t.shape[0] < 2 else float(1 / self.dt)
         self.num_t = self.num_timesteps = int(t.shape[0])
         self.t0 = self.t_start = float(t[0])
         self.t1 = self.t_end = np.inf if t.shape[0] < 2 else float(t[-1]) + self.dt
         self.t = self.time = _array(t)
         self.bitrate = None if bitrate is None else float(bitrate)
-        self.bitlength = None if bitrate is None else float(1/bitrate)
+        self.bitlength = None if bitrate is None else float(1 / bitrate)
         self.wl = self.wavelength = _array(wl)
-        self.f = _array(c/wl)
-        self.dwl = self.wavelength_step = np.inf if wl.shape[0] < 2 else float(wl[1] - wl[0])
-        self.df = np.inf if wl.shape[0] < 2 else float(c/wl[1] - c/wl[0])
+        self.f = _array(c / wl)
+        self.dwl = self.wavelength_step = (
+            np.inf if wl.shape[0] < 2 else float(wl[1] - wl[0])
+        )
+        self.df = np.inf if wl.shape[0] < 2 else float(c / wl[1] - c / wl[0])
         self.num_wl = self.num_wavelengths = int(wl.shape[0])
         self.num_f = int(wl.shape[0])
         self.wl0 = self.wavelength_start = float(wl[0])
-        self.f0 = float(c/wl[0])
-        self.wl1 = self.wavelength_end = None if wl.shape[0]<2 else float(wl[-1]) + self.dwl
-        self.f1 = np.inf if wl.shape[0]<2 else float(c/(wl[-1] + self.dwl))
+        self.f0 = float(c / wl[0])
+        self.wl1 = self.wavelength_end = (
+            None if wl.shape[0] < 2 else float(wl[-1]) + self.dwl
+        )
+        self.f1 = np.inf if wl.shape[0] < 2 else float(c / (wl[-1] + self.dwl))
         self.c = float(c)
         self.freqdomain = self.frequency_domain = bool(freqdomain)
         self.grad = self.enable_grad = bool(grad)
@@ -294,7 +348,21 @@ class Environment(object):
         self.__dict__.update(kwargs)
         self._grad_manager = torch.enable_grad() if self.grad else torch.no_grad()
         # synonyms for backward compatibility:
-        self._synonyms = ("wavelength", "t_start", "t_end", "num_timesteps", "time", "timestep", "wavelength", "num_wavelengths", "wavelength_step", "wavelength_start", "wavelength_end", "frequency_domain", "enable_grad")
+        self._synonyms = (
+            "wavelength",
+            "t_start",
+            "t_end",
+            "num_timesteps",
+            "time",
+            "timestep",
+            "wavelength",
+            "num_wavelengths",
+            "wavelength_step",
+            "wavelength_start",
+            "wavelength_end",
+            "frequency_domain",
+            "enable_grad",
+        )
         self._initialized = True
 
     def copy(self, **kwargs):
@@ -328,10 +396,14 @@ class Environment(object):
             c (float): speed of light used during simulations.
             freqdomain (bool): only do frequency domain calculations.
             grad (bool): track gradients during the simulation (set this to True during training.)
-            name (str): name of the environment
+            name (optional, str): name of the environment
             **kwargs (optional): any number of extra keyword arguments will be stored as attributes to the environment.
         """
-        new = {k:_convert_default(v) for k, v in self.__dict__.items() if not k.startswith("_") and not k in self._synonyms}
+        new = {
+            k: _convert_default(v)
+            for k, v in self.__dict__.items()
+            if not k.startswith("_") and not k in self._synonyms
+        }
         new.update(kwargs)
         return self.__class__(**new)
 
@@ -350,8 +422,16 @@ class Environment(object):
         return self
 
     def __eq__(self, other):
-        self = {k: v for k, v in self.__dict__.items() if not k.startswith("_") and k not in ("f", "t", "wl")+self._synonyms}
-        other = {k: v for k, v in other.__dict__.items() if not k.startswith("_") and k not in ("f", "t", "wl")+other._synonyms}
+        self = {
+            k: v
+            for k, v in self.__dict__.items()
+            if not k.startswith("_") and k not in ("f", "t", "wl") + self._synonyms
+        }
+        other = {
+            k: v
+            for k, v in other.__dict__.items()
+            if not k.startswith("_") and k not in ("f", "t", "wl") + other._synonyms
+        }
         return self == other
 
     def __repr__(self):
@@ -360,23 +440,29 @@ class Environment(object):
             if k.startswith("_") or k in self._synonyms:
                 continue
             if isinstance(v, float):
-                s = s + "%s=%s, " % (str(k), "%.3e"%v)
+                s = s + "%s=%s, " % (str(k), "%.3e" % v)
                 continue
             s = s + "%s=%s, " % (str(k), repr(v))
-        s = s[:-2]+ ")"
+        s = s[:-2] + ")"
         return s
 
     def __str__(self):
-        s = ("Simulation Environment:\n"
-             "-----------------------\n")
-        colwidth = max(len(k) for k in self.__dict__.keys() if not k.startswith("_") and not k in self._synonyms)+1
+        s = "Simulation Environment:\n" "-----------------------\n"
+        colwidth = (
+            max(
+                len(k)
+                for k in self.__dict__.keys()
+                if not k.startswith("_") and not k in self._synonyms
+            )
+            + 1
+        )
         for k, v in self.__dict__.items():
             if k.startswith("_") or k in self._synonyms:
                 continue
             if isinstance(v, float):
-                s = s + "%s%s: %s\n" % (str(k)," "*(colwidth-len(k)),"%.3e"%v)
+                s = s + "%s%s: %s\n" % (str(k), " " * (colwidth - len(k)), "%.3e" % v)
                 continue
-            s = s + "%s%s: %s\n" % (str(k)," "*(colwidth-len(k)), repr(v))
+            s = s + "%s%s: %s\n" % (str(k), " " * (colwidth - len(k)), repr(v))
         return s
 
     def __setattr__(self, name, value):
