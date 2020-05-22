@@ -29,6 +29,11 @@ def default_components():
 ## Fixtures ##
 ##############
 
+## PyTorch
+@pytest.fixture
+def gen():
+    """ default pytorch random generator """
+    return torch.Generator(device="cpu").manual_seed(42)
 
 ## Environments
 

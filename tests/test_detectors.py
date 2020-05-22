@@ -11,7 +11,7 @@ from scipy.signal import lfilter, butter
 
 import photontorch as pt
 
-from fixtures import lpdet
+from fixtures import gen, lpdet
 
 
 #############
@@ -59,11 +59,10 @@ def test_lowpass_detector_b_parameter(lpdet):
     assert b.shape[0] == lpdet.filter_order + 1
 
 
-def test_lowpass_detector_forward(lpdet):
+def test_lowpass_detector_forward(gen, lpdet):
     num_bits = 24
     num_samples_per_bit = int(lpdet.samplerate / lpdet.bitrate + 0.5)
     with torch.no_grad():
-        gen = torch.Generator().manual_seed(23)
         stream = (
             torch.stack(
                 [torch.rand(num_bits, generator=gen) > 0.5] * num_samples_per_bit, 1

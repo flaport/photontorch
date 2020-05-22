@@ -12,11 +12,18 @@ __version__ = "0.0.4"
 # Test pytorch version
 import torch
 
-if torch.__version__.split(".")[0] == "0" and int(torch.__version__.split(".")[1]) < 4:
+torch_version = tuple(int(v) for v in torch.__version__.split("."))
+if torch_version[0] < 1 or (torch_version[0] < 2 and torch_version[1] < 3):
     raise ImportError(
-        "Torch version [%s] is not compatible with"
-        "minimum required version >= 0.4.x" % torch.__version__
+        "Photontorch requires PyTorch>=1.3.0. Your version: %s" % torch.__version__
     )
+
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    message="Named tensors and all their associated APIs are an experimental feature and subject to change. Please do not use them for anything important until they are released as stable.",
+)
 
 ## Submodules
 from . import components

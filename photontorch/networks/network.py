@@ -96,8 +96,8 @@ class Network(Component):
                 the connection string can have two formats: 1. "comp1:port1:comp2:port2": signifying a connection between ports
                 (always reflexive) 2. "comp:port:output_port": signifying a connection to an output port index
             name (str): name of the network
-            deepcopy (bool): if a deepcopy of the components should be taken
-                before the components are registered to the network.
+            copy_components (bool): create a deepcopy of each component before
+                linking them together.
 
         Note:
             Although it's possible to initialize the network with a list of
@@ -148,7 +148,7 @@ class Network(Component):
         # register connections:
         if connections is not None:
             self.connections += connections
-            self._register_connections()  # add components tot he components dict
+            self._register_connections()  # add components to the components dict
 
     # add a component to the network
     def add_component(self, name, comp, copy=True):
@@ -193,20 +193,18 @@ class Network(Component):
         """ link components together
 
         Args:
-            *ports: the ports to link together. The first and last port can be an integer
-                to specify the ordering of the network ports.
-
-        Note:
-            if more than two ports are specified, then the intermediate ports
-            should be of the 'double port' type (i.e. ``idx1:comp_name:idx2``).
-            The first index will connect to the port before; the second index
-            will connect to the port after.
+            *ports[str]: the components and ports to link together.
+                The following format is expected: "idx1:component:idx2".
+                This format specifies the input port (idx1) and the output
+                port (idx2) of a component to use in the chain.
+                The chain can be preceded and followed by an integer,
+                specifying the port indices of the resulting network.
 
         Example:
-            >>> with pt.Network() as nw:
-            >>>     nw.dc = pt.DirectionalCoupler()
-            >>>     nw.wg = pt.Waveguide()
-            >>>     nw.link(0, '0:dc:2','0:wg:1','3:dc:1', 1)
+            >>> with pt.Network() as allpass:
+            >>>     allpass.dc = pt.DirectionalCoupler()
+            >>>     allpass.wg = pt.Waveguide()
+            >>>     allpass.link(0, '0:dc:2', '0:wg:1', '3:dc:1', 1)
 
         """
 
@@ -313,12 +311,12 @@ class Network(Component):
 
     # terminate a network
     def terminate(self, term=None, name=None):
-        """ Terminate open conections with the term of your choice
+        """ Terminate open conections with the Term of your choice
 
         Args:
             term: (Term|list|dict): Which term to use. Defaults to Term. If a
                 dictionary or list is specified, then one needs to specify as
-                many terms as there are open connections.
+                many terms as there are open ports.
 
         Returns:
             terminated network.
@@ -384,10 +382,11 @@ class Network(Component):
 
         Note:
             during initialization, the reduced connection matrix is calculated
-            for all batches and for all wavelengths. This is a quite lengthy
+            for all batches and for all wavelengths. This is a quite verbose
             calculation, because the matrices need to be (batch) multiplied in
             the right way. Below, you can find the equation for the reduced
-            connection matrix if you get lost:
+            connection matrix we're trying to calculate (will saved to network
+            attribute ``._C``.
 
             .. math::
 
@@ -403,9 +402,10 @@ class Network(Component):
 
         Note:
             Usually, calling ``initialize`` directly is not necessary.
-            ``Network.forward`` calls ``initialize`` automatically. It could however
-            be useful to call ``initialize`` if you want access to the reduced
-            matrices (without needing the response of the network to an input signal).
+            ``Network.forward`` calls ``initialize`` automatically. It could
+            however be useful to call ``initialize`` if you want access to the
+            reduced matrices without needing the response of the network to an
+            input signal.
         """
 
         ## get current environment
@@ -447,8 +447,8 @@ class Network(Component):
         # Check if simulation timestep is too big:
         if (delays[delays_in_seconds.data > 0] < 1).any():
             warnings.warn(
-                "Simulation timestep might be too large, resulting "
-                "in too short delays. Try using a smaller timestep",
+                "Simulation timestep might be too large, resulting in zero "
+                "delays for nonzero lengths. Try using a smaller timestep",
                 RuntimeWarning,
             )
 
@@ -523,7 +523,7 @@ class Network(Component):
             rP = rP - bmm(rCmlml, rSmlml) + bmm(iCmlml, iSmlml)
             iP = -bmm(rCmlml, iSmlml) - bmm(iCmlml, rSmlml)
 
-            # 2. Calculate inv(P)@Cmlmc [using torch.gesv]
+            # 2. Calculate inv(P)@Cmlmc [using torch.solve]
             M = torch.cat([torch.cat([rP, -iP], -1), torch.cat([iP, rP], -1)], -2)
             Cmlmc = ones * torch.cat([ones * rCmlmc[None], ones * iCmlmc[None]], -2)
             x, _ = torch.solve(Cmlmc, M)
@@ -565,7 +565,7 @@ class Network(Component):
         # finish initialization:
         return self
 
-    def simulation_buffer(self, num_batches):
+    def _simulation_buffer(self, num_batches):
         """ Create cyclic buffer to keep the time-delayed states of the network.
 
         Args:
@@ -587,219 +587,172 @@ class Network(Component):
         )
         return buffer
 
-    def handle_source(self, source, axes=None):
-        """ bring a source tensor in a usable form.
-
-        the .forward method ideally expects an input source of shape
-        source.shape == (2, #timesteps, #wavelengths, #mc nodes, #batches)
-
-        however, it can be tedious to bring your input array in exactly this format.
-        This method brings the source array (which may be lower dimensional) in the
-        expected format.
+    def _handle_source(self, source):
+        """ bring a source tensor in a usable form to use in forward pass.
 
         Args:
-            source (Tensor): the input tensor to be brought in the expected format
-                for the forward pass
-            axes (str): the "priority" order of the axes. If a certain input
-                tensor has to be expanded to more dimensions, it is often ambiguous which
-                dimensions (axes) are already present. You can override the default
-                priority (which can change with the type of environment used) by specifying
-                a list of axes present. Allowed characters to use are: - t:
-                time axis; - w: wavelength axis; - s: source axis; - b: batch axis
+            source (Tensor): The source tensor to validate and handle.
 
-        Example:
-            >>> src = torch.random.randn(num_batches, num_timesteps)
-            >>> new_src = nw.handle_source(src, axes="bt")
-            >>> new_src.shape == (2, num_timesteps, num_wavelengths, num_mc_nodes, num_batches)
-            True
+        Returns:
+            Tensor: The source tensor with shape (2, t, w, n, b) to be used
+                during the forward pass. With 'n' being the number of MC nodes in
+                the network.
 
         Note:
-            Usually, calling ``handle_source`` directly is not necessary.
-            ``Network.forward`` calls ``handle_source`` and accepts the same
-            keyword arguments.
+             The source tensor should have shape (t, w, s, b), with
+               * t: the number of timesteps in the simulation environment.
+               * w: the number of wavelengths in the simulation environment.
+               * s: the number of sources in the network.
+               * b: the number of unrelated input waveforms (the batch size).
 
+             Alternatively, two of such tensors can be stacked together in dimension 0
+             to represent the real and imaginary part of a complex tensor,
+             resulting in a tensor of shape (2, t, w, s, b).
+
+             Any lower dimensional tensor should have named dimensions to remove any
+             ambiguity in the broadcasting rules. Dimensions of a tensor can be named
+             with the ``.rename`` method of the PyTorch Tensor class.
+             accepted dimension names are 'c', 't', 'w', 's', 'b'.
         """
-        stacked = False
+        _note = self._handle_source.__doc__.split("Note:")[-1]
+        _possible_names = ("c", "t", "w", "s", "b")
 
-        # The source should be a tensor
+        if isinstance(source, np.ndarray):
+            if source.dtype in (np.complex64, np.complex128, np.complex256):
+                source = np.stack([np.real(source), np.imag(source)], axis=0)
+
         if not torch.is_tensor(source):
-            source = np.asarray(source)
-            source = torch.stack(
-                [
-                    torch.tensor(
-                        np.real(source),
-                        dtype=torch.get_default_dtype(),
-                        device=self.device,
-                    ),
-                    torch.tensor(
-                        np.imag(source),
-                        dtype=torch.get_default_dtype(),
-                        device=self.device,
-                    ),
-                ],
-                0,
-            )
-            stacked = True
-        elif source.shape == (
-            2,
-            self.env.num_timesteps,
-            self.env.num_wavelengths,
-            self.num_sources,
-        ):
-            source = source[:, :, :, :, None]
-            stacked = True
-        elif source.shape[:-1] == (
-            2,
-            self.env.num_timesteps,
-            self.env.num_wavelengths,
-            self.num_sources,
-        ):
-            stacked = True
+            try:
+                source = torch.tensor(
+                    source, dtype=torch.get_default_dtype(), device=self.device
+                )
+            except TypeError:
+                raise ValueError("Cannot convert source to torch tensor.\n%s" % _note)
 
-        # The source should be a tensor with ndim > 0
-        if len(source.shape) == 0:
-            source = source * torch.ones(
-                (self.env.num_timesteps, self.env.num_wavelengths, self.num_sources, 1),
-                dtype=source.dtype,
-                device=source.device,
-            )
-        if len(source.shape) == 1 and source.shape[0] == 2:
-            source = source[:, None, None, None, None] * torch.ones(
-                (self.env.num_timesteps, self.env.num_wavelengths, self.num_sources, 1),
-                dtype=source.dtype,
-                device=source.device,
-            )
-            stacked = True
+        if source.ndim > 5:
+            raise ValueError("Source dimensionality too high.\n%s" % _note)
 
-        # The source should be a tensor with the first dimension == 2 for the real and imag part
-        if source.shape[0] != 2 or (
-            not stacked
-            and (
-                source.shape[0] == self.num_sources
-                or source.shape[0] == self.env.num_wavelengths
-                or source.shape[0] == self.env.num_timesteps
-            )
-        ):
-            source = torch.stack([source, torch.zeros_like(source)])
-
-        # default ordering of the source axis according to the number of dimensions:
-        # the first dimension (real|imag) is ignored
-        if axes is None:
-            if len(source.shape) - 1 == 1:
-                if source.shape[-1] == self.env.num_timesteps:
-                    axes = "t"
-                elif source.shape[-1] == self.num_sources:
-                    axes = "s"
-                elif source.shape[-1] == self.env.num_wavelengths:
-                    axes = "w"
-                else:
-                    axes = "b"
-            elif len(source.shape) - 1 == 2:
-                if source.shape[-1] == self.num_sources:
-                    axes = "ts"
-                elif source.shape[-1] == self.env.num_wavelengths:
-                    axes = "tw"
-                else:
-                    axes = "tb"
-            elif len(source.shape) - 1 == 3:
-                axes = "t"
-                if source.shape[-2] == self.num_sources:
-                    axes = axes + "s"
-                elif source.shape[-2] == self.env.num_wavelengths:
-                    axes = axes + "w"
-                else:
-                    axes = axes + "b"
-                if source.shape[-1] == self.env.num_wavelengths and "w" not in axes:
-                    axes = axes + "w"
-                elif source.shape[-1] == self.num_sources and "s" not in axes:
-                    axes = axes + "s"
-                elif "b" not in axes:
-                    axes = axes + "b"
-            elif len(source.shape) - 1 == 4:
-                axes = "twsb"
+        if not all(source.names):
+            if any(source.names):
+                raise ValueError(
+                    "Network does not accept source tensors with partly named dimensions. "
+                    "Either name None of them (in which case a 4D or 5D tensor is expected) "
+                    "or name all of them.\n%s" % _note
+                )
+            if source.ndim == 5:
+                if c > 2:
+                    raise ValueError(
+                        "First dimension of a 5D source should "
+                        "maximally be 2, containing the real and"
+                        "the imaginary part.\n%s" % _note
+                    )
+            elif source.ndim == 4:
+                source = source[None]
+            elif source.ndim == 0:
+                source = source[None, None, None, None, None]
             else:
-                raise ValueError("invalid input source shape")
+                raise ValueError(
+                    "No named dimensions found for low dimensional source\n%s" % _note
+                )
+            source = source.rename("c", "t", "w", "s", "b")
 
-        # Iterate over the axis names and add dimensions if axis does not exist
-        # In the meantime keep track of the order of the axisses
-        for c in "twsb":
-            if c not in axes:
+
+        for name in source.names:
+            if name not in _possible_names:
+                raise ValueError(
+                    "name '%s' is not an allowed dimension name for a source. "
+                    "allowed names are: %s\n%s"
+                    % (name, str(_possible_names)[1:-1], _note)
+                )
+
+        names = list(source.names)
+        source = source.rename(None)
+        for name in _possible_names:
+            if name not in names:
                 source = source[..., None]
-                axes = axes + c
+                names.append(name)
+        source = source.rename(*names).align_to("c", "t", "w", "s", "b").rename(None)
 
-        # Transpose the source to the default order: (2, time, wls, sources, batches)
-        order = [0]
-        for c in "twsb":
-            order.append(axes.index(c) + 1)
-
-        source = source.permute(*order)
-
-        # perform checks on the source tensor:
-        _, num_timesteps, num_wl, num_sources, num_batches = source.shape
-
-        # check if the number of wavelengths corresponds to the number of wavelengths in the environment
-        if num_wl > 1 and num_wl != self.env.num_wavelengths:
+        if source.shape[0] == 1:
+            source = torch.cat([source, torch.zeros_like(source)], 0)
+        if source.shape[1] > 1 and source.shape[1] != self.env.num_timesteps:
+            if source.shape[1] < self.env.num_timesteps:
+                source = torch.cat(
+                    [
+                        source,
+                        torch.zeros(
+                            (2, self.env.num_timesteps - source.shape[0])
+                            + source.shape[2:],
+                            dtype=torch.get_default_dtype(),
+                            device=source.device,
+                        ),
+                    ],
+                    1,
+                )
+            else:
+                source = source[:, : self.env.num_timesteps]
+        if source.shape[2] > 1 and source.shape[2] != self.env.num_wavelengths:
             raise ValueError(
-                "Number of wavelengths in the source does not correspond"
-                " to the number of wavelengths in the environment."
+                "Source is defined for a different number of wavelengths than the number present in the simulation environment.\n%s"
+                % _note
+            )
+        if source.shape[3] > 1 and source.shape[3] != self.num_sources:
+            raise ValueError(
+                "Source is defined for a different number of source nodes than the number present in the network\n%s"
+                % _note
             )
 
-        # add zeros to the unused mc nodes:
-        if num_sources < self.nmc:
-            source = torch.cat(
-                [
-                    source,
-                    torch.zeros(
-                        (2, num_timesteps, num_wl, self.nmc - num_sources, num_batches),
-                        dtype=source.dtype,
-                        device=source.device,
-                    ),
-                ],
-                -2,
-            )
+        source_template = torch.empty(
+            (2, self.env.num_timesteps, self.env.num_wavelengths, self.num_sources, 1),
+            dtype=torch.get_default_dtype(),
+            device=source.device,
+        )
 
-        # repeat last source value if num_timesteps < env.num_timesteps
-        if num_timesteps < self.env.num_timesteps:
-            repeated_source = source[:, -1, None] * torch.ones(
-                (
-                    2,
-                    self.env.num_timesteps - num_timesteps,
-                    num_wl,
-                    self.nmc,
-                    num_batches,
+        source, _ = torch.broadcast_tensors(source, source_template)
+
+        # we want zero source values for all other MC nodes.
+        source = torch.cat(
+            [
+                source,
+                torch.zeros(
+                    source.shape[:3] + (self.nmc - source.shape[3], source.shape[4]),
+                    dtype=torch.get_default_dtype(),
+                    device=source.device,
                 ),
-                device=source.device,
-                dtype=source.dtype,
-            )
-            source = torch.cat([source, repeated_source], 1)
+            ],
+            3,
+        )
 
         return source
 
-    def forward(self, source=1.0, power=True, detector=None, axes=None):
-        """ Forward pass of the network.
+    def forward(self, source=0.0, power=True, detector=None):
+        """ calculate the network's response to an applied source.
 
         Args:
-            source (Tensor): should ideally be a float tensor of shape
-                (2 = (real|imag), #time, #wavelength, #sources, #batches)
-                if the tensor shape does not match the ideal shape, photontorch will attempt
-                to infer the intended shape. This might fail.
-            axes (str): the "priority" order of the axes. If a certain input
-                tensor has to be expanded to more dimensions, it is often ambiguous which
-                dimensions (axes) are already present. You can override the default
-                priority (which can change with the type of environment used) by specifying
-                a list of axes present. Allowed characters to use are: - t:
-                time axis; - w: wavelength axis; - s: source axis; - b: batch axis
-            power (bool): choose to return the power as output or the complex
-                valued fields. In the latter case, the complex components will be stacked
-                along the first dimension (PyTorch does not support complex tensors (yet))
-            detector (Detector|callable): pass an extra detector instance to detect the fields
+            source (Tensor): The source tensor to calculate the response for.
+            power (bool): Return detected power, otherwise return complex signal.
+            detector (callable): Custom detector function to use to detect the signal.
 
         Returns:
-            a tensor containing the the detected fields. This tensor has shape
-            ``(# time, # wavelengths, # detectors, # batches)``
-            if ``power==True`` or
-            ``(2 = (real|imag), # time, # wavelengths, # detectors, # batches)``
-            if ``power==False``
+            Tensor: The detected tensor with shape (t, w, s, b) or with
+                shape (2, t, w, s, b) in the case of power=False (in that case, dimension
+                0 contains the stacked real and imaginary part of the result)
+
+        Note:
+             The source tensor should have shape (t, w, s, b), with
+               * t: the number of timesteps in the simulation environment.
+               * w: the number of wavelengths in the simulation environment.
+               * s: the number of sources in the network.
+               * b: the number of unrelated input waveforms (the batch size).
+
+             Alternatively, two of such tensors can be stacked together in dimension 0
+             to represent the real and imaginary part of a complex tensor,
+             resulting in a tensor of shape (2, t, w, s, b).
+
+             Any lower dimensional tensor should have named dimensions to remove any
+             ambiguity in the broadcasting rules. Dimensions of a tensor can be named
+             with the ``.rename`` method of the PyTorch Tensor class.
+             accepted dimension names are 'c', 't', 'w', 's', 'b'.
 
         """
 
@@ -808,7 +761,7 @@ class Network(Component):
         if self.env is not current_environment() or torch.is_grad_enabled():
             self.initialize()
 
-        source = self.handle_source(source, axes=axes)
+        source = self._handle_source(source)
 
         num_batches = source.shape[-1]
 
@@ -825,7 +778,7 @@ class Network(Component):
             detected = torch.stack([detected, detected], 0)
 
         ## Get new simulation buffer
-        buffer = self.simulation_buffer(num_batches)
+        buffer = self._simulation_buffer(num_batches)
 
         # solve
         for i, t in enumerate(self.env.time):

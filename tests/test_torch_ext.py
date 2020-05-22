@@ -11,16 +11,16 @@ import pytest
 import numpy as np
 import photontorch as pt
 
-from fixtures import nw as mod
+from fixtures import gen, nw as mod
 
 ###########
 ## Tests ##
 ###########
 
 ## Autograd
-def test_block_diag():
-    t1 = torch.rand((2, 2), requires_grad=True)
-    t2 = torch.rand((3, 3), requires_grad=True)
+def test_block_diag(gen):
+    t1 = torch.rand((2, 2), requires_grad=True, generator=gen)
+    t2 = torch.rand((3, 3), requires_grad=True, generator=gen)
     t = pt.torch_ext.autograd.block_diag(t1, t2)
     loss = ((t - torch.ones_like(t)) ** 2).sum()
     loss.backward()
