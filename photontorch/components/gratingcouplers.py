@@ -61,7 +61,7 @@ class GratingCoupler(Component):
         fwhm2sigma = 1.0 / (2 * np.sqrt(2 * np.log(2)))
         sigma = fwhm2sigma * self.bandwidth
         wls = torch.tensor(
-            self.env.wavelength, device=self.device, dtype=torch.get_default_dtype()
+            self.env.wl, device=self.device, dtype=torch.get_default_dtype()
         )
         loss = torch.sqrt(
             self.Tmax * torch.exp(-((self.wl0 - wls) ** 2) / (2 * sigma ** 2))

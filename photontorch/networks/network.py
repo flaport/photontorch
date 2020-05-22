@@ -426,7 +426,7 @@ class Network(Component):
 
         ## delays
         # delays can be turned off for frequency domain calculations
-        delays_in_seconds = self.delays * float(not self.env.frequency_domain)
+        delays_in_seconds = self.delays * float(not self.env.freqdomain)
         # resulting delays in terms of the simulation timestep:
         delays = (delays_in_seconds / self.env.dt + 0.5).long()
 
@@ -490,8 +490,8 @@ class Network(Component):
         iCmcmc = self.C[1, mc, :][:, mc]
 
         if self.nml == 0:
-            rC = torch.stack([rCmcmc] * self.env.num_wavelengths, dim=0)
-            iC = torch.stack([iCmcmc] * self.env.num_wavelengths, dim=0)
+            rC = torch.stack([rCmcmc] * self.env.num_wl, dim=0)
+            iC = torch.stack([iCmcmc] * self.env.num_wl, dim=0)
         else:
             # Only do the following steps if there is at least one ml node:
 
@@ -518,7 +518,7 @@ class Network(Component):
             # We do this in 5 steps:
 
             # 1. Calculation of the helper matrix P = I - Cmlml@Smlml
-            ones = torch.ones((self.env.num_wavelengths, 1, 1), device=self.device)
+            ones = torch.ones((self.env.num_wl, 1, 1), device=self.device)
             rP = ones * torch.eye(self.nml, device=self.device)[None, :, :]
             rP = rP - bmm(rCmlml, rSmlml) + bmm(iCmlml, iSmlml)
             iP = -bmm(rCmlml, iSmlml) - bmm(iCmlml, rSmlml)
@@ -579,7 +579,7 @@ class Network(Component):
             (
                 2,
                 int(self._delays.max()) + 1,
-                self.env.num_wavelengths,
+                self.env.num_wl,
                 self.nmc,
                 num_batches,
             ),
@@ -675,13 +675,13 @@ class Network(Component):
 
         if source.shape[0] == 1:
             source = torch.cat([source, torch.zeros_like(source)], 0)
-        if source.shape[1] > 1 and source.shape[1] != self.env.num_timesteps:
-            if source.shape[1] < self.env.num_timesteps:
+        if source.shape[1] > 1 and source.shape[1] != self.env.num_t:
+            if source.shape[1] < self.env.num_t:
                 source = torch.cat(
                     [
                         source,
                         torch.zeros(
-                            (2, self.env.num_timesteps - source.shape[0])
+                            (2, self.env.num_t - source.shape[0])
                             + source.shape[2:],
                             dtype=torch.get_default_dtype(),
                             device=source.device,
@@ -690,8 +690,8 @@ class Network(Component):
                     1,
                 )
             else:
-                source = source[:, : self.env.num_timesteps]
-        if source.shape[2] > 1 and source.shape[2] != self.env.num_wavelengths:
+                source = source[:, : self.env.num_t]
+        if source.shape[2] > 1 and source.shape[2] != self.env.num_wl:
             raise ValueError(
                 "Source is defined for a different number of wavelengths than the number present in the simulation environment.\n%s"
                 % _note
@@ -703,7 +703,7 @@ class Network(Component):
             )
 
         source_template = torch.empty(
-            (2, self.env.num_timesteps, self.env.num_wavelengths, self.num_sources, 1),
+            (2, self.env.num_t, self.env.num_wl, self.num_sources, 1),
             dtype=torch.get_default_dtype(),
             device=source.device,
         )
@@ -767,8 +767,8 @@ class Network(Component):
 
         detected = torch.zeros(
             (
-                self.env.num_timesteps,
-                self.env.num_wavelengths,
+                self.env.num_t,
+                self.env.num_wl,
                 self.num_detectors,
                 num_batches,
             ),
@@ -781,7 +781,7 @@ class Network(Component):
         buffer = self._simulation_buffer(num_batches)
 
         # solve
-        for i, t in enumerate(self.env.time):
+        for i, t in enumerate(self.env.t):
             det, buffer = self.step(t, source[:, i], buffer)
 
             if power:

@@ -41,13 +41,13 @@ def gen():
 @pytest.fixture
 def tenv():
     """ default time domain environment """
-    return pt.Environment(num_timesteps=7, num_wavelengths=2)
+    return pt.Environment(num_t=7, num_wl=2)
 
 
 @pytest.fixture
 def fenv():
     """ default frequency domain environment """
-    return pt.Environment(wavelength=np.linspace(1.5, 1.6, 100), frequency_domain=True)
+    return pt.Environment(wl=np.linspace(1.5, 1.6, 100), freqdomain=True)
 
 
 ## Components

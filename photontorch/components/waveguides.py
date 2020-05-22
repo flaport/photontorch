@@ -73,7 +73,7 @@ class Waveguide(Connection):
         delays[:] = self.ng * self.length / self.env.c
 
     def set_S(self, S):
-        wls = torch.tensor(self.env.wavelength, dtype=torch.float64, device=self.device)
+        wls = torch.tensor(self.env.wl, dtype=torch.float64, device=self.device)
 
         # neff depends on the wavelength:
         neff = self.neff - (wls - self.wl0) * (self.ng - self.neff) / self.wl0

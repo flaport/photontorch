@@ -24,20 +24,20 @@ def test_tenv_creation(tenv):
 
 
 def test_fenv_creation(fenv):
-    assert fenv.frequency_domain == True
-    assert fenv.num_timesteps == 1
+    assert fenv.freqdomain == True
+    assert fenv.num_t == 1
 
 
 def test_env_with_multiple_wavelengths_creation():
-    env = pt.Environment(num_wavlengths=3)
+    env = pt.Environment(num_wl=3)
 
 
 def test_env_with_wl_specified_creation():
-    env = pt.Environment(wavelength=1.55e-6)
+    env = pt.Environment(wl=1.55e-6)
 
 
 def test_env_with_no_delays_creation():
-    env = pt.Environment(use_delays=False)
+    env = pt.Environment(freqdomain=True)
 
 
 def test_env_with_extra_arguments_creation():

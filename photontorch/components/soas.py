@@ -255,7 +255,7 @@ class AgrawalSoa(BaseSoa):
             * self.neff
             * 2
             * np.pi
-            * np.mean(env.wavelength)  # TODO: make this an array
+            * np.mean(env.wl)  # TODO: make this an array
         )  # phase introduced by the soa
 
         super(AgrawalSoa, self).initialize()

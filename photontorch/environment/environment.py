@@ -1,4 +1,4 @@
-""" PhotonTorch Simulation Environment
+""" Photontorch Simulation Environment
 
 The simulation environment module contains a single class: ``Environment``
 
@@ -30,208 +30,358 @@ import numpy as np
 _current_environments = deque()
 
 
+#############
+## Helpers ##
+#############
+
+class _DefaultArgument:
+    """ wrap default function arguments in this class to figure out if argument
+    was supplied manually or due to being there by defualt."""
+    pass
+
+class _float(float, _DefaultArgument):
+    """ wrap default float function arguments in this class to figure out if
+    argument was supplied manually or due to being there by defualt."""
+    def __repr__(self):
+        return "%.3e"%self
+
+class _int(int, _DefaultArgument):
+    """ wrap default int function arguments in this class to figure out if
+    argument was supplied manually or due to being there by defualt."""
+    pass
+
+class _bool(int, _DefaultArgument):
+    """ wrap default bool function arguments in this class to figure out if
+    argument was supplied manually or due to being there by defualt."""
+    pass
+
+class _str(str, _DefaultArgument):
+    """ wrap default string function arguments in this class to figure out if
+    argument was supplied manually or due to being there by defualt."""
+    pass
+
+class _Array(np.ndarray):
+    """ numpy array with more concise repr """
+    def __repr__(self):
+        if self.ndim==1 and self.shape[0] > 4:
+            return "array([%.3e, %.3e, ..., %.3e])"%(self[0], self[1], self[-1])
+        else:
+            return "array(%s)"%(str(["%.3e"%v for v in self]).replace("'", ""))
+
+class _DefaultArray(_Array, _DefaultArgument):
+    """ wrap default numpy array function arguments in this class to figure out
+    if argument was supplied manually or due to being there by defualt."""
+    pass
+
+def _array(arr, default_array=False):
+    """ create either an _Array or a _DefaultArray. """
+    arr = arr.view(_DefaultArray) if default_array else arr.view(_Array)
+    arr.setflags(write=False)
+    return arr
+
+def _is_default(arg):
+    """ check if a certain value is a default argument """
+    return isinstance(arg, _DefaultArgument) or arg is None
+
+def _convert_default(value):
+    """ convert any value to a default argument """
+    if isinstance(value, bool):
+        return _bool(value)
+    elif isinstance(value, int):
+        return _int(value)
+    elif isinstance(value, float):
+        return _float(value)
+    elif isinstance(value, str):
+        return _str(value)
+    elif isinstance(value, np.ndarray):
+        return _array(value, default_array=True)
+    else:
+        return value
+
+
 #################
 ## Environment ##
 #################
 
 
-class Environment(dict):
+class Environment(object):
     """ Simulation Environment
 
     The simulation environment is a smart data class that contains all
     the necessary parameters to initialize a network for a simulation.
 
     It is able to initialize parameters that depend on each other correctly.
-    Changing a parameter that depends on another, changes both.
+
+    Note:
+        After creating an Environment, the parameters of the environment
+        get frozen and cannot be changed. However, a new environment can be
+        created from the old one with the ``.copy`` method, which accepts the
+        same arguments as Environment, but uses the current values as defaults.
 
     """
 
-    _initialized = False
-
-    def __init__(self, **kwargs):
-
+    def __init__(
+        self,
+        dt=_float(1e-14),
+        samplerate=_float(1e14),
+        num_t=_int(100),
+        t0=_float(0),
+        t1=_float(1e-12),
+        t=_array(np.arange(0, 1e-12, 1e-14), default_array=True),
+        bitrate=None,
+        bitlength=None,
+        wl=_float(1.55e-6),
+        f=_float(299792458.0/1.55e-6),
+        dwl=_float(1e-9),
+        df=_float(299792458.0/1.550e-6 - 99792458.0/1.551e-6),
+        num_wl=_int(1),
+        num_f=_int(1),
+        wl0=_float(1.5e-6),
+        f0=_float(299792458.0/1.6e-6),
+        wl1=_float(1.6e-6),
+        f1=_float(299792458.0/1.5e-6),
+        c=_float(299792458.0),
+        freqdomain=_bool(False),
+        grad=_bool(False),
+        name=_str("env"),
+        **kwargs
+    ):
         """
         Args:
-            dt (float=1e-14): timestep of the simulation
-            t_start (float=0): start time of the simulation in seconds
-            t_end (float=1000*dt): end time of the simulation in seconds
-            num_timesteps (int=1000): number of timesteps in the simulation (use this
-                in stead of t_end.)
-            t (np.ndarray=np.arange(0, 1000*dt, dt)): array with the times of the
-                simulation (use this in stead of dt, t_start, t_end and num_timesteps)
-
-            wavelength (float|np.ndarray=np.array([1.55e-6])): wavelength(s) of the
-                simulation
-            num_wavelengths (int=1): number of wavelengths in the simulation
-            wavelength_start (float=1.5e-6): starting wavelength of the simulation
-            wavelength_end (float=1.6e-6): ending wavelength of the simulation
-
-            frequency_domain (bool=True): ignore the delays in the network to
-                perform a frequency domain simulation.
-
-            device (str=None): which device to do the simulation on. If `None`, the
-                default of the network is used.
-
-            c (float=299792458.0): speed of light used for the simulations
-
-            enable_grad (bool=False): do not track gradients (disable/enable training).
-
-            name (str="env"): the name of the environment
-
-        Note:
-            The environment can take unlimited extra keyword arguments, which will be
-            stored as attributes.
+            dt (float): timestep of the simulation (mutually exclusive with t, samplerate and num_t)
+            samplerate (float): samplerate of the simulation (mutually exclusive with t, dt and num_t).
+            num_t (int): number of timesteps in the simulation (mutually exclusive with t, dt and samplerate).
+            t0 (float): starting time of the simulation (mutually exclusive with t).
+            t1 (float): ending time of the simulation (mutually exclusive with t).
+            t (np.ndarray): full 1D t array (mutually exclusive with dt, t0, t1, num_t and samplerate).
+            bitrate (optional, float): bitrate of the signal (mutually exclusive with bitlength).
+            bitlength (optional, float): bitlength of the signal (mutually exclusive with bitrate).
+            wl (float): wavelength(s) to simulate for (mutually exclusive with f, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
+            f (float): frequencie(s) to simulate for (mutually exclusive with wl, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
+            dwl (float): wavelength step sizebetween wl0 and wl1 (mutually exclusive with wl, f, df, num_wl and num_f).
+            df (float): frequency step between f0 and f1 (mutually exclusive with wl, f, dwl, num_wl and num_f).
+            num_wl (int): number of independent wavelengths in the simulation (mutually exclusive with wl, f, num_f, dwl and df)
+            num_f (int): number of independent frequencies in the simulation (mutually exclusive with wl, f, num_wl, dwl and df)
+            wl0 (float): start of wavelength range (mutually exclusive with wl, f and f0).
+            f0 (float): start of frequency range (mutually exclusive with wl, f and wl0).
+            wl1 (float): end of wavelength range (mutually exclusive with wl, f and f1).
+            f1 (float): end of frequency range (mutually exclusive with wl, f and wl1).
+            c (float): speed of light used during simulations.
+            freqdomain (bool): only do frequency domain calculations.
+            grad (bool): track gradients during the simulation (set this to True during training.)
+            name (str): name of the environment
+            **kwargs (optional): any number of extra keyword arguments will be stored as attributes to the environment.
         """
+        c = float(c)
 
-        ## Handle constants and booleans
-        self["c"] = kwargs.pop("c", 299792458.0)  # speed of light
-        use_delays = kwargs.pop("use_delays", True)  # for backward compatibility
-        self["frequency_domain"] = kwargs.pop("frequency_domain", not use_delays)
-        self["name"] = kwargs.pop("name", "env")
+        # parse kwargs for backward compatibility:
+        wl = kwargs.pop("wavelength", wl)
+        t0 = kwargs.pop("t_start", t0)
+        t1 = kwargs.pop("t_end", t1)
+        num_t = kwargs.pop("num_timesteps", num_t)
+        t = kwargs.pop("time", t)
+        dt = kwargs.pop("timestep", dt)
+        wavelength = kwargs.pop("wavelength", wl)
+        num_wl = kwargs.pop("num_wavelengths", num_wl)
+        dwl = kwargs.pop("wavelength_step", dwl)
+        wl0 = kwargs.pop("wavelength_start", wl0)
+        wl1 = kwargs.pop("wavelength_end", wl1)
+        freqdomain = kwargs.pop("frequency_domain", freqdomain)
+        grad = kwargs.pop("enable_grad", grad)
 
-        ## Simulation device
-        # for backward compatibility:
-        device = {None: None, True: "cuda", False: "cpu"}[kwargs.pop("cuda", None)]
-        # select device
-        self["device"] = kwargs.pop("device", device)
+        if sum([not _is_default(v) for v in (dt, num_t, samplerate, t)]) > 1:
+            raise ValueError("Environment: too many arguments given to determine t array: arguments 'dt', 'num_t', 'samplerate' and 't' are mutually exclusive")
+        if not _is_default(t0) and not _is_default(t):
+            raise ValueError("Environment: too many arguments given to determine t array: arguments 't0' and 't' are mutually exclusive")
+        if not _is_default(t1) and not _is_default(t):
+            raise ValueError("Environment: too many arguments given to determine t array: arguments 't1' and 't' are mutually exclusive")
+        if bitrate is not None and bitlength is not None:
+            raise ValueError("Environment: too many arguments given to determine bitrate: arguments 'bitrate' and 'bitlength' are mutually exclusive")
+        if not _is_default(wl) and not _is_default(f):
+            raise ValueError("Environment: too many arguments given to determine wavelength array: arguments 'wl' and 'f' are mutually exclusive")
+        if sum([not _is_default(v) for v in (dwl, df, num_wl, num_f, wl, f)]) > 1:
+            raise ValueError("Environment: too many arguments given to determine wavelength array: arguments 'dwl', 'df', 'num_wl', 'num_f', 'wl' and 'f' are mutually exclusive.")
+        if sum([not _is_default(v) for v in (wl0, f0, wl, f)]) > 1:
+            raise ValueError("Environment: too many arguments given to determine wavelength array: arguments 'wl0', 'f0', 'wl' and 'f' are mutually exclusive.")
+        if sum([not _is_default(v) for v in (wl1, f1, wl, f)]) > 1:
+            raise ValueError("Environment: too many arguments given to determine wavelength array: arguments 'wl1', 'f1', 'wl' and 'f' are mutually exclusive.")
 
-        ## Handle wavelength
-        # create default wavelength:
-        wl_start = float(
-            kwargs.pop("wavelength_start", kwargs.pop("wl_start", 1.55e-6))
-        )
-        wl_end = float(kwargs.pop("wavelength_end", kwargs.pop("wl_end", 1.55e-6)))
-        num_wavelengths = int(kwargs.pop("num_wavelengths", kwargs.pop("num_wl", 1)))
-        default_wavelength = np.linspace(wl_start, wl_end, num_wavelengths)
-        # get wavelength (we leave the other options for backward compatibility)
-        wavelength = np.array(
-            kwargs.pop(
-                "wavelength", kwargs.pop("wl", kwargs.pop("wls", default_wavelength))
-            )
-        )
-        if wavelength.ndim == 0:
-            wavelength = wavelength[None]  # make wavelength a 1D array
-        elif wavelength.ndim > 1:
-            raise ValueError("wavelength should be a float or a  1D array")
-        # set environment attributes
-        self["wavelength"] = wavelength
-        self["wavelength_start"] = wavelength[0]
-        self["wavelength_end"] = wavelength[-1]
-        self["num_wavelengths"] = wavelength.shape[0]
-        if len(wavelength) > 1:
-            self["wavelength_step"] = wavelength[1] - wavelength[0]
+        if not _is_default(bitlength):
+            bitrate = float(1/bitlength)
 
-        ## Handle time
-        # create default time:
-        dt = kwargs.pop("dt", None)
-        t_start = float(kwargs.pop("t_start", 0))
-        if self["frequency_domain"]:
-            num_timesteps = 1
+        if not _is_default(t) or sum([not _is_default(v) for v in (dt, samplerate, num_t, t0, t1)]) == 0:
+            if not isinstance(t, np.ndarray):
+                t = np.array(t)
+            if t.ndim == 0:
+                t = t[None]
+            elif t.ndim > 1:
+                raise ValueError("Dimensionality of 't' array too high: expected 1D array, got %iD array."%t.ndim)
+            t = _array(t)
         else:
-            num_timesteps = kwargs.pop("num_timesteps", 1000)
-        if dt is None:
-            t_end = float(kwargs.pop("t_end", 1e-12))
-            dt = t_end / num_timesteps
+            if not _is_default(samplerate):
+                dt = float(1/samplerate)
+            elif not _is_default(num_t):
+                dt = float((t1-t0)/num_t)
+            try:
+                t = _array(np.arange(min(t0, t1), max(t0, t1), abs(dt)))
+            except ValueError:
+                raise ValueError("Cannot create time range. Are dt or num_t, t0 and t1 all specified?")
+        if freqdomain:
+            t = t[:1]
+
+        if (not _is_default(wl) or not _is_default(f)) or sum([not _is_default(v) for v in (num_wl, num_f, dwl, df, wl0, f0, wl1, f1)]) == 0:
+            if not _is_default(f):
+                wl = c / f
+            if not isinstance(wl, np.ndarray):
+                wl = np.array(wl)
+            if wl.ndim == 0:
+                wl = wl[None]
+            elif wl.ndim > 1:
+                raise ValueError("Dimensionality of 'wl' or 'f' array too high: expected 1D array, got %iD array."%wl.ndim)
         else:
-            t_end = float(kwargs.pop("t_end", num_timesteps * dt))
+            if not _is_default(df):
+                if not _is_default(wl0):
+                    f1 = c / wl0
+                f1 = float(f1)
+                if not _is_default(wl1):
+                    f0 = c / wl0
+                f0 = float(f0)
+                try:
+                    wl = c/np.arange(max(f0, f1), min(f0, f1), -abs(df))
+                except ValueError:
+                    raise ValueError("Cannot create frequency range. Are df or num_f, f0 and f1 all specified?")
+            else:
+                if not _is_default(f0):
+                    wl1 = c / f0
+                wl1 = float(wl1)
+                if not _is_default(f0):
+                    wl0 = c / f1
+                wl0 = float(wl0)
+                if not _is_default(num_wl):
+                    dwl = float((wl1 - wl0)/num_wl)
+                elif not _is_default(num_f):
+                    dwl = float((wl1 - wl0)/num_f)
+                dwl = float(dwl)
+                try:
+                    wl = np.arange(min(wl0, wl1), max(wl0, wl1), abs(dwl))
+                except ValueError:
+                    raise ValueError("Cannot create frequency range. Are dwl or num_wl, wl0 and wl1 all specified?")
+        if wl[0] > wl[-1]:
+            wl = wl[::-1].copy()
 
-        if dt > t_end:
-            t_end = 1.6 * dt
-
-        default_time = np.arange(t_start, t_end - 0.5 * dt, dt)
-        # get time (leave the other options for backward compatibility)
-        time = np.array(kwargs.pop("time", kwargs.pop("t", default_time)))
-        if time.ndim == 0:
-            time = time[None]
-        elif time.ndim > 1:
-            raise ValueError("time should be a float or a 1D array")
-        self["time"] = time
-        self["t_start"] = time[0]
-        self["t_end"] = time[-1] + dt
-        self["dt"] = dt if time.shape[0] == 1 else time[1] - time[0]
-        self["num_timesteps"] = time.shape[0]
-
-        # we need this check as long as there are no complex tensors in torch, as
-        # having only two timesteps might yield problems. (the two time steps might
-        # be misinterpreted as the real and imaginary part of a single timestep)
-        if self["num_timesteps"] == 2:
-            raise ValueError(
-                "A simulation with two timesteps is for the moment not allowed."
-                "Take a single timestep OR at least 3 timesteps."
-            )
-
-        self["enable_grad"] = kwargs.pop("enable_grad", not kwargs.pop("no_grad", True))
-        if self["enable_grad"]:
-            self["grad_manager"] = torch.enable_grad()
-        else:
-            self["grad_manager"] = torch.no_grad()
-
-        # other keyword arguments are added to the attributes:
-        super(Environment, self).__init__(**kwargs)
-
-        # add keywords as attributes
-        self.__dict__ = self
-
-        # finish initialization
+        self.dt = self.timestep = np.inf if t.shape[0] < 2 else float(t[1] - t[0])
+        self.samplerate = 0 if t.shape[0] < 2 else float(1/self.dt)
+        self.num_t = self.num_timesteps = int(t.shape[0])
+        self.t0 = self.t_start = float(t[0])
+        self.t1 = self.t_end = np.inf if t.shape[0] < 2 else float(t[-1]) + self.dt
+        self.t = self.time = _array(t)
+        self.bitrate = None if bitrate is None else float(bitrate)
+        self.bitlength = None if bitrate is None else float(1/bitrate)
+        self.wl = self.wavelength = _array(wl)
+        self.f = _array(c/wl)
+        self.dwl = self.wavelength_step = np.inf if wl.shape[0] < 2 else float(wl[1] - wl[0])
+        self.df = np.inf if wl.shape[0] < 2 else float(c/wl[1] - c/wl[0])
+        self.num_wl = self.num_wavelengths = int(wl.shape[0])
+        self.num_f = int(wl.shape[0])
+        self.wl0 = self.wavelength_start = float(wl[0])
+        self.f0 = float(c/wl[0])
+        self.wl1 = self.wavelength_end = None if wl.shape[0]<2 else float(wl[-1]) + self.dwl
+        self.f1 = np.inf if wl.shape[0]<2 else float(c/(wl[-1] + self.dwl))
+        self.c = float(c)
+        self.freqdomain = self.frequency_domain = bool(freqdomain)
+        self.grad = self.enable_grad = bool(grad)
+        self.name = str(name)
+        self.__dict__.update(kwargs)
+        self._grad_manager = torch.enable_grad() if self.grad else torch.no_grad()
+        # synonyms for backward compatibility:
+        self._synonyms = ("wavelength", "t_start", "t_end", "num_timesteps", "time", "timestep", "wavelength", "num_wavelengths", "wavelength_step", "wavelength_start", "wavelength_end", "frequency_domain", "enable_grad")
         self._initialized = True
 
     def copy(self, **kwargs):
-        """ Create a (deep) copy of the environment
+        """ Create a copy of the environment
 
         Note:
-            You can optionally change the copied environment attributes by
-            specifying keyword arguments.
+            This copy method accepts the same keyword arguments as the
+            Environment initialization.  Supplying arguments overrides the
+            values in the copied environment. The original environment remains
+            unchanged.
 
+        Args:
+            dt (float): tstep of the simulation (mutually exclusive with t, samplerate and num_t)
+            samplerate (float): samplerate of the simulation (mutually exclusive with t, dt and num_t).
+            num_t (int): number of tsteps in the simulation (mutually exclusive with t, dt and samplerate).
+            t0 (float): starting time of the simulation (mutually exclusive with t).
+            t1 (float): ending time of the simulation (mutually exclusive with t).
+            t (np.ndarray): full 1D t array (mutually exclusive with dt, t0, t1, num_t and samplerate).
+            bitrate (optional, float): bitrate of the signal (mutually exclusive with bitlength).
+            bitlength (optional, float): bitlength of the signal (mutually exclusive with bitrate).
+            wl (float): wavelength(s) to simulate for (mutually exclusive with f, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
+            f (float): frequencie(s) to simulate for (mutually exclusive with wl, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
+            dwl (float): wavelength step between wl0 and wl1 (mutually exclusive with wl, f, df, num_wl and num_f).
+            df (float): frequency step between f0 and f1 (mutually exclusive with wl, f, dwl, num_wl and num_f).
+            num_wl (int): number of independent wavelengths in the simulation (mutually exclusive with wl, f, num_f, dwl and df)
+            num_f (int): number of independent frequencies in the simulation (mutually exclusive with wl, f, num_wl, dwl and df)
+            wl0 (float): start of wavelength range (mutually exclusive with wl, f and f0).
+            f0 (float): start of frequency range (mutually exclusive with wl, f and wl0).
+            wl1 (float): end of wavelength range (mutually exclusive with wl, f and f1).
+            f1 (float): end of frequency range (mutually exclusive with wl, f and wl1).
+            c (float): speed of light used during simulations.
+            freqdomain (bool): only do frequency domain calculations.
+            grad (bool): track gradients during the simulation (set this to True during training.)
+            name (str): name of the environment
+            **kwargs (optional): any number of extra keyword arguments will be stored as attributes to the environment.
         """
-        new = deepcopy(dict(self))
-        del new["_initialized"]
-        del new["grad_manager"]
+        new = {k:_convert_default(v) for k, v in self.__dict__.items() if not k.startswith("_") and not k in self._synonyms}
         new.update(kwargs)
-
-        if "dt" in kwargs or "num_timesteps" in kwargs:
-            if "dt" in kwargs:
-                if new["dt"] > new["t_end"]:
-                    new["t_end"] = new["dt"]
-            if "num_timesteps" not in kwargs:
-                new["time"] = np.arange(
-                    new["t_start"], new["t_end"] - 0.5 * new["dt"], new["dt"]
-                )
-            else:
-                if "dt" not in kwargs and new["num_timesteps"] > 1:
-                    new["dt"] = new["time"][1] - new["time"][0]
-                new["t_end"] = new["t_start"] + new["num_timesteps"] * new["dt"]
-                new["time"] = np.arange(
-                    new["t_start"], new["t_end"] - 0.5 * new["dt"], new["dt"]
-                )
-
         return self.__class__(**new)
 
-    def close(self):
-        """ close the current environment """
-        if _current_environments[0] is self:
-            del _current_environments[0]
-        self.grad_manager.__exit__()
-
-    def _set(self):
-        """ set the current environment """
-        _current_environments.appendleft(self)
-        self.grad_manager.__enter__()
-        return self
-
     def __enter__(self):
-        """ enter the with block (set the current environment) """
-        return self._set()
+        _current_environments.appendleft(self)
+        self._grad_manager.__enter__()
+        return self
 
     def __exit__(self, error, value, traceback):
         """ exit the with block (close the current environment) """
-        self.close()
+        if _current_environments[0] is self:
+            del _current_environments[0]
+        self._grad_manager.__exit__()
         if error is not None:
             raise  # raise the last error thrown
         return self
 
+    def __eq__(self, other):
+        self = {k: v for k, v in self.__dict__.items() if not k.startswith("_") and k not in ("f", "t", "wl")+self._synonyms}
+        other = {k: v for k, v in other.__dict__.items() if not k.startswith("_") and k not in ("f", "t", "wl")+other._synonyms}
+        return self == other
+
+    def __repr__(self):
+        s = "Environment("
+        for k, v in self.__dict__.items():
+            if k.startswith("_") or k in self._synonyms:
+                continue
+            if isinstance(v, float):
+                s = s + "%s=%s, " % (str(k), "%.3e"%v)
+                continue
+            s = s + "%s=%s, " % (str(k), repr(v))
+        s = s[:-2]+ ")"
+        return s
+
+    def __str__(self):
+        s = ("Simulation Environment:\n"
+             "-----------------------\n")
+        colwidth = max(len(k) for k in self.__dict__.keys() if not k.startswith("_") and not k in self._synonyms)+1
+        for k, v in self.__dict__.items():
+            if k.startswith("_") or k in self._synonyms:
+                continue
+            if isinstance(v, float):
+                s = s + "%s%s: %s\n" % (str(k)," "*(colwidth-len(k)),"%.3e"%v)
+                continue
+            s = s + "%s%s: %s\n" % (str(k)," "*(colwidth-len(k)), repr(v))
+        return s
+
     def __setattr__(self, name, value):
         """ this locks the attributes """
-        if self._initialized:
+        if hasattr(self, "_initialized") and self._initialized:
             raise AttributeError(
                 "Changing the attributes of an environment is not allowed. "
                 "Consider creating a new environment or use the copy method."
@@ -241,62 +391,13 @@ class Environment(dict):
 
     def __setitem__(self, name, value):
         """ this locks the attributes """
-        if self._initialized:
+        if hasattr(self, "_initialized") and self._initialized:
             raise AttributeError(
                 "Changing the attributes of an environment is not allowed. "
                 "Consider creating a new environment or use the copy method."
             )
         else:
             super(Environment, self).__setitem__(name, value)
-
-    def __eq__(self, other):
-        """ check if two environments are equal to each other """
-        if not isinstance(other, Environment):
-            return False
-        d1 = dict(self)
-        del d1["time"]
-        del d1["wavelength"]
-        d2 = dict(other)
-        del d2["time"]
-        del d2["wavelength"]
-        return d1 == d2
-
-    def __to_str_dict(self):
-        """ Dictionary representation of the environment """
-        env = OrderedDict()
-        env["name"] = repr(self.name)
-        env["frequency_domain"] = self.frequency_domain
-        if not self.frequency_domain:
-            env["t_start"] = "%.2e" % self.t_start
-            env["t_end"] = "%.2e" % self.t_end
-            env["dt"] = "%.2e" % self.dt
-            env["num_timesteps"] = self.num_timesteps
-        if self.num_wavelengths > 1:
-            env["wavelength_start"] = "%.3e" % self.wavelength_start
-            env["wavelength_end"] = "%.3e" % self.wavelength_end
-            env["num_wavelengths"] = repr(self.num_wavelengths)
-        else:
-            env["wavelength"] = "%.3e" % self.wavelength[0]
-        env.update({k: repr(v) for k, v in self.__dict__.items() if k[0] != "_"})
-        del env["wavelength"]
-        del env["time"]
-        return env
-
-    def __repr__(self):
-        """ Get the string representation of the environment """
-        dic = self.__to_str_dict()
-        return (
-            "Environment(" + ", ".join("=".join([k, v]) for k, v in dic.items()) + ")"
-        )
-
-    def __str__(self):
-        """ Set the string representation of the environment """
-        dic = self.__to_str_dict()
-        s = "Simulation Environment:\n"
-        s = s + "-----------------------\n"
-        for k, v in dic.items():
-            s = s + "%s = %s\n" % (str(k), str(v))
-        return s
 
 
 #########################
@@ -339,4 +440,4 @@ def set_environment(*args, **kwargs):
     else:
         env = Environment(**kwargs)
 
-    env._set()
+    env.__enter__()

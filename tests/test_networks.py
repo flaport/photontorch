@@ -126,7 +126,7 @@ def test_forward_with_constant_source(nw, tenv):
 
 def test_forward_with_timesource(gen, nw, tenv):
     with tenv:
-        nw(torch.rand(tenv.num_timesteps, generator=gen).rename("t"))
+        nw(torch.rand(tenv.num_t, generator=gen).rename("t"))
 
 
 def test_forward_with_different_value_for_each_source(gen, nw, tenv):
@@ -140,7 +140,7 @@ def test_forward_with_batch_weights(gen, nw, tenv):
         nw.initialize()
         nw(
             torch.rand(
-                tenv.num_timesteps, tenv.num_wavelengths, nw.num_sources, 3
+                tenv.num_t, tenv.num_wl, nw.num_sources, 3
             )
         )
 
@@ -182,11 +182,11 @@ def test_network_plot(gen, tenv, fenv):
 
     tnw = AddDrop()
 
-    with tenv.copy(wls=np.array([1.5, 1.55, 1.6]) * 1e-6) as env:
+    with tenv.copy(wl=np.array([1.5, 1.55, 1.6]) * 1e-6) as env:
         tnw.initialize()
 
         # test time mode 1
-        detected = torch.rand(env.num_timesteps, generator=gen)
+        detected = torch.rand(env.num_t, generator=gen)
         tnw.plot(detected)
 
         # test time mode 0
@@ -195,61 +195,61 @@ def test_network_plot(gen, tenv, fenv):
             tnw.plot(detected)
 
         # test time mode 2
-        detected = torch.rand(env.num_timesteps, tnw.num_detectors, generator=gen)
+        detected = torch.rand(env.num_t, tnw.num_detectors, generator=gen)
         tnw.plot(detected)
 
         # test time mode 3
-        detected = torch.rand(env.num_timesteps, env.num_wavelengths, generator=gen)
+        detected = torch.rand(env.num_t, env.num_wl, generator=gen)
         tnw.plot(detected)
 
         # test time mode 4
         detected = torch.rand(
-            env.num_timesteps, env.num_wavelengths, tnw.num_detectors, generator=gen
+            env.num_t, env.num_wl, tnw.num_detectors, generator=gen
         )
         tnw.plot(detected)
 
         # test time mode 5
-        detected = torch.rand(env.num_timesteps, env.num_wavelengths, 11, generator=gen)
+        detected = torch.rand(env.num_t, env.num_wl, 11, generator=gen)
         tnw.plot(detected)
 
         # test time mode 6
         detected = torch.rand(
-            env.num_timesteps, tnw.num_detectors, 11, generator=gen,
+            env.num_t, tnw.num_detectors, 11, generator=gen,
         )  # this one is not covered?
         tnw.plot(detected)
 
         # test time mode 6
         detected = torch.rand(
-            env.num_timesteps, env.num_wavelengths, tnw.num_detectors, 11, generator=gen,
+            env.num_t, env.num_wl, tnw.num_detectors, 11, generator=gen,
         )
         tnw.plot(detected)
 
         # test time mode 7
         with pytest.raises(RuntimeError):
             detected = torch.rand(
-                env.num_timesteps, env.num_wavelengths, tnw.num_detectors, 11, 2, generator=gen
+                env.num_t, env.num_wl, tnw.num_detectors, 11, 2, generator=gen
             )
             tnw.plot(detected)
 
         # test wl mode 1
-        detected = torch.rand(env.num_wavelengths, generator=gen)
+        detected = torch.rand(env.num_wl, generator=gen)
         tnw.plot(detected)
 
         # test wl mode 2
-        detected = torch.rand(env.num_wavelengths, tnw.num_detectors, generator=gen)
+        detected = torch.rand(env.num_wl, tnw.num_detectors, generator=gen)
         tnw.plot(detected)
 
         # test wl mode 3
-        detected = torch.rand(env.num_wavelengths, 11, generator=gen)
+        detected = torch.rand(env.num_wl, 11, generator=gen)
         tnw.plot(detected)
 
         # test wl mode 4
-        detected = torch.rand(env.num_wavelengths, tnw.num_detectors, 11, generator=gen)
+        detected = torch.rand(env.num_wl, tnw.num_detectors, 11, generator=gen)
         tnw.plot(detected)
 
         # test wl mode 5
         with pytest.raises(RuntimeError):
-            detected = torch.rand(env.num_wavelengths, tnw.num_detectors, 11, 2, generator=gen)
+            detected = torch.rand(env.num_wl, tnw.num_detectors, 11, 2, generator=gen)
             tnw.plot(detected)
 
 

@@ -162,9 +162,6 @@ class Component(Module):
         """
         self._env = env = current_environment()
 
-        if env.device is not None:
-            self.to(env.device)
-
         self.zero_grad()
         if (self.sources_at & self.detectors_at).any():
             raise ValueError(
@@ -186,7 +183,7 @@ class Component(Module):
                 denotes the stacked real and imaginary part.
         """
         S = torch.zeros(
-            (2, self.env.num_wavelengths, self.num_ports, self.num_ports),
+            (2, self.env.num_wl, self.num_ports, self.num_ports),
             device=self.device,
         )
         self.set_S(S)

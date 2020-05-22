@@ -70,12 +70,12 @@ def plot(network, detected, **kwargs):
 
     # Handle x
     time_mode = wl_mode = False
-    if network.env.num_timesteps == y.shape[0]:
+    if network.env.num_t == y.shape[0]:
         time_mode = True
-        x = network.env.time
-    elif network.env.num_wavelengths == y.shape[0]:
+        x = network.env.t
+    elif network.env.num_wl == y.shape[0]:
         wl_mode = True
-        x = network.env.wavelength
+        x = network.env.wl
     if not (time_mode or wl_mode):
         raise ValueError("First dimension should be #timesteps or #wavelengths")
 
@@ -103,7 +103,7 @@ def plot(network, detected, **kwargs):
     detectors = [
         name for name, comp in network.components.items() if isinstance(comp, Detector)
     ]
-    wavelengths = ["%inm" % wl for wl in 1e9 * network.env.wavelength]
+    wavelengths = ["%inm" % wl for wl in 1e9 * network.env.wl]
 
     # Plot
     if y.ndim == 1:
@@ -122,7 +122,7 @@ def plot(network, detected, **kwargs):
                 "%i | %s" % (i, det) for i in range(y.shape[1]) for det in detectors
             ]
             return plotfunc(
-                x, y.reshape(network.env.num_wavelengths, -1), labels, **kwargs
+                x, y.reshape(network.env.num_wl, -1), labels, **kwargs
             )
         else:
             raise RuntimeError(
@@ -131,7 +131,7 @@ def plot(network, detected, **kwargs):
 
     if time_mode:
         if y.ndim == 2:
-            if y.shape[1] == network.env.num_wavelengths:
+            if y.shape[1] == network.env.num_wl:
                 labels = wavelengths
             elif y.shape[1] == network.num_detectors:
                 labels = detectors
@@ -140,14 +140,14 @@ def plot(network, detected, **kwargs):
             return plotfunc(x, y, labels, **kwargs)
         elif y.ndim == 3:
             if (
-                y.shape[1] == network.env.num_wavelengths
+                y.shape[1] == network.env.num_wl
                 and y.shape[2] == network.num_detectors
             ):
                 labels = [
                     "%s | %s" % (wl, det) for wl in wavelengths for det in detectors
                 ]
             elif (
-                y.shape[1] == network.env.num_wavelengths
+                y.shape[1] == network.env.num_wl
                 and y.shape[2] != network.num_detectors
             ):
                 y = y.transpose(0, 2, 1)
@@ -160,7 +160,7 @@ def plot(network, detected, **kwargs):
                     "%i | %s" % (b, det) for b in range(y.shape[1]) for det in detectors
                 ]
             return plotfunc(
-                x, y.reshape(network.env.num_timesteps, -1), labels, **kwargs
+                x, y.reshape(network.env.num_t, -1), labels, **kwargs
             )
         elif y.ndim == 4:
             y = y.transpose(0, 3, 1, 2)
@@ -171,7 +171,7 @@ def plot(network, detected, **kwargs):
                 for det in detectors
             ]
             return plotfunc(
-                x, y.reshape(network.env.num_timesteps, -1), labels, **kwargs
+                x, y.reshape(network.env.num_t, -1), labels, **kwargs
             )
         else:
             raise RuntimeError(

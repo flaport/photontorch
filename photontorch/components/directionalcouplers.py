@@ -234,7 +234,7 @@ class RealisticDirectionalCoupler(Component):
         self.wl0 = wl0
 
     def set_S(self, S):
-        wl = torch.tensor(self.env.wavelength, dtype=torch.float64, device=self.device)
+        wl = torch.tensor(self.env.wl, dtype=torch.float64, device=self.device)
         dwl = wl - self.wl0
         dn = self.n0 + self.de1_n0 * dwl + 0.5 * self.de2_n0 * dwl ** 2
         kappa0 = self.k0 + self.de1_k0 * dwl + 0.5 * self.de2_k0 * dwl ** 2
