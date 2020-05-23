@@ -3,6 +3,7 @@
 
 # documentation build
 docs/_build
+docs/examples
 
 # python cache
 __pycache__
