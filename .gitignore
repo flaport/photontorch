@@ -1,6 +1,9 @@
 # Mac folders
 .DS_Store
 
+# extra notebooks
+*_.ipynb
+
 # documentation build
 docs/_build
 docs/examples

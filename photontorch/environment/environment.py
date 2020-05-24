@@ -179,11 +179,11 @@ class Environment(object):
     ):
         """
         Args:
-            dt (float): [s] timestep of the simulation (mutually exclusive with t, samplerate and num_t)
-            samplerate (float): [1/s] samplerate of the simulation (mutually exclusive with t, dt and num_t).
+            dt (float): [s] timestep of the simulation (mutually exclusive with t and samplerate)
+            samplerate (float): [1/s] samplerate of the simulation (mutually exclusive with t and t1).
             num_t (int): number of timesteps in the simulation (mutually exclusive with t, dt and samplerate).
             t0 (float): [s] starting time of the simulation (mutually exclusive with t).
-            t1 (float): [s] ending time of the simulation (mutually exclusive with t).
+            t1 (float): [s] ending time of the simulation (mutually exclusive with t and num_t).
             t (np.ndarray): [s] full 1D time array (mutually exclusive with dt, t0, t1, num_t and samplerate).
             bitrate (optional, float): [1/s] bitrate of the signal (mutually exclusive with bitlength).
             bitlength (optional, float): [s] bitlength of the signal (mutually exclusive with bitrate).
@@ -220,17 +220,17 @@ class Environment(object):
         freqdomain = kwargs.pop("frequency_domain", freqdomain)
         grad = kwargs.pop("enable_grad", grad)
 
-        if sum([not _is_default(v) for v in (dt, num_t, samplerate, t)]) > 1:
+        if sum([not _is_default(v) for v in (dt, samplerate, t)]) > 1:
             raise ValueError(
-                "Environment: too many arguments given to determine t array: arguments 'dt', 'num_t', 'samplerate' and 't' are mutually exclusive"
+                "Environment: too many arguments given to determine t array: arguments 'dt', 'samplerate' and 't' are mutually exclusive"
             )
         if not _is_default(t0) and not _is_default(t):
             raise ValueError(
                 "Environment: too many arguments given to determine t array: arguments 't0' and 't' are mutually exclusive"
             )
-        if not _is_default(t1) and not _is_default(t):
+        if sum([not _is_default(v) for v in (t1, num_t, t)]) > 1:
             raise ValueError(
-                "Environment: too many arguments given to determine t array: arguments 't1' and 't' are mutually exclusive"
+                "Environment: too many arguments given to determine t array: arguments 't1', 'num_t' and 't' are mutually exclusive"
             )
         if bitrate is not None and bitlength is not None:
             raise ValueError(
@@ -273,14 +273,19 @@ class Environment(object):
         else:
             if not _is_default(samplerate):
                 dt = float(1 / samplerate)
-            elif not _is_default(num_t):
-                dt = float((t1 - t0) / num_t)
-            try:
-                t = _array(np.arange(min(t0, t1), max(t0, t1), abs(dt)))
-            except ValueError:
-                raise ValueError(
-                    "Cannot create time range. Are dt or num_t, t0 and t1 all specified?"
+            if not _is_default(num_t):
+                t = _array(
+                    np.linspace(
+                        abs(t0), abs(t0) + num_t * abs(dt), num_t, endpoint=False
+                    )
                 )
+            else:
+                try:
+                    t = _array(np.arange(min(t0, t1), max(t0, t1), abs(dt)))
+                except ValueError:
+                    raise ValueError(
+                        "Cannot create time range. Are dt or num_t, t0 and t1 all specified?"
+                    )
         if freqdomain:
             t = t[:1]
 
@@ -389,25 +394,25 @@ class Environment(object):
             unchanged.
 
         Args:
-            dt (float): tstep of the simulation (mutually exclusive with t, samplerate and num_t)
-            samplerate (float): samplerate of the simulation (mutually exclusive with t, dt and num_t).
-            num_t (int): number of tsteps in the simulation (mutually exclusive with t, dt and samplerate).
-            t0 (float): starting time of the simulation (mutually exclusive with t).
-            t1 (float): ending time of the simulation (mutually exclusive with t).
-            t (np.ndarray): full 1D t array (mutually exclusive with dt, t0, t1, num_t and samplerate).
-            bitrate (optional, float): bitrate of the signal (mutually exclusive with bitlength).
-            bitlength (optional, float): bitlength of the signal (mutually exclusive with bitrate).
-            wl (float): wavelength(s) to simulate for (mutually exclusive with f, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
-            f (float): frequencie(s) to simulate for (mutually exclusive with wl, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
-            dwl (float): wavelength step between wl0 and wl1 (mutually exclusive with wl, f, df, num_wl and num_f).
-            df (float): frequency step between f0 and f1 (mutually exclusive with wl, f, dwl, num_wl and num_f).
+            dt (float): [s] timestep of the simulation (mutually exclusive with t and samplerate)
+            samplerate (float): [1/s] samplerate of the simulation (mutually exclusive with t and t1).
+            num_t (int): number of timesteps in the simulation (mutually exclusive with t, dt and samplerate).
+            t0 (float): [s] starting time of the simulation (mutually exclusive with t).
+            t1 (float): [s] ending time of the simulation (mutually exclusive with t and num_t).
+            t (np.ndarray): [s] full 1D time array (mutually exclusive with dt, t0, t1, num_t and samplerate).
+            bitrate (optional, float): [1/s] bitrate of the signal (mutually exclusive with bitlength).
+            bitlength (optional, float): [s] bitlength of the signal (mutually exclusive with bitrate).
+            wl (float): [m] full 1D wavelength array (mutually exclusive with f, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
+            f (float): [1/s] full 1D frequency array (mutually exclusive with wl, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
+            dwl (float): [m] wavelength step sizebetween wl0 and wl1 (mutually exclusive with wl, f, df, num_wl and num_f).
+            df (float): [1/s] frequency step between f0 and f1 (mutually exclusive with wl, f, dwl, num_wl and num_f).
             num_wl (int): number of independent wavelengths in the simulation (mutually exclusive with wl, f, num_f, dwl and df)
             num_f (int): number of independent frequencies in the simulation (mutually exclusive with wl, f, num_wl, dwl and df)
-            wl0 (float): start of wavelength range (mutually exclusive with wl, f and f0).
-            f0 (float): start of frequency range (mutually exclusive with wl, f and wl0).
-            wl1 (float): end of wavelength range (mutually exclusive with wl, f and f1).
-            f1 (float): end of frequency range (mutually exclusive with wl, f and wl1).
-            c (float): speed of light used during simulations.
+            wl0 (float): [m] start of wavelength range (mutually exclusive with wl, f and f0).
+            f0 (float): [1/s] start of frequency range (mutually exclusive with wl, f and wl0).
+            wl1 (float): [m] end of wavelength range (mutually exclusive with wl, f and f1).
+            f1 (float): [1/s] end of frequency range (mutually exclusive with wl, f and wl1).
+            c (float): [m/s] speed of light used during simulations.
             freqdomain (bool): only do frequency domain calculations.
             grad (bool): track gradients during the simulation (set this to True during training.)
             name (optional, str): name of the environment
