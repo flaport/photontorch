@@ -637,7 +637,7 @@ class Network(Component):
                     "or name all of them.\n%s" % _note
                 )
             if source.ndim == 5:
-                if c > 2:
+                if source.shape[0] > 2:
                     raise ValueError(
                         "First dimension of a 5D source should "
                         "maximally be 2, containing the real and"
