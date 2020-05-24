@@ -535,9 +535,9 @@ def current_environment():
         return _current_environments[0]
     else:
         raise RuntimeError(
-            "Environment is not set. Execute your code inside an "
+            "Environment not found. Execute your code inside an "
             "environment-defining with-block or use the 'set_environment()' "
-            "function to set your environment globally."
+            "function to set the environment globally."
         )
 
 

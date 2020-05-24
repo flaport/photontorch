@@ -15,6 +15,8 @@ import torch
 import numpy as np
 from scipy.signal import butter, lfilter
 
+## Relative
+from ..environment.environment import current_environment
 
 ###############
 ## Functions ##
@@ -75,14 +77,27 @@ class BitStreamGenerator:
         Args:
             bits (int|sequence): - if int: generate that number of bits, then create stream.
                 - if sequence: interpret the sequence as bits, then create stream.
-            bitrate (optional, float): [1/s] override data rate of the bitstream
-            samplerate (optional, float): [1/s] override sample rate of the bitstream
+            bitrate (optional, float): [1/s] override data rate of the bitstream (defaults to bitrate found in environment)
+            samplerate (optional, float): [1/s] override the sample rate of the signal (defaults to samplerate found in environment)
             cutoff_frequency (optional, float): [1/s] override cutoff frequency of the bitstream. If None: no lowpass filtering.
             filter_order (optional, int): override filter order to enforce cutoff frequency
             seed (optional, int): override seed used to generate bits (if needed)
             dtype (optional, torch.dtype): override dtype to generate the bits for. None -> "torch.get_default_dtype()"
             device (optional, torch.device): override device to generate the bits on. None -> "cpu"
+
+        Note:
+            If a bitrate and/or samplerate can be found in the current environment,
+            those values will be regarded as keyword arguments and hence get precedence over
+            the values given during the BitStreamGenerator initialization.
         """
+
+        try:
+            env = current_environment()
+            bitrate = env.bitrate if bitrate is None else bitrate
+            samplerate = env.samplerate if bitrate is None else bitrate
+        except RuntimeError:
+            pass
+
         bitrate = self.bitrate if bitrate is None else float(bitrate)
         samplerate = self.samplerate if samplerate is None else float(samplerate)
         cutoff_frequency = (
@@ -195,8 +210,13 @@ class _Loss(torch.nn.Module):
             target (Tensor): target power tensor. Should be broadcastable to the same shape as prediction.
             latency (optional, float): [bits] override fractional latency in bit lengths. This value can be a floating point number bigger than 1.
             warmup (optional, int): [bits] override integer number of warmup bits. warmup bits are disregarded during the loss calculation.
-            bitrate (optional, float): [1/s] override data rate of the bitstream
-            samplerate (optional, float): [1/s] override sample rate of the bitstream
+            bitrate (optional, float): [1/s] override data rate of the bitstream (defaults to bitrate found in environment)
+            samplerate (optional, float): [1/s] override the sample rate of the signal (defaults to samplerate found in environment)
+
+        Note:
+            If a bitrate and/or samplerate can be found in the current environment,
+            those values will be regarded as keyword arguments and hence get precedence over
+            the values given during the loss initialization.
         """
         raise NotImplementedError(
             "Implement forward function for your loss by subclassing."
@@ -218,12 +238,25 @@ class _Loss(torch.nn.Module):
             x (Tensor): Should be broadcastable to tensor with shape (# timesteps, # wavelengths, # readouts, # batches)
             latency (optional, float): [bits] override fractional latency in bit lengths. This value can be a floating point number bigger than 1.
             warmup (optional, int): [bits] override integer number of warmup bits. warmup bits are disregarded during the loss calculation.
-            bitrate (optional, float): [1/s] override data rate of the bitstream
+            bitrate (optional, float): [1/s] override data rate of the bitstream (defaults to bitrate found in environment)
             samplerate (optional, float): [1/s] override sample rate of the bitstream
             unit (str): unit to use for time array (time values will be multiplied accordingly)
             show (bool): run plt.show at the end of this method.
             **kwargs: keyword arguments given to plt.plot.
+
+        Note:
+            If a bitrate and/or samplerate can be found in the current environment,
+            those values will be regarded as keyword arguments and hence get precedence over
+            the values given during the loss initialization.
         """
+
+        try:
+            env = current_environment()
+            bitrate = env.bitrate if bitrate is None else bitrate
+            samplerate = env.samplerate if bitrate is None else bitrate
+        except RuntimeError:
+            pass
+
         import matplotlib.pyplot as plt
 
         bitrate = self.bitrate if bitrate is None else float(bitrate)
@@ -239,10 +272,13 @@ class _Loss(torch.nn.Module):
         x = x[w + l : :]
 
         time = np.arange(x.shape[0]) / samplerate
-        units = {"s": 0, "ms": 3, r"$\mu$s": 6, "ns": 9, "ps": 12, "fs": 15}
-        unit = unit.replace("u", r"$\mu$")
+        units = {"s": 0, "ms": 3, r"us": 6, "ns": 9, "ps": 12, "fs": 15}
         if unit not in units:
-            unit = "ns"
+            raise ValueError(
+                "Invalid unit '%s'. Valid units are: %s"
+                % (unit, str([unit for unit in units]))
+            )
+        unit = unit.replace("us", r"$\mu$s")
         factor = 10 ** units[unit]
         p = plt.plot(time * factor, x.data.cpu().numpy(), **kwargs)
         plt.xlabel("t [%s]" % unit)
@@ -261,6 +297,14 @@ class MSELoss(_Loss):
         bitrate=None,
         samplerate=None,
     ):
+
+        try:
+            env = current_environment()
+            bitrate = env.bitrate if bitrate is None else bitrate
+            samplerate = env.samplerate if bitrate is None else bitrate
+        except RuntimeError:
+            pass
+
         bitrate = self.bitrate if bitrate is None else float(bitrate)
         samplerate = self.samplerate if samplerate is None else float(samplerate)
         latency = self.latency if latency is None else float(latency)
@@ -320,9 +364,22 @@ class BERLoss(_Loss):
             threshold (optional, float): override threshold value (where to place the 0/1 threshold)
             latency (optional, float): [bits] override fractional latency in bit lengths. This value can be a floating point number bigger than 1.
             warmup (optional, int): [bits] override integer number of warmup bits. warmup bits are disregarded during the loss calculation.
-            bitrate (optional, float): [1/s] override data rate of the bitstream
-            samplerate (optional, float): override the sample rate of the signal [in Hz]
+            bitrate (optional, float): [1/s] override data rate of the bitstream (defaults to bitrate found in environment)
+            samplerate (optional, float): [1/s] override the sample rate of the signal (defaults to samplerate found in environment)
+
+        Note:
+            If a bitrate and/or samplerate can be found in the current environment,
+            those values will be regarded as keyword arguments and hence get precedence over
+            the values given during the loss initialization.
         """
+
+        try:
+            env = current_environment()
+            bitrate = env.bitrate if bitrate is None else bitrate
+            samplerate = env.samplerate if bitrate is None else bitrate
+        except RuntimeError:
+            pass
+
         with torch.no_grad():
             threshold = self.threshold if threshold is None else float(threshold)
             bitrate = self.bitrate if bitrate is None else float(bitrate)
