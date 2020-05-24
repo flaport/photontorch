@@ -12,6 +12,7 @@ simulation.
 #############
 
 # Standard Library
+import re
 from copy import deepcopy
 from collections import OrderedDict
 from collections import deque
@@ -75,10 +76,23 @@ class _Array(np.ndarray):
     """ numpy array with more concise repr """
 
     def __repr__(self):
-        if self.ndim == 1 and self.shape[0] > 4:
+        if self.ndim != 1:
+            return (
+                super(_Array, self).__repr__().replace(self.__class__.__name__, "array")
+            )
+        if self.shape[0] > 4:
             return "array([%.3e, %.3e, ..., %.3e])" % (self[0], self[1], self[-1])
         else:
             return "array(%s)" % (str(["%.3e" % v for v in self]).replace("'", ""))
+
+    def __str__(self):
+        if self.ndim != 1:
+            return super(_Array, self).__str__()
+        if self.ndim == 1 and self.shape[0] > 4:
+            return "[%.3e, %.3e, ..., %.3e]" % (self[0], self[1], self[-1])
+        else:
+            s = "[" + "%.3e " * self.shape[0] + "]"
+            return s % self
 
 
 class _DefaultArray(_Array, _DefaultArgument):
@@ -165,25 +179,25 @@ class Environment(object):
     ):
         """
         Args:
-            dt (float): timestep of the simulation (mutually exclusive with t, samplerate and num_t)
-            samplerate (float): samplerate of the simulation (mutually exclusive with t, dt and num_t).
+            dt (float): [s] timestep of the simulation (mutually exclusive with t, samplerate and num_t)
+            samplerate (float): [1/s] samplerate of the simulation (mutually exclusive with t, dt and num_t).
             num_t (int): number of timesteps in the simulation (mutually exclusive with t, dt and samplerate).
-            t0 (float): starting time of the simulation (mutually exclusive with t).
-            t1 (float): ending time of the simulation (mutually exclusive with t).
-            t (np.ndarray): full 1D t array (mutually exclusive with dt, t0, t1, num_t and samplerate).
-            bitrate (optional, float): bitrate of the signal (mutually exclusive with bitlength).
-            bitlength (optional, float): bitlength of the signal (mutually exclusive with bitrate).
-            wl (float): wavelength(s) to simulate for (mutually exclusive with f, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
-            f (float): frequencie(s) to simulate for (mutually exclusive with wl, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
-            dwl (float): wavelength step sizebetween wl0 and wl1 (mutually exclusive with wl, f, df, num_wl and num_f).
-            df (float): frequency step between f0 and f1 (mutually exclusive with wl, f, dwl, num_wl and num_f).
+            t0 (float): [s] starting time of the simulation (mutually exclusive with t).
+            t1 (float): [s] ending time of the simulation (mutually exclusive with t).
+            t (np.ndarray): [s] full 1D time array (mutually exclusive with dt, t0, t1, num_t and samplerate).
+            bitrate (optional, float): [1/s] bitrate of the signal (mutually exclusive with bitlength).
+            bitlength (optional, float): [s] bitlength of the signal (mutually exclusive with bitrate).
+            wl (float): [m] full 1D wavelength array (mutually exclusive with f, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
+            f (float): [1/s] full 1D frequency array (mutually exclusive with wl, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
+            dwl (float): [m] wavelength step sizebetween wl0 and wl1 (mutually exclusive with wl, f, df, num_wl and num_f).
+            df (float): [1/s] frequency step between f0 and f1 (mutually exclusive with wl, f, dwl, num_wl and num_f).
             num_wl (int): number of independent wavelengths in the simulation (mutually exclusive with wl, f, num_f, dwl and df)
             num_f (int): number of independent frequencies in the simulation (mutually exclusive with wl, f, num_wl, dwl and df)
-            wl0 (float): start of wavelength range (mutually exclusive with wl, f and f0).
-            f0 (float): start of frequency range (mutually exclusive with wl, f and wl0).
-            wl1 (float): end of wavelength range (mutually exclusive with wl, f and f1).
-            f1 (float): end of frequency range (mutually exclusive with wl, f and wl1).
-            c (float): speed of light used during simulations.
+            wl0 (float): [m] start of wavelength range (mutually exclusive with wl, f and f0).
+            f0 (float): [1/s] start of frequency range (mutually exclusive with wl, f and wl0).
+            wl1 (float): [m] end of wavelength range (mutually exclusive with wl, f and f1).
+            f1 (float): [1/s] end of frequency range (mutually exclusive with wl, f and wl1).
+            c (float): [m/s] speed of light used during simulations.
             freqdomain (bool): only do frequency domain calculations.
             grad (bool): track gradients during the simulation (set this to True during training.)
             name (optional, str): name of the environment
@@ -338,7 +352,7 @@ class Environment(object):
         self.wl0 = self.wavelength_start = float(wl[0])
         self.f0 = float(c / wl[0])
         self.wl1 = self.wavelength_end = (
-            None if wl.shape[0] < 2 else float(wl[-1]) + self.dwl
+            np.inf if wl.shape[0] < 2 else float(wl[-1]) + self.dwl
         )
         self.f1 = np.inf if wl.shape[0] < 2 else float(c / (wl[-1] + self.dwl))
         self.c = float(c)
@@ -464,6 +478,30 @@ class Environment(object):
                 continue
             s = s + "%s%s: %s\n" % (str(k), " " * (colwidth - len(k)), repr(v))
         return s
+
+    def _repr_html_(self):
+        descriptions = [
+            row.strip().split(":")
+            for row in self.__init__.__doc__.split("Args:\n")[1]
+            .split("\n\n")[0]
+            .split("\n")
+            if (row.strip() and ":" in row)
+        ]
+        descriptions = {
+            re.sub(r" \(.*\)", "", k).strip(): re.sub(r" \(.*\)", "", v).strip()
+            for k, v in descriptions
+        }
+        row = "<tr><th>%s</th><td>%s</td><td>%s</td></tr>\n"
+        html = "<div>\n<table>\n<thead>\n<tr>\n<th>key</th>\n<th>value</th>\n<th>description</th>\n</tr>\n</thead>\n<tbody>\n"
+        for k, v in self.__dict__.items():
+            if k.startswith("_") or k in self._synonyms:
+                continue
+            if isinstance(v, float):
+                html = html + row % (k, "%.3e" % v, descriptions.get(k, ""))
+                continue
+            html = html + row % (k, str(v), descriptions.get(k, ""))
+        html = html + "</tbody>\n</table>\n</div>"
+        return html
 
     def __setattr__(self, name, value):
         """ this locks the attributes """
