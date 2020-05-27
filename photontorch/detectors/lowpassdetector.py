@@ -4,10 +4,10 @@ The ``LospassDetector`` performs the (differentiable) PyTorch equivalent of the
 following numpy/scipy function: ::
 
     from scipy.signal import butter, lfilter
-    def detect(x, bitrate, samplerate, cutoff_frequency, filter_order):
+    def detect(x, bitrate, samplerate, cutoff_frequency, responsivity, filter_order):
         normal_cutoff = cutoff_frequency / ( 0.5 * samplerate)
         b, a = butter(N=filter_order, Wn=normal_cutoff, btype='lowpass', analog=False)
-        return lfilter(b, a, x, axis=0)
+        return lfilter(b, a, responsivity * x, axis=0)
 
 """
 
@@ -39,22 +39,33 @@ T = 300  # [K] room temperature
 
 
 class LowpassDetector(torch.nn.Module):
-    """ LowpassDetector: Detect by lowpass filtering the signal. """
+    """ Detect by lowpass filtering the signal.
+
+    The LowpassDetector transforms a raw optical power [W] to a detection current [A].
+
+    """
 
     def __init__(
-        self, bitrate=40e9, samplerate=160e9, cutoff_frequency=20e9, filter_order=4,
+        self,
+        bitrate=40e9,
+        samplerate=160e9,
+        cutoff_frequency=20e9,
+        responsivity=1.0,
+        filter_order=4,
     ):
         """
         Args:
             bitrate (float): [1/s] data rate of the signal to filter
             samplerate (float): [1/s] sample rate of the signal to filter
             cutoff_frequency (float): [1/s] cutoff frequency of the detector
+            responsivity (float): [A/W] resonsivity of the detector
             filter_order (int): filter order of the butter filter
         """
         super(LowpassDetector, self).__init__()
         self.bitrate = float(bitrate)
         self.samplerate = float(samplerate)
         self.cutoff_frequency = float(cutoff_frequency)
+        self.responsivity = float(responsivity)
         self.filter_order = int(filter_order + 0.5)
         self.normal_cutoff = 2 * self.cutoff_frequency / self.samplerate
 
@@ -80,7 +91,7 @@ class LowpassDetector(torch.nn.Module):
         """ detect a bitstream by low-pass filtering
 
         Args:
-            signal (Tensor): signal to detect.
+            signal (Tensor): [W] optical power to detect.
             num_splits (int): number of parallel parts to split the timestream in
             split_padding (int): number of bits padding when splitting the timstream in parts.
 
@@ -95,9 +106,14 @@ class LowpassDetector(torch.nn.Module):
             defined, which pads a number of bits from the previous / next
             signal part before and after the current signal part to detect.
         """
+        # unit: sqrt(W) -> W (only when complex valued amplitudes are given)
         if signal.shape[0] == 2:  # complex valued signal (photontorch convention)
             signal = signal[0] ** 2 + signal[1] ** 2  # amplitude -> power
 
+        # unit: W -> A:
+        signal = self.responsivity * signal
+
+        # do no filtering when nyquist frequency equals samplerate
         if self.normal_cutoff == 1.0:
             return signal
 
