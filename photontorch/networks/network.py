@@ -431,7 +431,10 @@ class Network(Component):
         # delays can be turned off for frequency domain calculations
         delays_in_seconds = self.delays * float(not self.env.freqdomain)
         # resulting delays in terms of the simulation timestep:
-        delays = (delays_in_seconds / self.env.dt + 0.5).long()
+        if self.env.dt is not None:
+            delays = (delays_in_seconds / self.env.dt + 0.5).long()
+        else:
+            delays = torch.zeros_like(delays_in_seconds).long()
 
         ## locations of memory-containing and memory-less nodes:
 

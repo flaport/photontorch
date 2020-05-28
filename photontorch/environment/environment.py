@@ -13,8 +13,7 @@ simulation.
 
 # Standard Library
 import re
-from copy import deepcopy
-from collections import OrderedDict
+import inspect
 from collections import deque
 
 # Torch
@@ -179,28 +178,28 @@ class Environment(object):
     ):
         """
         Args:
-            dt (float): [s] timestep of the simulation (mutually exclusive with t and samplerate)
-            samplerate (float): [1/s] samplerate of the simulation (mutually exclusive with t and t1).
-            num_t (int): number of timesteps in the simulation (mutually exclusive with t, dt and samplerate).
+            t (np.ndarray): [s] full 1D time array (mutually exclusive with dt, t0, t1, num_t and samplerate).
             t0 (float): [s] starting time of the simulation (mutually exclusive with t).
             t1 (float): [s] ending time of the simulation (mutually exclusive with t and num_t).
-            t (np.ndarray): [s] full 1D time array (mutually exclusive with dt, t0, t1, num_t and samplerate).
+            num_t (int): number of timesteps in the simulation (mutually exclusive with t, dt and samplerate).
+            dt (float): [s] timestep of the simulation (mutually exclusive with t and samplerate)
+            samplerate (float): [1/s] samplerate of the simulation (mutually exclusive with t and t1).
             bitrate (optional, float): [1/s] bitrate of the signal (mutually exclusive with bitlength).
             bitlength (optional, float): [s] bitlength of the signal (mutually exclusive with bitrate).
             wl (float): [m] full 1D wavelength array (mutually exclusive with f, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
-            f (float): [1/s] full 1D frequency array (mutually exclusive with wl, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
-            dwl (float): [m] wavelength step sizebetween wl0 and wl1 (mutually exclusive with wl, f, df, num_wl and num_f).
-            df (float): [1/s] frequency step between f0 and f1 (mutually exclusive with wl, f, dwl, num_wl and num_f).
-            num_wl (int): number of independent wavelengths in the simulation (mutually exclusive with wl, f, num_f, dwl and df)
-            num_f (int): number of independent frequencies in the simulation (mutually exclusive with wl, f, num_wl, dwl and df)
             wl0 (float): [m] start of wavelength range (mutually exclusive with wl, f and f0).
-            f0 (float): [1/s] start of frequency range (mutually exclusive with wl, f and wl0).
             wl1 (float): [m] end of wavelength range (mutually exclusive with wl, f and f1).
+            num_wl (int): number of independent wavelengths in the simulation (mutually exclusive with wl, f, num_f, dwl and df)
+            dwl (float): [m] wavelength step sizebetween wl0 and wl1 (mutually exclusive with wl, f, df, num_wl and num_f).
+            f (float): [1/s] full 1D frequency array (mutually exclusive with wl, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
+            f0 (float): [1/s] start of frequency range (mutually exclusive with wl, f and wl0).
             f1 (float): [1/s] end of frequency range (mutually exclusive with wl, f and wl1).
+            num_f (int): number of independent frequencies in the simulation (mutually exclusive with wl, f, num_wl, dwl and df)
+            df (float): [1/s] frequency step between f0 and f1 (mutually exclusive with wl, f, dwl, num_wl and num_f).
             c (float): [m/s] speed of light used during simulations.
             freqdomain (bool): only do frequency domain calculations.
             grad (bool): track gradients during the simulation (set this to True during training.)
-            name (optional, str): name of the environment
+            name (str): name of the environment
             **kwargs (optional): any number of extra keyword arguments will be stored as attributes to the environment.
         """
         c = float(c)
@@ -232,7 +231,7 @@ class Environment(object):
             raise ValueError(
                 "Environment: too many arguments given to determine t array: arguments 't1', 'num_t' and 't' are mutually exclusive"
             )
-        if bitrate is not None and bitlength is not None:
+        if not _is_default(bitrate) and not _is_default(bitlength):
             raise ValueError(
                 "Environment: too many arguments given to determine bitrate: arguments 'bitrate' and 'bitlength' are mutually exclusive"
             )
@@ -288,6 +287,7 @@ class Environment(object):
                     )
         if freqdomain:
             t = t[:1]
+            bitrate = bitlength = None
 
         if (not _is_default(wl) or not _is_default(f)) or sum(
             [not _is_default(v) for v in (num_wl, num_f, dwl, df, wl0, f0, wl1, f1)]
@@ -338,32 +338,34 @@ class Environment(object):
         if wl[0] > wl[-1]:
             wl = wl[::-1].copy()
 
-        self.dt = self.timestep = np.inf if t.shape[0] < 2 else float(t[1] - t[0])
-        self.samplerate = 0 if t.shape[0] < 2 else float(1 / self.dt)
-        self.num_t = self.num_timesteps = int(t.shape[0])
-        self.t0 = self.t_start = float(t[0])
-        self.t1 = self.t_end = np.inf if t.shape[0] < 2 else float(t[-1]) + self.dt
+        self.name = str(name)
         self.t = self.time = _array(t)
+        self.t0 = self.t_start = float(t[0])
+        self.t1 = self.t_end = (
+            None if t.shape[0] < 2 else float(t[-1]) + float(t[1] - t[0])
+        )
+        self.num_t = self.num_timesteps = int(t.shape[0])
+        self.dt = self.timestep = None if t.shape[0] < 2 else float(t[1] - t[0])
+        self.samplerate = None if t.shape[0] < 2 else float(1 / self.dt)
         self.bitrate = None if bitrate is None else float(bitrate)
         self.bitlength = None if bitrate is None else float(1 / bitrate)
         self.wl = self.wavelength = _array(wl)
-        self.f = _array(c / wl)
-        self.dwl = self.wavelength_step = (
-            np.inf if wl.shape[0] < 2 else float(wl[1] - wl[0])
-        )
-        self.df = np.inf if wl.shape[0] < 2 else float(c / wl[1] - c / wl[0])
-        self.num_wl = self.num_wavelengths = int(wl.shape[0])
-        self.num_f = int(wl.shape[0])
         self.wl0 = self.wavelength_start = float(wl[0])
-        self.f0 = float(c / wl[0])
         self.wl1 = self.wavelength_end = (
-            np.inf if wl.shape[0] < 2 else float(wl[-1]) + self.dwl
+            None if wl.shape[0] < 2 else float(wl[-1]) + float(wl[1] - wl[0])
         )
-        self.f1 = np.inf if wl.shape[0] < 2 else float(c / (wl[-1] + self.dwl))
+        self.num_wl = self.num_wavelengths = int(wl.shape[0])
+        self.dwl = self.wavelength_step = (
+            None if wl.shape[0] < 2 else float(wl[1] - wl[0])
+        )
+        self.f = _array(c / wl)
+        self.f0 = float(c / wl[0])
+        self.f1 = None if wl.shape[0] < 2 else float(c / (wl[-1] + self.dwl))
+        self.num_f = int(wl.shape[0])
+        self.df = None if wl.shape[0] < 2 else float(c / wl[1] - c / wl[0])
         self.c = float(c)
         self.freqdomain = self.frequency_domain = bool(freqdomain)
         self.grad = self.enable_grad = bool(grad)
-        self.name = str(name)
         self.__dict__.update(kwargs)
         self._grad_manager = torch.enable_grad() if self.grad else torch.no_grad()
         # synonyms for backward compatibility:
@@ -394,32 +396,34 @@ class Environment(object):
             unchanged.
 
         Args:
-            dt (float): [s] timestep of the simulation (mutually exclusive with t and samplerate)
-            samplerate (float): [1/s] samplerate of the simulation (mutually exclusive with t and t1).
-            num_t (int): number of timesteps in the simulation (mutually exclusive with t, dt and samplerate).
+            t (np.ndarray): [s] full 1D time array (mutually exclusive with dt, t0, t1, num_t and samplerate).
             t0 (float): [s] starting time of the simulation (mutually exclusive with t).
             t1 (float): [s] ending time of the simulation (mutually exclusive with t and num_t).
-            t (np.ndarray): [s] full 1D time array (mutually exclusive with dt, t0, t1, num_t and samplerate).
+            num_t (int): number of timesteps in the simulation (mutually exclusive with t, dt and samplerate).
+            dt (float): [s] timestep of the simulation (mutually exclusive with t and samplerate)
+            samplerate (float): [1/s] samplerate of the simulation (mutually exclusive with t and t1).
             bitrate (optional, float): [1/s] bitrate of the signal (mutually exclusive with bitlength).
             bitlength (optional, float): [s] bitlength of the signal (mutually exclusive with bitrate).
             wl (float): [m] full 1D wavelength array (mutually exclusive with f, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
-            f (float): [1/s] full 1D frequency array (mutually exclusive with wl, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
-            dwl (float): [m] wavelength step sizebetween wl0 and wl1 (mutually exclusive with wl, f, df, num_wl and num_f).
-            df (float): [1/s] frequency step between f0 and f1 (mutually exclusive with wl, f, dwl, num_wl and num_f).
-            num_wl (int): number of independent wavelengths in the simulation (mutually exclusive with wl, f, num_f, dwl and df)
-            num_f (int): number of independent frequencies in the simulation (mutually exclusive with wl, f, num_wl, dwl and df)
             wl0 (float): [m] start of wavelength range (mutually exclusive with wl, f and f0).
-            f0 (float): [1/s] start of frequency range (mutually exclusive with wl, f and wl0).
             wl1 (float): [m] end of wavelength range (mutually exclusive with wl, f and f1).
+            num_wl (int): number of independent wavelengths in the simulation (mutually exclusive with wl, f, num_f, dwl and df)
+            dwl (float): [m] wavelength step sizebetween wl0 and wl1 (mutually exclusive with wl, f, df, num_wl and num_f).
+            f (float): [1/s] full 1D frequency array (mutually exclusive with wl, dwl, df, num_wl, num_f, wl0, f0, wl1 and f1).
+            f0 (float): [1/s] start of frequency range (mutually exclusive with wl, f and wl0).
             f1 (float): [1/s] end of frequency range (mutually exclusive with wl, f and wl1).
+            num_f (int): number of independent frequencies in the simulation (mutually exclusive with wl, f, num_wl, dwl and df)
+            df (float): [1/s] frequency step between f0 and f1 (mutually exclusive with wl, f, dwl, num_wl and num_f).
             c (float): [m/s] speed of light used during simulations.
             freqdomain (bool): only do frequency domain calculations.
             grad (bool): track gradients during the simulation (set this to True during training.)
-            name (optional, str): name of the environment
+            name (str): name of the environment
             **kwargs (optional): any number of extra keyword arguments will be stored as attributes to the environment.
         """
+        init_argspec = inspect.getfullargspec(self.__class__)
+        default_kwargs = dict(zip(init_argspec.args[1:], init_argspec.defaults))
         new = {
-            k: _convert_default(v)
+            k: (_convert_default(v) if v is not None else default_kwargs.get(k))
             for k, v in self.__dict__.items()
             if not k.startswith("_") and not k in self._synonyms
         }
@@ -441,6 +445,8 @@ class Environment(object):
         return self
 
     def __eq__(self, other):
+        if not isinstance(other, Environment):
+            return False
         self = {
             k: v
             for k, v in self.__dict__.items()

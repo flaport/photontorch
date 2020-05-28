@@ -234,7 +234,12 @@ class AgrawalSoa(BaseSoa):
         self.wl = wl  # wavelength of the simulation
 
     def initialize(self):
-        self._env = env = current_environment()
+        env = current_environment()
+        if env.freqdomain:
+            raise RuntimeError(
+                "SOAs cannot be initialized for a frequency domain environment."
+            )
+        self._env = env
 
         # elementary charge
         q = 1.6e-19
