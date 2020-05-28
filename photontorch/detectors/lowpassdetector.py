@@ -23,6 +23,7 @@ from scipy.signal import butter
 
 # Relative
 from ..torch_ext.nn import Module
+from ..environment.environment import current_environment
 
 ###############
 ## Constants ##
@@ -50,50 +51,60 @@ class LowpassDetector(torch.nn.Module):
         bitrate=40e9,
         samplerate=160e9,
         cutoff_frequency=20e9,
-        responsivity=1.0,
         filter_order=4,
+        responsivity=1.0,
     ):
         """
         Args:
             bitrate (float): [1/s] data rate of the signal to filter
             samplerate (float): [1/s] sample rate of the signal to filter
             cutoff_frequency (float): [1/s] cutoff frequency of the detector
-            responsivity (float): [A/W] resonsivity of the detector
             filter_order (int): filter order of the butter filter
+            responsivity (float): [A/W] resonsivity of the detector
         """
         super(LowpassDetector, self).__init__()
         self.bitrate = float(bitrate)
         self.samplerate = float(samplerate)
         self.cutoff_frequency = float(cutoff_frequency)
-        self.responsivity = float(responsivity)
         self.filter_order = int(filter_order + 0.5)
-        self.normal_cutoff = 2 * self.cutoff_frequency / self.samplerate
+        self.responsivity = float(responsivity)
 
-        if self.normal_cutoff == 1.0:
-            return
-
-        if self.normal_cutoff > 1.0:
+        normal_cutoff = 2 * self.cutoff_frequency / self.samplerate
+        if normal_cutoff > 1.0:
             raise ValueError(
                 "The samplerate of the signal is smaller than the nyquist "
                 "frequency [=2 x cutoff_frequency]\n"
-                "%.2e > %.2e" % (self.samplerate, 2 * self.cutoff_frequency)
+                "%.2e < %.2e" % (self.samplerate, 2 * self.cutoff_frequency)
             )
 
-        # set filter parameters:
-        dtype = torch.get_default_dtype()
-        b, a = butter(
-            self.filter_order, self.normal_cutoff, btype="lowpass", analog=False
-        )
-        self.register_buffer("a", torch.tensor(a[::-1, None].copy()[:-1], dtype=dtype))
-        self.register_buffer("b", torch.tensor(b[::-1, None].copy(), dtype=dtype))
-
-    def forward(self, signal, num_splits=1, split_padding=5):
+    def forward(
+        self,
+        signal,
+        num_splits=1,
+        split_padding=5,
+        bitrate=None,
+        samplerate=None,
+        cutoff_frequency=None,
+        filter_order=None,
+        responsivity=None,
+    ):
         """ detect a bitstream by low-pass filtering
 
         Args:
             signal (Tensor): [W] optical power to detect.
             num_splits (int): number of parallel parts to split the timestream in
             split_padding (int): number of bits padding when splitting the timstream in parts.
+            bitrate (optional, float): [1/s] override data rate of the signal to filter
+            samplerate (optional, float): [1/s] override sample rate of the signal to filter
+            cutoff_frequency (optional, float): [1/s] override cutoff frequency of the detector
+            filter_order (optional, int): override filter order of the butter filter
+            responsivity (optional, float): [A/W] override resonsivity of the detector
+
+        Note:
+            If a bitrate and/or samplerate can be found in the current
+            environment, those values will be regarded as keyword arguments and
+            hence get precedence over the values given during the detector
+            initialization.
 
         Note:
             Splitting the signal in parts to be processed in parallel can considerably
@@ -106,16 +117,62 @@ class LowpassDetector(torch.nn.Module):
             defined, which pads a number of bits from the previous / next
             signal part before and after the current signal part to detect.
         """
+
+        # handle arguments
+        num_splits = int(num_splits + 0.5)
+        split_padding = int(split_padding + 0.5)
+        if num_splits > 1 and split_padding < 1:
+            raise ValueError(
+                "split padding should be larger than 0 when the number of splits is bigger than 1"
+            )
+        try:
+            env = current_environment()
+            bitrate = env.bitrate if bitrate is None else bitrate
+            samplerate = env.samplerate if samplerate is None else samplerate
+        except RuntimeError:
+            pass
+        bitrate = self.bitrate if bitrate is None else float(bitrate)
+        samplerate = self.samplerate if samplerate is None else float(samplerate)
+        cutoff_frequency = (
+            self.cutoff_frequency
+            if cutoff_frequency is None
+            else float(cutoff_frequency)
+        )
+        filter_order = (
+            self.filter_order if filter_order is None else int(filter_order + 0.5)
+        )
+        responsivity = (
+            self.responsivity if responsivity is None else float(responsivity)
+        )
+
         # unit: sqrt(W) -> W (only when complex valued amplitudes are given)
         if signal.shape[0] == 2:  # complex valued signal (photontorch convention)
             signal = signal[0] ** 2 + signal[1] ** 2  # amplitude -> power
 
         # unit: W -> A:
-        signal = self.responsivity * signal
+        signal = responsivity * signal
+
+        # calculate normal cutoff frequency
+        normal_cutoff = 2 * cutoff_frequency / samplerate
 
         # do no filtering when nyquist frequency equals samplerate
-        if self.normal_cutoff == 1.0:
+        if normal_cutoff == 1.0:
             return signal
+
+        # error when samplerate is too low for chosen cutoff_frequency
+        if normal_cutoff > 1.0:
+            raise ValueError(
+                "The samplerate of the signal is smaller than the nyquist "
+                "frequency [=2 x cutoff_frequency]\n"
+                "%.2e < %.2e" % (samplerate, 2 * cutoff_frequency)
+            )
+
+        # set filter parameters:
+        b, a = butter(filter_order, normal_cutoff, btype="lowpass", analog=False)
+        a = torch.tensor(
+            a[::-1, None].copy()[:-1], dtype=signal.dtype, device=signal.device
+        )
+        b = torch.tensor(b[::-1, None].copy(), dtype=signal.dtype, device=signal.device)
 
         # reshape to (# detected streams, # timesteps)
         original_shape = signal.shape  #
@@ -129,7 +186,7 @@ class LowpassDetector(torch.nn.Module):
                     % (num_splits, signal.shape[0])
                 )
             short_length = signal.shape[0] // num_splits
-            f = min(split_padding * int(self.samplerate / self.bitrate), short_length)
+            f = min(split_padding * int(samplerate / bitrate), short_length)
             signal = signal.reshape(num_splits, short_length, num_signals)
             prepend = torch.cat(
                 [torch.zeros_like(signal[:1, -f:]), signal[:-1, -f:]], 0
@@ -139,8 +196,8 @@ class LowpassDetector(torch.nn.Module):
             long_length = signal.shape[1]
             signal = signal.permute(1, 2, 0).reshape(long_length, -1)
 
-        a = self.a.to(dtype=signal.dtype, device=signal.device)
-        b = self.b.to(dtype=signal.dtype, device=signal.device)
+        a = a.to(dtype=signal.dtype, device=signal.device)
+        b = b.to(dtype=signal.dtype, device=signal.device)
 
         # custom lfilter implementation
         N = a.shape[0] + 1

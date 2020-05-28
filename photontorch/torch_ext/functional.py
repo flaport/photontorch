@@ -94,7 +94,7 @@ class BitStreamGenerator:
         try:
             env = current_environment()
             bitrate = env.bitrate if bitrate is None else bitrate
-            samplerate = env.samplerate if bitrate is None else bitrate
+            samplerate = env.samplerate if samplerate is None else samplerate
         except RuntimeError:
             pass
 
@@ -253,7 +253,7 @@ class _Loss(torch.nn.Module):
         try:
             env = current_environment()
             bitrate = env.bitrate if bitrate is None else bitrate
-            samplerate = env.samplerate if bitrate is None else bitrate
+            samplerate = env.samplerate if samplerate is None else samplerate
         except RuntimeError:
             pass
 
@@ -301,7 +301,7 @@ class MSELoss(_Loss):
         try:
             env = current_environment()
             bitrate = env.bitrate if bitrate is None else bitrate
-            samplerate = env.samplerate if bitrate is None else bitrate
+            samplerate = env.samplerate if samplerate is None else samplerate
         except RuntimeError:
             pass
 
@@ -376,7 +376,7 @@ class BERLoss(_Loss):
         try:
             env = current_environment()
             bitrate = env.bitrate if bitrate is None else bitrate
-            samplerate = env.samplerate if bitrate is None else bitrate
+            samplerate = env.samplerate if samplerate is None else samplerate
         except RuntimeError:
             pass
 
