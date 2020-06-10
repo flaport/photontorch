@@ -122,6 +122,11 @@ class Photodetector(LowpassDetector):
             defined, which pads a number of bits from the previous / next
             signal part before and after the current signal part to detect.
         """
+        cutoff_frequency = (
+            self.cutoff_frequency
+            if cutoff_frequency is None
+            else float(cutoff_frequency)
+        )
         responsivity = (
             self.responsivity if responsivity is None else float(responsivity)
         )

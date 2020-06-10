@@ -131,8 +131,6 @@ class LowpassDetector(torch.nn.Module):
             samplerate = env.samplerate if samplerate is None else samplerate
         except RuntimeError:
             pass
-        bitrate = self.bitrate if bitrate is None else float(bitrate)
-        samplerate = self.samplerate if samplerate is None else float(samplerate)
         cutoff_frequency = (
             self.cutoff_frequency
             if cutoff_frequency is None
@@ -144,6 +142,8 @@ class LowpassDetector(torch.nn.Module):
         responsivity = (
             self.responsivity if responsivity is None else float(responsivity)
         )
+        bitrate = self.bitrate if bitrate is None else float(bitrate)
+        samplerate = self.samplerate if samplerate is None else float(samplerate)
 
         # unit: sqrt(W) -> W (only when complex valued amplitudes are given)
         if signal.shape[0] == 2:  # complex valued signal (photontorch convention)

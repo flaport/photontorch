@@ -49,6 +49,10 @@ class BitStreamGenerator:
             seed (int): seed used to generate bits (if needed)
             dtype (torch.dtype): dtype to generate the bits for. None -> "torch.get_default_dtype()"
             device (torch.device): device to generate the bits on. None -> "cpu"
+
+        Note:
+            Although the causality of using negative latencies is questionable, they *are* allowed. However, each (fractional) negative latency should be compensated with an (integer) number of warmup bits (rounded up) to make it work.
+
         """
         self.bitrate = float(bitrate)
         self.samplerate = float(samplerate)
@@ -89,6 +93,9 @@ class BitStreamGenerator:
             If a bitrate and/or samplerate can be found in the current environment,
             those values will be regarded as keyword arguments and hence get precedence over
             the values given during the BitStreamGenerator initialization.
+
+        Note:
+            Although the causality of using negative latencies is questionable, they *are* allowed. However, each (fractional) negative latency should be compensated with an (integer) number of warmup bits (rounded up) to make it work.
         """
 
         try:
@@ -217,6 +224,9 @@ class _Loss(torch.nn.Module):
             If a bitrate and/or samplerate can be found in the current environment,
             those values will be regarded as keyword arguments and hence get precedence over
             the values given during the loss initialization.
+
+        Note:
+            Although the causality of using negative latencies is questionable, they *are* allowed. However, each (fractional) negative latency should be compensated with an (integer) number of warmup bits (rounded up) to make it work.
         """
         raise NotImplementedError(
             "Implement forward function for your loss by subclassing."
@@ -248,6 +258,9 @@ class _Loss(torch.nn.Module):
             If a bitrate and/or samplerate can be found in the current environment,
             those values will be regarded as keyword arguments and hence get precedence over
             the values given during the loss initialization.
+
+        Note:
+            Although the causality of using negative latencies is questionable, they *are* allowed. However, each (fractional) negative latency should be compensated with an (integer) number of warmup bits (rounded up) to make it work.
         """
 
         try:
@@ -269,10 +282,18 @@ class _Loss(torch.nn.Module):
         # delay sequences with warmup and latency
         l = int(latency * samplerate / bitrate + 0.5)  # latency sample points
         w = int(int(warmup + 0.5) * samplerate / bitrate + 0.5)  # warmup sample points
+        if w < 0:
+            raise ValueError(
+                "warmup should be a positive integer (number of warmup bits)"
+            )
+        if w + l < 0:
+            raise ValueError(
+                "please add more warmup bits for negative latency %.2f" % latency
+            )
         x = x[w + l : :]
 
         time = np.arange(x.shape[0]) / samplerate
-        units = {"s": 0, "ms": 3, r"us": 6, "ns": 9, "ps": 12, "fs": 15}
+        units = {"s": 0, "ms": 3, "us": 6, "ns": 9, "ps": 12, "fs": 15}
         if unit not in units:
             raise ValueError(
                 "Invalid unit '%s'. Valid units are: %s"
@@ -314,6 +335,14 @@ class MSELoss(_Loss):
         # delay sequences with warmup and latency
         l = int(latency * samplerate / bitrate + 0.5)  # latency sample points
         w = int(int(warmup + 0.5) * samplerate / bitrate + 0.5)  # warmup sample points
+        if w < 0:
+            raise ValueError(
+                "warmup should be a positive integer (number of warmup bits)"
+            )
+        if w + l < 0:
+            raise ValueError(
+                "please add more warmup bits for negative latency %.2f" % latency
+            )
         target = target[w::]
         prediction = prediction[w + l : :]
 
@@ -371,6 +400,9 @@ class BERLoss(_Loss):
             If a bitrate and/or samplerate can be found in the current environment,
             those values will be regarded as keyword arguments and hence get precedence over
             the values given during the loss initialization.
+
+        Note:
+            Although the causality of using negative latencies is questionable, they *are* allowed. However, each (fractional) negative latency should be compensated with an (integer) number of warmup bits (rounded up) to make it work.
         """
 
         try:
@@ -403,6 +435,14 @@ class BERLoss(_Loss):
             s = int(samplerate / bitrate + 0.5)  # samples per bit
             l = int(latency * samplerate / bitrate + 0.5)  # latency sample points
             w = int(int(warmup + 0.5) * samplerate / bitrate + 0.5)  # warmup samples
+            if w < 0:
+                raise ValueError(
+                    "warmup should be a positive integer (number of warmup bits)"
+                )
+            if w + s // 2 + l < 0:
+                raise ValueError(
+                    "please add more warmup bits for negative latency %.2f" % latency
+                )
             target = target[w + s // 2 :: s]
             prediction = prediction[w + s // 2 + l :: s]
 
