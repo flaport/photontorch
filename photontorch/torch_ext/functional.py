@@ -16,6 +16,7 @@ import numpy as np
 from scipy.signal import butter, lfilter
 
 ## Relative
+from .nn import Module
 from ..environment.environment import current_environment
 
 ###############
@@ -23,7 +24,7 @@ from ..environment.environment import current_environment
 ###############
 
 
-class BitStreamGenerator:
+class BitStreamGenerator(Module):
     """BitStreamGenerator
 
     Generate a bitstream from a sequence of bits (or from a random seed)
@@ -54,6 +55,7 @@ class BitStreamGenerator:
             Although the causality of using negative latencies is questionable, they *are* allowed. However, each (fractional) negative latency should be compensated with an (integer) number of warmup bits (rounded up) to make it work.
 
         """
+        super(BitStreamGenerator, self).__init__()
         self.bitrate = float(bitrate)
         self.samplerate = float(samplerate)
         self.cutoff_frequency = (
@@ -65,7 +67,7 @@ class BitStreamGenerator:
         self.dtype = torch.get_default_dtype() if dtype is None else dtype
         self._rng = np.random.RandomState(seed=self.seed)
 
-    def __call__(
+    def forward(
         self,
         bits=100,
         bitrate=None,
@@ -131,28 +133,31 @@ class BitStreamGenerator:
         if isinstance(bits, int):
             bits = rng.rand(bits) > 0.5
 
-        rc = 1
-        temp_samplerate = samplerate
-        if cutoff_frequency is not None:
-            # handle fractional sampling:
-            temp_samplerate = max(
-                int(8 * cutoff_frequency + 0.5) // int(samplerate + 0.5) * samplerate,
-                samplerate,
-            )
-            rc = int(temp_samplerate + 0.5) // int(samplerate + 0.5)
-        rates_gcd = np.gcd(int(temp_samplerate + 0.5), int(bitrate + 0.5))
-        rs = int(temp_samplerate + 0.5) // rates_gcd
-        rb = int(bitrate + 0.5) // rates_gcd
-        stream = np.stack([bits] * rs, 1).reshape(-1, *bits.shape[1:]).copy()
+        with torch.no_grad():
+            rc = 1
+            temp_samplerate = samplerate
+            if cutoff_frequency is not None:
+                # handle fractional sampling:
+                temp_samplerate = max(
+                    int(8 * cutoff_frequency + 0.5)
+                    // int(samplerate + 0.5)
+                    * samplerate,
+                    samplerate,
+                )
+                rc = int(temp_samplerate + 0.5) // int(samplerate + 0.5)
+            rates_gcd = np.gcd(int(temp_samplerate + 0.5), int(bitrate + 0.5))
+            rs = int(temp_samplerate + 0.5) // rates_gcd
+            rb = int(bitrate + 0.5) // rates_gcd
+            stream = np.stack([bits] * rs, 1).reshape(-1, *bits.shape[1:]).copy()
 
-        if cutoff_frequency is not None:
-            normal_cutoff = cutoff_frequency / (0.5 * temp_samplerate * rb)
-            b, a = butter(
-                N=filter_order, Wn=normal_cutoff, btype="lowpass", analog=False
-            )
-            stream = lfilter(b, a, stream, axis=0)
+            if cutoff_frequency is not None:
+                normal_cutoff = cutoff_frequency / (0.5 * temp_samplerate * rb)
+                b, a = butter(
+                    N=filter_order, Wn=normal_cutoff, btype="lowpass", analog=False
+                )
+                stream = lfilter(b, a, stream, axis=0)
 
-        stream = torch.tensor(stream[:: rb * rc].copy(), dtype=dtype, device=device)
+            stream = torch.tensor(stream[:: rb * rc].copy(), dtype=dtype, device=device)
 
         return stream
 
@@ -185,7 +190,7 @@ def _broadcast_prediction_target(prediction, target):
     return prediction, target
 
 
-class _Loss(torch.nn.Module):
+class _Loss(Module):
     """ Base class for loss function extensions. """
 
     def __init__(self, latency=0.0, warmup=0, bitrate=40e9, samplerate=160e9):

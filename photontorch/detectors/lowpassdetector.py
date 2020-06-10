@@ -39,7 +39,7 @@ T = 300  # [K] room temperature
 #####################
 
 
-class LowpassDetector(torch.nn.Module):
+class LowpassDetector(Module):
     """ Detect by lowpass filtering the signal.
 
     The LowpassDetector transforms a raw optical power [W] to a detection current [A].

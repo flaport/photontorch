@@ -49,16 +49,6 @@ def test_photodetector_creation(lpdet):
     )
 
 
-def test_lowpass_detector_a_parameter(lpdet):
-    a = lpdet.a
-    assert a.shape[0] == lpdet.filter_order
-
-
-def test_lowpass_detector_b_parameter(lpdet):
-    b = lpdet.b
-    assert b.shape[0] == lpdet.filter_order + 1
-
-
 def test_lowpass_detector_forward(gen, lpdet):
     num_bits = 24
     num_samples_per_bit = int(lpdet.samplerate / lpdet.bitrate + 0.5)
