@@ -571,7 +571,7 @@ def set_environment(*args, **kwargs):
         env = args[0].copy(**kwargs)
     elif "env" in kwargs:
         env = kwargs.pop("env")
-        env = env.copy(**kargs)
+        env = env.copy(**kwargs)
     else:
         env = Environment(**kwargs)
 
