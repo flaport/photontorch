@@ -15,15 +15,6 @@ from fixtures import default_components, tenv, comp, wg
 ###########
 
 
-@pytest.mark.parametrize("comp", default_components())
-def test_component_initialization(comp, tenv):
-    with tenv:
-        x = comp.initialize()
-    comp.delays
-    comp.S
-    assert x is not None
-
-
 def test_initialization_with_sources_detectors_at_same_port(tenv):
     class WrongTerm(pt.Term):
         def get_sources_at(self):

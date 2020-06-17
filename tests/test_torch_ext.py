@@ -21,7 +21,7 @@ from fixtures import gen, nw as mod
 def test_block_diag(gen):
     t1 = torch.rand((2, 2), requires_grad=True, generator=gen)
     t2 = torch.rand((3, 3), requires_grad=True, generator=gen)
-    t = pt.torch_ext.autograd.block_diag(t1, t2)
+    t = pt.block_diag(t1, t2)
     loss = ((t - torch.ones_like(t)) ** 2).sum()
     loss.backward()
 
@@ -46,51 +46,51 @@ def test_module_cuda(mod):
 
 
 def test_bounded_parameter_with_no_data():
-    bp = pt.nn.BoundedParameter()
+    bp = pt.BoundedParameter()
     with pytest.raises(RuntimeError):
         bool(bp)
 
 
 def test_bounded_parameter_with_data_out_of_bounds():
     with pytest.raises(ValueError):
-        bp = pt.nn.BoundedParameter(data=torch.tensor([0.5, 1.5]), bounds=(0, 1))
+        bp = pt.BoundedParameter(data=torch.tensor([0.5, 1.5]), bounds=(0, 1))
 
 
 def test_bounded_parameter_with_wrong_bounds():
     with pytest.raises(ValueError):
-        bp = pt.nn.BoundedParameter(data=torch.tensor([0.5]), bounds=(1, 0))
+        bp = pt.BoundedParameter(data=torch.tensor([0.5]), bounds=(1, 0))
 
 
 def test_bounded_parameter_with_no_tensor_data():
     with pytest.raises(TypeError):
-        bp = pt.nn.BoundedParameter(data=[0.5])
+        bp = pt.BoundedParameter(data=[0.5])
 
 
 def test_bounded_parameter_with_too_many_bounds():
     with pytest.raises(ValueError):
-        bp = pt.nn.BoundedParameter(data=torch.tensor(0.6), bounds=np.array([0, 1, 2]))
+        bp = pt.BoundedParameter(data=torch.tensor(0.6), bounds=np.array([0, 1, 2]))
 
 
 def test_bounded_parameter_repr():
-    s = repr(pt.nn.BoundedParameter(data=torch.tensor([0.5])))
+    s = repr(pt.BoundedParameter(data=torch.tensor([0.5])))
     assert s.startswith("BoundedParameter")
 
 
 def test_bounded_parameter_deepcopy():
-    bp = pt.nn.BoundedParameter(data=torch.tensor([0.5]))
+    bp = pt.BoundedParameter(data=torch.tensor([0.5]))
     bp2 = deepcopy(bp)
     assert bp2 is not bp
     assert bp.__class__ is bp2.__class__
 
 
 def test_buffer_with_no_data():
-    bp = pt.nn.Buffer()
+    bp = pt.Buffer()
     with pytest.raises(RuntimeError):
         bool(bp)
 
 
 def test_buffer_repr():
-    s = repr(pt.nn.Buffer(data=torch.tensor([0.5])))
+    s = repr(pt.Buffer(data=torch.tensor([0.5])))
     assert s.startswith("Buffer")
 
 

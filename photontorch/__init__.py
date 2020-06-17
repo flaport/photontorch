@@ -107,6 +107,9 @@ from .torch_ext.autograd import block_diag
 
 # neural networks
 from .torch_ext import nn
+from .torch_ext.nn import Buffer
+from .torch_ext.nn import BoundedParameter
+from .torch_ext.nn import Module
 
 # tensor
 from .torch_ext.tensor import where

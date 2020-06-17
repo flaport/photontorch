@@ -34,6 +34,7 @@ import torch
 import numpy as np
 
 ## Relative
+from .visualize import plot, graph
 from ..torch_ext.nn import Buffer
 from ..components.component import Component
 from ..components.terms import Term
@@ -69,9 +70,6 @@ class Network(Component):
 
     connections = None
     """ list containing all the connection of the network """
-
-    # dedicated plotting methods for plotting detected power
-    from .visualize import plot, graph
 
     # network properties
     @property
@@ -950,6 +948,39 @@ class Network(Component):
                 order.append(i)
 
         return order
+
+    def plot(self, detected, **kwargs):
+        """ Plot detected power versus time or wavelength
+
+        Args:
+            detected (np.ndarray|Tensor): detected power. Allowed shapes:
+                * (#timesteps,)
+                * (#timesteps, #detectors)
+                * (#timesteps, #detectors, #batches)
+                * (#timesteps, #wavelengths)
+                * (#timesteps, #wavelengths, #detectors)
+                * (#timesteps, #wavelengths, #detectors, #batches)
+                * (#wavelengths,)
+                * (#wavelengths, #detectors)
+                * (#wavelengths, #detectors, #batches)
+                the plot function should be smart enough to figure out what to plot.
+            **kwargs: keyword arguments given to plt.plot
+
+        Note:
+            if #timesteps = #wavelengths, the plotting function will choose #timesteps
+            as the first dimension
+
+        """
+        return plot(self, detected, **kwargs)
+
+    def graph(self, draw=True):
+        """ create a graph visualization of the network
+
+        Args:
+            draw (bool): draw the graph with matplotlib
+
+        """
+        return graph(self, draw=True)
 
     def __setattr__(self, name, attr):
         """ set attributes of the network """

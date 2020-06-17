@@ -20,7 +20,13 @@ import photontorch as pt
 
 def default_components():
     excluded = ["Component"]
-    for name, cls in pt.components.__dict__.items():
+    items = [(name, cls) for name, cls in pt.__dict__.items() if _is_component(cls)]
+    for name, cls in items:
+        try:
+            if not isinstance(cls, pt.Component):
+                continue
+        except:
+            continue
         if name[0] != "_" and name[0] == name[0].upper() and name not in excluded:
             yield cls()
 

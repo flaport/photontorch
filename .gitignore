@@ -21,6 +21,10 @@ __pycache__
 # byte code
 *.pyc
 
+# compiled
+*.so
+*.pyd
+
 # logs
 *.log
 

@@ -31,7 +31,7 @@ from ..torch_ext import block_diag
 ###################
 
 
-class _MixingPhaseArray(Network):
+class _MixingPhaseArrayRings(Network):
     """ helper network for RingNetwork """
 
     def __init__(
@@ -41,7 +41,7 @@ class _MixingPhaseArray(Network):
         Args:
             N (int): number of input / output ports (the network represents an NxN matrix)
             wg_factory (callable): function without arguments which creates the waveguides.
-            mzi_factory (callable): function without arguments which creates the MZIs or 
+            mzi_factory (callable): function without arguments which creates the MZIs or
                 any other general 4-port component with  ports defined anti-clockwise.
             name (optional, str): name of the component
         """
@@ -71,7 +71,7 @@ class _MixingPhaseArray(Network):
         for i in range(self.N):
             connections += ["wg%i:1:%i" % (i, self.N + i)]
 
-        super(_MixingPhaseArray, self).__init__(components, connections, name=name)
+        super(_MixingPhaseArrayRings, self).__init__(components, connections, name=name)
 
 
 class _UnclosedRingArray(Network):
@@ -95,7 +95,7 @@ class _UnclosedRingArray(Network):
         Args:
             N (int): number of input waveguides (= number of output waveguides)
             wg_factory (callable): function without arguments which creates the waveguides.
-            mzi_factory (callable): function without arguments which creates the MZIs or 
+            mzi_factory (callable): function without arguments which creates the MZIs or
                 any other general 4-port component with  ports defined anti-clockwise.
             name (optional, str): name of the component
         """
@@ -176,7 +176,7 @@ class RingNetwork(Network):
             N (int): number of input waveguides (= number of output waveguides)
             capacity (int): number of consecutive MZI layers (1 more than the consequtive number of ring layers)
             wg_factory (callable): function without arguments which creates the waveguides.
-            mzi_factory (callable): function without arguments which creates the MZIs or 
+            mzi_factory (callable): function without arguments which creates the MZIs or
                 any other general 4-port component with  ports defined anti-clockwise.
             name (optional, str): name of the component
         """
@@ -194,7 +194,7 @@ class RingNetwork(Network):
             components["layer%i" % i] = _UnclosedRingArray(
                 N=N, mzi_factory=mzi_factory, wg_factory=wg_factory
             )
-        components["layer%i" % (capacity // 2)] = _MixingPhaseArray(
+        components["layer%i" % (capacity // 2)] = _MixingPhaseArrayRings(
             N=N, mzi_factory=mzi_factory, wg_factory=wg_factory
         )
 
