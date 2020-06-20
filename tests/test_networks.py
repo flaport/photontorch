@@ -11,6 +11,22 @@ import photontorch as pt
 
 from fixtures import gen, unw, nw, tenv, fenv, lpdet, wg, rnw, reck, clements
 
+#############
+## Helpers ##
+#############
+
+
+def check_unitarity(nw):
+    with pt.Environment(num_t=1, freqdomain=True):
+        nw.initialize()
+        I = np.array(np.eye(nw.num_sources) + 0j, dtype=np.complex64)
+        T = torch.tensor(np.stack([np.real(I), np.imag(I)], 0), names=["c", "s", "b"])
+        R = nw(T, power=False)[:, 0, 0, :, :].data.cpu().numpy()
+        R = R[0] + 1j * R[1]
+        J = R @ R.T.conj()
+        np.testing.assert_array_almost_equal(I, J)
+
+
 ###########
 ## Tests ##
 ###########
@@ -159,6 +175,14 @@ def test_network_connection_with_equal_ports(wg):
 def test_network_connection_with_too_high_port_index(wg):
     with pytest.raises(ValueError):
         nw = pt.Network(components={"wg1": wg, "wg2": wg}, connections=["wg1:1:wg2:2"])
+
+
+def test_reck_unitarity(reck):
+    check_unitarity(reck)
+
+
+def test_clements_unitarity(clements):
+    check_unitarity(clements)
 
 
 def test_network_plot(gen, tenv, fenv):
