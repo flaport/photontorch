@@ -320,6 +320,10 @@ class Network(Component):
         self.actions_at = Buffer(self.get_actions_at()[o])
         self.free_idxs = Buffer(self.get_free_idxs())
         self.terminated = len(self.free_idxs) == 0
+        self.num_sources = int(self.sources_at.sum())
+        self.num_detectors = int(self.detectors_at.sum())
+        self.num_actions = int(self.actions_at.sum())
+        self.num_free_ports = len(self.free_idxs)
 
     # terminate a network
     def terminate(self, term=None, name=None):
@@ -441,14 +445,17 @@ class Network(Component):
         delays_in_seconds = self.delays * float(not self.env.freqdomain)
         # resulting delays in terms of the simulation timestep:
         if self.env.dt is not None:
-            delays = (delays_in_seconds / self.env.dt + 0.5).long()
+            delays_in_timesteps = (delays_in_seconds / self.env.dt + 0.5).long()
         else:
-            delays = torch.zeros_like(delays_in_seconds).long()
+            delays_in_timesteps = torch.zeros_like(delays_in_seconds).long()
 
         ## locations of memory-containing and memory-less nodes:
 
         mc = (
-            self.sources_at | self.detectors_at | self.actions_at | (delays > 0)
+            self.sources_at
+            | self.detectors_at
+            | self.actions_at
+            | (delays_in_timesteps > 0)
         )  # memory-containing nodes:
         ml = torch.where(mc.ne(1))[0]  # negation of mc: memory-less nodes
         mc = torch.where(mc)[0]
@@ -460,7 +467,7 @@ class Network(Component):
             return self
 
         # Check if simulation timestep is too big:
-        if (delays[delays_in_seconds.data > 0] < 1).any():
+        if (delays_in_timesteps[delays_in_seconds.data > 0] < 1).any():
             warnings.warn(
                 "Simulation timestep might be too large, resulting in zero "
                 "delays for nonzero lengths. Try using a smaller timestep",
@@ -471,28 +478,17 @@ class Network(Component):
         sources_at = torch.where(self.sources_at[mc])[0]
         detectors_at = torch.where(self.detectors_at[mc])[0]
         actions_at = torch.where(self.actions_at[mc])[0]
-        self.num_sources = len(sources_at)
-        self.num_detectors = len(detectors_at)
-        self.num_actions = len(actions_at)
-
-        ## Create action for the network if necessary:
-        self.components_with_action = [
-            comp for comp in self.components.values() if comp.actions_at.any()
-        ]
-        self.action_idxs = np.cumsum(
-            [self.num_sources]
-            + [comp.num_ports for comp in self.components_with_action]
-        )
-
-        ## New port order
         others_at = torch.where(
             (self.sources_at | self.actions_at | self.detectors_at)[mc].ne(1)
         )[0]
         new_order = torch.cat((sources_at, actions_at, others_at, detectors_at))
-        self.mc = mc = mc[new_order]
-        self._sources_at = torch.where(self.sources_at[mc])[0]
-        self._detectors_at = torch.where(self.detectors_at[mc])[0]
-        self._actions_at = torch.where(self.actions_at[mc])[0]
+
+        ## New port order
+        mc = mc[new_order]
+        self._delays = delays_in_seconds[mc]
+        self._sources_at = self.sources_at[mc]
+        self._detectors_at = self.detectors_at[mc]
+        self._actions_at = self.actions_at[mc]
 
         ## S-matrix subsets
 
@@ -561,7 +557,6 @@ class Network(Component):
             iC = ix + iCmcmc[None]
 
         ## Save the reduced matrices
-        self._delays = delays[mc]
         self._rS = rSmcmc
         self._iS = iSmcmc
         self._rC = rC
@@ -569,10 +564,10 @@ class Network(Component):
 
         # Create buffermask (# time, # wavelengths = 1, # mc nodes, # batches = 1)
         self.buffermask = torch.zeros(
-            (2, int(self._delays.max()) + 1, 1, self.nmc, 1), device=self.device
+            (2, int(delays_in_timesteps.max()) + 1, 1, self.nmc, 1), device=self.device
         )
         self.buffermask[
-            :, self._delays - 1, :, range(self.nmc), :
+            :, delays_in_timesteps[mc] - 1, :, range(self.nmc), :
         ] = 1.0  # delay == 1 -> index 0
 
         self.initialized = True
@@ -590,8 +585,9 @@ class Network(Component):
             torch.Tensor[2, #timesteps, #wavelengths, #mc nodes, num_batches]
 
         """
+        max_delay = 0 if self.env.freqdomain else int(self._delays.max() / self.env.dt)
         buffer = torch.zeros(
-            (2, int(self._delays.max()) + 1, self.env.num_wl, self.nmc, num_batches,),
+            (2, max_delay + 1, self.env.num_wl, self.nmc, num_batches,),
             device=self.device,
         )
         return buffer

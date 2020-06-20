@@ -173,6 +173,17 @@ class Component(Module):
         self.delays = self.get_delays()
         self.S = self.get_S()
 
+        if not isinstance(self, Network):
+            self._delays = self.delays
+            self._rS = self.S[0]
+            self._iS = self.S[1]
+            self._rC = self.C
+            self._iC = torch.zeros_like(self.C)
+            self._sources_at = self.sources_at
+            self._detectors_at = self.detectors_at
+            self._actions_at = self.actions_at
+            self._free_idxs = self.free_idxs
+
         return self  # return the initialized component, so operations can be chained
 
     def get_S(self):
@@ -276,4 +287,4 @@ class Component(Module):
 
 # placed here to prevent circular imports
 
-from ..networks.network import current_network
+from ..networks.network import Network, current_network
