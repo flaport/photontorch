@@ -24,7 +24,7 @@ like so: ::
 # Standard library
 import warnings
 import functools
-from copy import copy, deepcopy
+from copy import copy
 from collections import OrderedDict, deque
 
 ## Torch
@@ -80,9 +80,7 @@ class Network(Component):
     # ------------------------
 
     # network initialization method
-    def __init__(
-        self, components=None, connections=None, name=None, copy_components=False
-    ):
+    def __init__(self, components=None, connections=None, name=None):
         """ Network initialization
 
         Args:
@@ -93,8 +91,6 @@ class Network(Component):
                 the connection string can have two formats: 1. "comp1:port1:comp2:port2": signifying a connection between ports
                 (always reflexive) 2. "comp:port:output_port": signifying a connection to an output port index
             name (optional, str): name of the network
-            copy_components (bool): create a deepcopy of each component before
-                linking them together.
 
         Note:
             Although it's possible to initialize the network with a list of
@@ -128,10 +124,6 @@ class Network(Component):
         # initial network initialization without calculating the necessary buffers
         super(Network, self).__init__(name=name)
 
-        # flag to see if a deepcopy of the component should be
-        # made before it's added to the network.
-        self.copy_components = copy_components
-
         # to store the components and connections:
         self.components = OrderedDict()
         self.connections = []  # a list of individual connections
@@ -151,7 +143,7 @@ class Network(Component):
         pass  # do not calculate buffers here.
 
     # add a component to the network
-    def add_component(self, name, comp, copy=True):
+    def add_component(self, name, comp):
         """ Add a component to the network
 
         Pytorch requires submodules to be registered as attributes of a module.
@@ -160,7 +152,6 @@ class Network(Component):
 
         Args:
             name (optional, str): name of the component to add to the network
-            copy (bool): copy the component before adding.
 
         Note:
             the following two lines are equivalent::
@@ -184,8 +175,6 @@ class Network(Component):
                 "network. The name will be inferred from the attributes name."
                 % (comp.name, name)
             )
-        if copy and self.copy_components:
-            comp = deepcopy(comp)
         self.add_module(name, comp)
 
     # link components together
@@ -331,10 +320,10 @@ class Network(Component):
         if term is None:
             term = Term()
         if isinstance(term, Term):
-            term = OrderedDict(
-                (term.__class__.__name__.lower() + "_%i" % i, deepcopy(term))
+            term = [
+                term.__class__(name=term.__class__.__name__.lower() + "_%i" % i)
                 for i in range(n)
-            )
+            ]
         if isinstance(term, (list, tuple)):
             term = OrderedDict((t.name, t) for t in term)
         if self.is_cuda:

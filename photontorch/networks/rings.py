@@ -5,7 +5,7 @@
 #############
 
 ## Standard Library
-from copy import copy, deepcopy
+from copy import copy
 from collections import OrderedDict
 
 ## Torch
