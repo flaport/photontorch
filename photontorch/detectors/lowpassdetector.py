@@ -22,7 +22,7 @@ import torch
 from scipy.signal import butter
 
 # Relative
-from ..torch_ext.nn import Module
+from ..nn.nn import Module
 from ..environment.environment import current_environment
 
 ###############

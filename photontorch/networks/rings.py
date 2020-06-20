@@ -22,8 +22,8 @@ from ..components.terms import Detector, Source
 from ..components.mzis import Mzi
 from ..components.waveguides import Waveguide
 from ..components.directionalcouplers import DirectionalCoupler
-from ..torch_ext.nn import Buffer, Parameter
-from ..torch_ext import block_diag
+from ..nn.nn import Buffer, Parameter
+from ..nn import block_diag
 
 
 ###################

@@ -29,7 +29,7 @@ from .autograd import block_diag
 
 
 ## custom neural network functions [not imported]
-# torch_ext.nn
+# nn.nn
 
 ## Custom Tensor Functions
 from .tensor import where

@@ -13,7 +13,7 @@ import numpy as np
 ## Relative
 from .component import Component
 from .waveguides import Waveguide
-from ..torch_ext.nn import BoundedParameter, Parameter, Buffer
+from ..nn.nn import BoundedParameter, Parameter, Buffer
 from ..environment import current_environment
 
 

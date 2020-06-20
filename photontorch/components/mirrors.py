@@ -9,7 +9,7 @@ import torch
 
 ## Relative
 from .component import Component
-from ..torch_ext.nn import BoundedParameter
+from ..nn.nn import BoundedParameter
 
 
 ############

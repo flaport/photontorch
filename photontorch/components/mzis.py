@@ -12,7 +12,7 @@ import numpy as np
 
 ## Relative
 from .component import Component
-from ..torch_ext.nn import Parameter, Buffer
+from ..nn.nn import Parameter, Buffer
 
 
 #########################

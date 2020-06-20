@@ -1,4 +1,4 @@
-""" torch_ext tests """
+""" nn tests """
 
 #############
 ## Imports ##

@@ -12,9 +12,9 @@ It should not be used directly.
 import torch
 
 ## Relative
-from ..torch_ext import where
-from ..torch_ext.nn import Module
-from ..torch_ext.nn import Buffer
+from ..nn import where
+from ..nn.nn import Module
+from ..nn.nn import Buffer
 from ..environment import current_environment
 
 

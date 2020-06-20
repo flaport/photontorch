@@ -17,7 +17,7 @@ import numpy as np
 
 ## Relative
 from .component import Component
-from ..torch_ext.nn import Buffer, Parameter
+from ..nn.nn import Buffer, Parameter
 
 
 #########

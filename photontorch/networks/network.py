@@ -35,11 +35,11 @@ import numpy as np
 
 ## Relative
 from .visualize import plot, graph
-from ..torch_ext.nn import Buffer
+from ..nn.nn import Buffer
 from ..components.component import Component
 from ..components.terms import Term
-from ..torch_ext.autograd import block_diag
-from ..torch_ext.tensor import where
+from ..nn.autograd import block_diag
+from ..nn.tensor import where
 from ..environment import current_environment
 
 

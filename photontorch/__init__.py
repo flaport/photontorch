@@ -29,7 +29,7 @@ warnings.filterwarnings(
 from . import components
 from . import environment
 from . import networks
-from . import torch_ext
+from . import nn
 
 
 ## Components
@@ -103,18 +103,18 @@ from .detectors.lowpassdetector import LowpassDetector
 ## PyTorch extensions
 
 # autograd
-from .torch_ext.autograd import block_diag
+from .nn.autograd import block_diag
 
 # neural networks
-from .torch_ext import nn
-from .torch_ext.nn import Buffer
-from .torch_ext.nn import BoundedParameter
-from .torch_ext.nn import Module
+from .nn import nn
+from .nn.nn import Buffer
+from .nn.nn import BoundedParameter
+from .nn.nn import Module
 
 # tensor
-from .torch_ext.tensor import where
+from .nn.tensor import where
 
 # custom functional additions
-from .torch_ext.functional import BERLoss
-from .torch_ext.functional import MSELoss
-from .torch_ext.functional import BitStreamGenerator
+from .nn.functional import BERLoss
+from .nn.functional import MSELoss
+from .nn.functional import BitStreamGenerator

@@ -27,7 +27,7 @@ class Buffer(torch.Tensor):
     module is set to a Buffer, it will automatically be added to the _buffers attribute.
 
     Note:
-        For the automatic registration of the Buffer to work, you need to use the torch_ext
+        For the automatic registration of the Buffer to work, you need to use the nn
         version of Module, which is a subclass of torch.nn.Module.
 
     """
@@ -49,12 +49,12 @@ class Buffer(torch.Tensor):
 class BoundedParameter(torch.nn.Parameter):
     """ A BoundedParameter is special Parameter that is bounded between a range.
 
-    Under the hood it registers an unbounded weight in our torch_ext.nn.Module and a
+    Under the hood it registers an unbounded weight in our nn.nn.Module and a
     class property calculating the desired parameter value on the fly by performing
     a scaled sigmoid
 
     Note:
-        For the registration of the BoundedParameter to work, you need to use the torch_ext
+        For the registration of the BoundedParameter to work, you need to use the nn
         version of Module, which is a subclass of torch.nn.Module.
 
     """
