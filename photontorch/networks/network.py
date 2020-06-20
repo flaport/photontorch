@@ -313,17 +313,19 @@ class Network(Component):
             self.components[name] = all_components[name]
 
         # set buffers
-        o = self.order = self.get_order()
+        o = self.order = self._get_port_order()
         self.C = Buffer(self.get_C()[:, o, :][:, :, o])
         self.sources_at = Buffer(self.get_sources_at()[o])
         self.detectors_at = Buffer(self.get_detectors_at()[o])
         self.actions_at = Buffer(self.get_actions_at()[o])
-        self.free_idxs = Buffer(self.get_free_idxs())
-        self.terminated = len(self.free_idxs) == 0
+        self.free_ports_at = (
+            (self.C.pow(2).sum([0, 1]) > 0) | (self.C.pow(2).sum([0, 2]) > 0)
+        ).ne(1)
+        self.terminated = self.free_ports_at.any().ne(1)
         self.num_sources = int(self.sources_at.sum())
         self.num_detectors = int(self.detectors_at.sum())
         self.num_actions = int(self.actions_at.sum())
-        self.num_free_ports = len(self.free_idxs)
+        self.num_free_ports = int(self.free_ports_at.sum())
 
     # terminate a network
     def terminate(self, term=None, name=None):
@@ -341,15 +343,14 @@ class Network(Component):
             the original (unterminated) network is always available with the
             ``.base`` attribute of the terminated network.
         """
-        n = len(self.free_idxs)
-        if n == 0:
+        if self.num_free_ports == 0:
             raise IndexError("no free ports for termination")
         if term is None:
             term = Term()
         if isinstance(term, Term):
             term = [
                 term.__class__(name=term.__class__.__name__.lower() + "_%i" % i)
-                for i in range(n)
+                for i in range(self.num_free_ports)
             ]
         if isinstance(term, (list, tuple)):
             term = OrderedDict((t.name, t) for t in term)
@@ -892,7 +893,9 @@ class Network(Component):
             np.cumsum([0] + [comp.num_ports for comp in self.components.values()])[:-1]
         )
         start_idxs = OrderedDict(zip(self.components.keys(), start_idxs))
-        free_idxs = [comp.free_idxs for comp in self.components.values()]
+        free_idxs = [
+            torch.where(comp.free_ports_at)[0] for comp in self.components.values()
+        ]
         free_idxs = OrderedDict(zip(self.components.keys(), free_idxs))
 
         def parse_connection(conn):
@@ -920,13 +923,15 @@ class Network(Component):
 
         return C
 
-    def get_order(self):
+    def _get_port_order(self):
         """ Get the reordering indices for the ports of the network """
         start_idxs = list(
             np.cumsum([0] + [comp.num_ports for comp in self.components.values()])[:-1]
         )
         start_idxs = OrderedDict(zip(self.components.keys(), start_idxs))
-        free_idxs = [comp.free_idxs for comp in self.components.values()]
+        free_idxs = [
+            torch.where(comp.free_ports_at)[0] for comp in self.components.values()
+        ]
         free_idxs = OrderedDict(zip(self.components.keys(), free_idxs))
 
         def parse_connection(conn):

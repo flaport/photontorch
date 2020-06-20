@@ -61,8 +61,14 @@ class Component(Module):
         self.sources_at = Buffer(self.get_sources_at())
         self.detectors_at = Buffer(self.get_detectors_at())
         self.actions_at = Buffer(self.get_actions_at())
-        self.free_idxs = Buffer(self.get_free_idxs())
-        self.terminated = len(self.free_idxs) == 0
+        self.free_ports_at = (
+            (self.C.pow(2).sum([0, 1]) > 0) | (self.C.pow(2).sum([0, 2]) > 0)
+        ).ne(1)
+        self.terminated = self.free_ports_at.any().ne(1)
+        self.num_sources = int(self.sources_at.sum())
+        self.num_detectors = int(self.detectors_at.sum())
+        self.num_actions = int(self.actions_at.sum())
+        self.num_free_ports = int(self.free_ports_at.sum())
 
     ## The following methods should be overwritten by subclasses:
 
@@ -180,9 +186,9 @@ class Component(Module):
             self._rC = self.C
             self._iC = torch.zeros_like(self.C)
             self._sources_at = self.sources_at
-            self._detectors_at = self.detectors_at
             self._actions_at = self.actions_at
-            self._free_idxs = self.free_idxs
+            self._detectors_at = self.detectors_at
+            self._free_ports_at = self.free_ports_at
 
         return self  # return the initialized component, so operations can be chained
 
@@ -258,16 +264,6 @@ class Component(Module):
         actions_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
         self.set_actions_at(actions_at)
         return actions_at
-
-    def get_free_idxs(self):
-        """ Calculate locations of the free indices to make a connections to.
-
-        Returns:
-            Tensor: a int64 tensor containing the indices
-            of the open ports in the component.
-        """
-        C = (abs(self.C) ** 2).sum(0)
-        return torch.where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1))[0]
 
     def __repr__(self):
         """ String Representation of the component """
