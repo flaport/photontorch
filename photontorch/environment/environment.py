@@ -1,9 +1,7 @@
-""" Photontorch Simulation Environment
+""" environment
 
-The simulation environment module contains a single class: ``Environment``
-
-This class contains all the necessary parameters to initialize a network for a
-simulation.
+The `Environment` class contains all the necessary parameters to initialize a
+network for a simulation.
 
 """
 
@@ -104,7 +102,6 @@ class _DefaultArray(_Array, _DefaultArgument):
 def _array(arr, default_array=False):
     """ create either an _Array or a _DefaultArray. """
     arr = arr.view(_DefaultArray) if default_array else arr.view(_Array)
-    arr.setflags(write=False)
     return arr
 
 
@@ -251,6 +248,10 @@ class Environment(object):
             raise ValueError(
                 "Environment: too many arguments given to determine wavelength array: arguments 'wl1', 'f1', 'wl' and 'f' are mutually exclusive."
             )
+        if dt < 0:
+            raise ValueError("'dt >= 0' required.")
+        if t0 > t1:
+            raise ValueError("'t0 < t1' required.")
 
         if not _is_default(bitlength):
             bitrate = float(1 / bitlength)
@@ -273,14 +274,10 @@ class Environment(object):
             if not _is_default(samplerate):
                 dt = float(1 / samplerate)
             if not _is_default(num_t):
-                t = _array(
-                    np.linspace(
-                        abs(t0), abs(t0) + num_t * abs(dt), num_t, endpoint=False
-                    )
-                )
+                t = _array(np.linspace(t0, t0 + num_t * dt, num_t, endpoint=False))
             else:
                 try:
-                    t = _array(np.arange(min(t0, t1), max(t0, t1), abs(dt)))
+                    t = _array(np.arange(t0, t1, dt))
                 except ValueError:
                     raise ValueError(
                         "Cannot create time range. Are dt or num_t, t0 and t1 all specified?"
@@ -294,6 +291,8 @@ class Environment(object):
         ) == 0:
             if not _is_default(f):
                 wl = c / f
+            if torch.is_tensor(wl):
+                wl = wl.to(torch.float64).detach().cpu().numpy()
             if not isinstance(wl, np.ndarray):
                 wl = np.array(wl)
             if wl.ndim == 0:
@@ -304,7 +303,7 @@ class Environment(object):
                     % wl.ndim
                 )
         else:
-            if not _is_default(df):
+            if not _is_default(num_f):
                 if not _is_default(wl0):
                     f1 = c / wl0
                 f1 = float(f1)
@@ -312,31 +311,42 @@ class Environment(object):
                     f0 = c / wl0
                 f0 = float(f0)
                 try:
-                    wl = c / np.arange(max(f0, f1), min(f0, f1), -abs(df))
+                    df = float((f1 - f0) / num_f)
+                    wl = c / np.arange(f0, f1, df)
+                except ValueError:
+                    raise ValueError(
+                        "Cannot create frequency range. Are df or num_f, f0 and f1 all specified?"
+                    )
+            elif not _is_default(df):
+                if not _is_default(wl0):
+                    f1 = c / wl0
+                f1 = float(f1)
+                if not _is_default(wl1):
+                    f0 = c / wl0
+                f0 = float(f0)
+                try:
+                    df = float(abs(df) if f1 >= f0 else -abs(df))
+                    wl = c / np.arange(f0, f1, df)
                 except ValueError:
                     raise ValueError(
                         "Cannot create frequency range. Are df or num_f, f0 and f1 all specified?"
                     )
             else:
                 if not _is_default(f0):
-                    wl1 = c / f0
-                wl1 = float(wl1)
-                if not _is_default(f0):
-                    wl0 = c / f1
+                    wl0 = c / f0
                 wl0 = float(wl0)
+                if not _is_default(f1):
+                    wl1 = c / f1
+                wl1 = float(wl1)
                 if not _is_default(num_wl):
-                    dwl = float((wl1 - wl0) / num_wl)
-                elif not _is_default(num_f):
-                    dwl = float((wl1 - wl0) / num_f)
+                    dwl = (wl1 - wl0) / num_wl
                 dwl = float(dwl)
                 try:
-                    wl = np.arange(min(wl0, wl1), max(wl0, wl1), abs(dwl))
+                    wl = np.arange(wl0, wl1, dwl)
                 except ValueError:
                     raise ValueError(
                         "Cannot create frequency range. Are dwl or num_wl, wl0 and wl1 all specified?"
                     )
-        if wl[0] > wl[-1]:
-            wl = wl[::-1].copy()
 
         self.name = str(name)
         self.t = self.time = _array(t)
@@ -350,19 +360,25 @@ class Environment(object):
         self.bitrate = None if bitrate is None else float(bitrate)
         self.bitlength = None if bitrate is None else float(1 / bitrate)
         self.wl = self.wavelength = _array(wl)
-        self.wl0 = self.wavelength_start = float(wl[0])
+        self.wl0 = self.wavelength_start = float(self.wl[0])
         self.wl1 = self.wavelength_end = (
-            None if wl.shape[0] < 2 else float(wl[-1]) + float(wl[1] - wl[0])
+            None
+            if self.wl.shape[0] < 2
+            else float(self.wl[-1] + (self.wl[-1] - self.wl[-2]))
         )
-        self.num_wl = self.num_wavelengths = int(wl.shape[0])
+        self.num_wl = self.num_wavelengths = int(self.wl.shape[0])
         self.dwl = self.wavelength_step = (
-            None if wl.shape[0] < 2 else float(wl[1] - wl[0])
+            None if wl.shape[0] < 2 else float(self.wl[1] - self.wl[0])
         )
-        self.f = _array(c / wl)
-        self.f0 = float(c / wl[0])
-        self.f1 = None if wl.shape[0] < 2 else float(c / (wl[-1] + self.dwl))
-        self.num_f = int(wl.shape[0])
-        self.df = None if wl.shape[0] < 2 else float(c / wl[1] - c / wl[0])
+        self.f = _array(c / self.wl)
+        self.f0 = float(self.f[0])
+        self.f1 = (
+            None
+            if self.f.shape[0] < 2
+            else float(self.f[-1] + (self.f[-1] - self.f[-2]))
+        )
+        self.num_f = int(self.f.shape[0])
+        self.df = None if self.f.shape[0] < 2 else float(self.f[1] - self.f[0])
         self.c = float(c)
         self.freqdomain = self.frequency_domain = bool(freqdomain)
         self.grad = self.enable_grad = bool(grad)
