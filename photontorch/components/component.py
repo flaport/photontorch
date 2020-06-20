@@ -56,6 +56,7 @@ class Component(Module):
         self._set_buffers()
 
     def _set_buffers(self):
+        """ create all buffers for the component """
         self.C = Buffer(self.get_C())
         self.sources_at = Buffer(self.get_sources_at())
         self.detectors_at = Buffer(self.get_detectors_at())

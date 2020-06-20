@@ -137,10 +137,9 @@ class Network(Component):
         # register connections:
         if connections is not None:
             self.connections += connections
-            self._register_components()  # add components to the components dict
 
-    def _set_buffers(self):
-        pass  # do not calculate buffers here.
+        # register connection/components:
+        self._set_buffers()
 
     # add a component to the network
     def add_component(self, name, comp):
@@ -250,8 +249,8 @@ class Network(Component):
             connection_string = "%s:%s:%s" % (name, q, p)
             self.connections.append(connection_string)
 
-        # register connections made:
-        self._register_components()
+        # register connections/components:
+        self._set_buffers()
 
     # helper function to link components together
     def _get_used_component_names(self):
@@ -278,9 +277,8 @@ class Network(Component):
         )
         return used_components.keys()
 
-    # helper function to link components together:
-    def _register_components(self):
-        """ create connection matrix from the network's list of connections """
+    def _set_buffers(self):
+        """ create all buffers for the network """
 
         # if not connections defined, exit early.
         if not self.connections:
@@ -299,11 +297,11 @@ class Network(Component):
         for i, conn in enumerate(self.connections):
             self.connections[i] = ":".join(part.strip() for part in conn.split(":"))
 
-        # sort connections (not truly necessary, but useful during inspecting)
+        # sort connections (not truly necessary, but useful during manual inspecting)
         def _conn_sort_key(conn):
             try:
                 comp, idx, out = conn.split(":")
-                return out
+                return "%03d" % int(out) + conn
             except ValueError:
                 return conn
 
