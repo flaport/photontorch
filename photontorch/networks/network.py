@@ -137,7 +137,7 @@ class Network(Component):
         # register connections:
         if connections is not None:
             self.connections += connections
-            self._register_connections()  # add components to the components dict
+            self._register_components()  # add components to the components dict
 
     def _set_buffers(self):
         pass  # do not calculate buffers here.
@@ -251,7 +251,7 @@ class Network(Component):
             self.connections.append(connection_string)
 
         # register connections made:
-        self._register_connections()
+        self._register_components()
 
     # helper function to link components together
     def _get_used_component_names(self):
@@ -279,17 +279,42 @@ class Network(Component):
         return used_components.keys()
 
     # helper function to link components together:
-    def _register_connections(self):
+    def _register_components(self):
         """ create connection matrix from the network's list of connections """
-        # get the registered modules from the network:
-        modules = self._modules
 
-        # add used components to the components dictionary:
+        # if not connections defined, exit early.
+        if not self.connections:
+            return
+
+        # if no components defined, exit early.
+        all_components = {
+            name: comp
+            for name, comp in self._modules.items()
+            if isinstance(comp, Component)
+        }
+        if not all_components:
+            return
+
+        # ensure connection string can be parsed
+        for i, conn in enumerate(self.connections):
+            self.connections[i] = ":".join(part.strip() for part in conn.split(":"))
+
+        # sort connections (not truly necessary, but useful during inspecting)
+        def _conn_sort_key(conn):
+            try:
+                comp, idx, out = conn.split(":")
+                return out
+            except ValueError:
+                return conn
+
+        self.connections.sort(key=_conn_sort_key)
+
+        # add components to components dict
         self.components = OrderedDict()
         for name in self._get_used_component_names():
-            self.components[name] = modules[name]
+            self.components[name] = all_components[name]
 
-        # calculate buffers
+        # set buffers
         o = self.order = self.get_order()
         self.C = Buffer(self.get_C()[:, o, :][:, :, o])
         self.sources_at = Buffer(self.get_sources_at()[o])
