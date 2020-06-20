@@ -12,7 +12,6 @@ It should not be used directly.
 import torch
 
 ## Relative
-from ..nn import where
 from ..nn.nn import Module
 from ..nn.nn import Buffer
 from ..environment import current_environment
@@ -256,7 +255,7 @@ class Component(Module):
             of the open ports in the component.
         """
         C = (abs(self.C) ** 2).sum(0)
-        return where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1))
+        return torch.where(((C.sum(0) > 0) | (C.sum(1) > 0)).ne(1))[0]
 
     def __repr__(self):
         """ String Representation of the component """

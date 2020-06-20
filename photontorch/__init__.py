@@ -111,9 +111,6 @@ from .nn.nn import Buffer
 from .nn.nn import BoundedParameter
 from .nn.nn import Module
 
-# tensor
-from .nn.tensor import where
-
 # custom functional additions
 from .nn.functional import BERLoss
 from .nn.functional import MSELoss

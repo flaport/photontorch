@@ -31,9 +31,6 @@ from .autograd import block_diag
 ## custom neural network functions [not imported]
 # nn.nn
 
-## Custom Tensor Functions
-from .tensor import where
-
 # custom functional additions
 from .functional import BERLoss
 from .functional import MSELoss

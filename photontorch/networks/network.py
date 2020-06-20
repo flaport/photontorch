@@ -39,7 +39,6 @@ from ..nn.nn import Buffer
 from ..components.component import Component
 from ..components.terms import Term
 from ..nn.autograd import block_diag
-from ..nn.tensor import where
 from ..environment import current_environment
 
 
@@ -439,8 +438,8 @@ class Network(Component):
         mc = (
             self.sources_at | self.detectors_at | self.actions_at | (delays > 0)
         )  # memory-containing nodes:
-        ml = where(mc.ne(1))  # negation of mc: memory-less nodes
-        mc = where(mc)
+        ml = torch.where(mc.ne(1))[0]  # negation of mc: memory-less nodes
+        mc = torch.where(mc)[0]
         self.nmc = len(mc)
         self.nml = len(ml)
 
@@ -457,9 +456,9 @@ class Network(Component):
             )
 
         ## Source and detector locations
-        sources_at = where(self.sources_at[mc])
-        detectors_at = where(self.detectors_at[mc])
-        actions_at = where(self.actions_at[mc])
+        sources_at = torch.where(self.sources_at[mc])[0]
+        detectors_at = torch.where(self.detectors_at[mc])[0]
+        actions_at = torch.where(self.actions_at[mc])[0]
         self.num_sources = len(sources_at)
         self.num_detectors = len(detectors_at)
         self.num_actions = len(actions_at)
@@ -474,14 +473,14 @@ class Network(Component):
         )
 
         ## New port order
-        others_at = where(
+        others_at = torch.where(
             (self.sources_at | self.actions_at | self.detectors_at)[mc].ne(1)
-        )
+        )[0]
         new_order = torch.cat((sources_at, actions_at, others_at, detectors_at))
         self.mc = mc = mc[new_order]
-        self._sources_at = where(self.sources_at[mc])
-        self._detectors_at = where(self.detectors_at[mc])
-        self._actions_at = where(self.actions_at[mc])
+        self._sources_at = torch.where(self.sources_at[mc])[0]
+        self._detectors_at = torch.where(self.detectors_at[mc])[0]
+        self._actions_at = torch.where(self.actions_at[mc])[0]
 
         ## S-matrix subsets
 
