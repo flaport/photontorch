@@ -61,10 +61,8 @@ class Component(Module):
         self.sources_at = Buffer(self.get_sources_at())
         self.detectors_at = Buffer(self.get_detectors_at())
         self.actions_at = Buffer(self.get_actions_at())
-        self.free_ports_at = (
-            (self.C.pow(2).sum([0, 1]) > 0) | (self.C.pow(2).sum([0, 2]) > 0)
-        ).ne(1)
-        self.terminated = self.free_ports_at.any().ne(1)
+        self.free_ports_at = Buffer(((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).ne(1))
+        self.terminated = bool(self.free_ports_at.any().ne(1).item())
         self.num_sources = int(self.sources_at.sum())
         self.num_detectors = int(self.detectors_at.sum())
         self.num_actions = int(self.actions_at.sum())
@@ -216,7 +214,7 @@ class Component(Module):
                 real and imaginary part.
 
         """
-        C = torch.zeros((2, self.num_ports, self.num_ports), device=self.device)
+        C = torch.zeros((self.num_ports, self.num_ports), device=self.device)
         self.set_C(C)
         return C
 

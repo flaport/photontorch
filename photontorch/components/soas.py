@@ -124,7 +124,7 @@ class BaseSoa(Component):
         return S
 
     def set_C(self, C):
-        C[0, 1, 1] = 1.0  # the internal state should be connected onto itself.
+        C[1, 1] = 1.0  # the internal state should be connected onto itself.
 
 
 class Soa(BaseSoa):

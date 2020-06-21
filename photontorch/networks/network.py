@@ -314,14 +314,12 @@ class Network(Component):
 
         # set buffers
         o = self.order = self._get_port_order()
-        self.C = Buffer(self.get_C()[:, o, :][:, :, o])
+        self.C = Buffer(self.get_C()[o, :][:, o])
         self.sources_at = Buffer(self.get_sources_at()[o])
         self.detectors_at = Buffer(self.get_detectors_at()[o])
         self.actions_at = Buffer(self.get_actions_at()[o])
-        self.free_ports_at = (
-            (self.C.pow(2).sum([0, 1]) > 0) | (self.C.pow(2).sum([0, 2]) > 0)
-        ).ne(1)
-        self.terminated = self.free_ports_at.any().ne(1)
+        self.free_ports_at = Buffer(((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).ne(1))
+        self.terminated = bool(self.free_ports_at.any().ne(1).item())
         self.num_sources = int(self.sources_at.sum())
         self.num_detectors = int(self.detectors_at.sum())
         self.num_actions = int(self.actions_at.sum())
@@ -353,7 +351,7 @@ class Network(Component):
                 for i in range(self.num_free_ports)
             ]
         if isinstance(term, (list, tuple)):
-            term = OrderedDict((t.name, t) for t in term)
+            term = OrderedDict((t.name, copy(t)) for t in term)
         if self.is_cuda:
             term = OrderedDict((name, t.cuda()) for name, t in term.items())
         copied = copy(self)  # shallow copy so we can change name if necessary
@@ -498,26 +496,22 @@ class Network(Component):
         iSmcmc = self.S[1, :, mc, :][:, :, mc]
 
         # MC subset of Connection matrix
-        rCmcmc = self.C[0, mc, :][:, mc]
-        iCmcmc = self.C[1, mc, :][:, mc]
+        rCmcmc = self.C[mc, :][:, mc]
 
         if self.nml == 0:
-            rC = torch.stack([rCmcmc] * self.env.num_wl, dim=0)
-            iC = torch.stack([iCmcmc] * self.env.num_wl, dim=0)
+            rC, iC = torch.broadcast_tensors(rCmcmc[None], torch.zeros_like(iSmcmc))
         else:
             # Only do the following steps if there is at least one ml node:
 
             # ML subsets of scattering matrix:
+            iSmlmc = self.S[0, :, ml, :][:, :, mc]
             rSmlml = self.S[0, :, ml, :][:, :, ml]
             iSmlml = self.S[1, :, ml, :][:, :, ml]
 
             # ML subsets of connection matrix:
-            rCmcml = self.C[0, mc, :][:, ml]
-            rCmlmc = self.C[0, ml, :][:, mc]
-            rCmlml = self.C[0, ml, :][:, ml]
-            iCmcml = self.C[1, mc, :][:, ml]
-            iCmlmc = self.C[1, ml, :][:, mc]
-            iCmlml = self.C[1, ml, :][:, ml]
+            rCmcml = self.C[mc, :][:, ml]
+            rCmlmc = self.C[ml, :][:, mc]
+            rCmlml = self.C[ml, :][:, ml]
 
             ## Helper function bmm
             def bmm(C, S):
@@ -532,12 +526,14 @@ class Network(Component):
             # 1. Calculation of the helper matrix P = I - Cmlml@Smlml
             ones = torch.ones((self.env.num_wl, 1, 1), device=self.device)
             rP = ones * torch.eye(self.nml, device=self.device)[None, :, :]
-            rP = rP - bmm(rCmlml, rSmlml) + bmm(iCmlml, iSmlml)
-            iP = -bmm(rCmlml, iSmlml) - bmm(iCmlml, rSmlml)
+            rP = rP - bmm(rCmlml, rSmlml)
+            iP = -bmm(rCmlml, iSmlml)
 
             # 2. Calculate inv(P)@Cmlmc [using torch.solve]
             M = torch.cat([torch.cat([rP, -iP], -1), torch.cat([iP, rP], -1)], -2)
-            Cmlmc = ones * torch.cat([ones * rCmlmc[None], ones * iCmlmc[None]], -2)
+            Cmlmc = torch.cat(
+                torch.broadcast_tensors(rCmlmc[None], torch.zeros_like(iSmlmc)), -2
+            )
             x, _ = torch.solve(Cmlmc, M)
             rx, ix = torch.split(x, x.shape[-2] // 2, -2)
 
@@ -548,14 +544,11 @@ class Network(Component):
             )
 
             # 4. Calculate Cmcml@Smlml@inv(P)@Cmlmc
-            rx, ix = (
-                bmm(rCmcml, rx) - bmm(iCmcml, ix),
-                bmm(rCmcml, ix) + bmm(iCmcml, rx),
-            )
+            rx, ix = (bmm(rCmcml, rx), bmm(rCmcml, ix))
 
             # 5. C = x + Cmcmc
             rC = rx + rCmcmc[None]
-            iC = ix + iCmcmc[None]
+            iC = ix
 
         ## Save the reduced matrices
         self._rS = rSmcmc
@@ -885,9 +878,7 @@ class Network(Component):
             To create the connection matrix, the connection strings are parsed.
         """
 
-        rC = block_diag(*(comp.C[0] for comp in self.components.values()))
-        iC = block_diag(*(comp.C[1] for comp in self.components.values()))
-        C = torch.stack([rC, iC])
+        C = block_diag(*(comp.C for comp in self.components.values()))
 
         start_idxs = list(
             np.cumsum([0] + [comp.num_ports for comp in self.components.values()])[:-1]
@@ -919,7 +910,7 @@ class Network(Component):
         for conn in self.connections:
             i, j = parse_connection(conn)
             if i is not None:
-                C[0, i, j] = C[0, j, i] = 1.0
+                C[i, j] = C[j, i] = 1.0
 
         return C
 
