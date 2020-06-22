@@ -113,15 +113,15 @@ def test_cpu(nw):
 
 def test_reinitialize(nw, tenv):
     with tenv:
-        nw.initialized = False  # fake the fact that the network is uninitialized
+        nw._env = None
         nw.initialize()
-        assert nw.initialized
+        assert nw.env is tenv
 
 
 def test_initialize_on_unterminated_network(unw, tenv):
     with tenv:
         unw.initialize()
-    assert not unw.initialized
+    assert unw._env is None
 
 
 def test_initializion_with_too_big_simulation_timestep(nw, tenv):

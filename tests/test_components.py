@@ -18,14 +18,15 @@ from fixtures import default_components, tenv, comp, wg
 
 def test_initialization_with_sources_detectors_at_same_port(tenv):
     class WrongTerm(pt.Term):
-        def get_sources_at(self):
-            return torch.ones(1, dtype=torch.bool, device=self.device)
+        def set_sources_at(self, sources_at):
+            sources_at[0] = True
 
-        def get_detectors_at(self):
-            return torch.ones(1, dtype=torch.bool, device=self.device)
+        def set_detectors_at(self, detectors_at):
+            detectors_at[0] = True
 
     with pytest.raises(ValueError):
         wt = WrongTerm()
+        assert wt.sources_at.any()
         with tenv:
             wt.initialize()
 

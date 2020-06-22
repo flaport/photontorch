@@ -311,19 +311,11 @@ class Network(Component):
         self.components = OrderedDict()
         for name in self._get_used_component_names():
             self.components[name] = all_components[name]
+            self.components[name].name = name
 
         # set buffers
-        o = self.order = self._get_port_order()
-        self.C = Buffer(self.get_C()[o, :][:, o])
-        self.sources_at = Buffer(self.get_sources_at()[o])
-        self.detectors_at = Buffer(self.get_detectors_at()[o])
-        self.actions_at = Buffer(self.get_actions_at()[o])
-        self.free_ports_at = Buffer(((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).ne(1))
-        self.terminated = bool(self.free_ports_at.any().ne(1).item())
-        self.num_sources = int(self.sources_at.sum())
-        self.num_detectors = int(self.detectors_at.sum())
-        self.num_actions = int(self.actions_at.sum())
-        self.num_free_ports = int(self.free_ports_at.sum())
+        o = self._port_order = self._get_port_order()
+        super(Network, self)._set_buffers()
 
     # terminate a network
     def terminate(self, term=None, name=None):
@@ -422,29 +414,29 @@ class Network(Component):
             reduced matrices without needing the response of the network to an
             input signal.
         """
+        self.zero_grad()
 
         ## get current environment
-        self._env = env = current_environment()
-
-        ## begin initialization:
-        self.initialized = False
+        env = current_environment()
 
         ## Initialize components in the network
         for comp in self.components.values():
             comp.initialize()
 
-        ## Initialize network
-        super(Network, self).initialize()
+        self.S = torch.zeros(
+            (2, env.num_wl, self.num_ports, self.num_ports), device=self.device
+        )
+        self.delays = torch.zeros(self.num_ports, device=self.device)
 
-        self.delays = self.delays[self.order]
-        self.S = self.S[:, :, self.order, :][:, :, :, self.order]
+        self.set_S(self.S)
+        self.set_delays(self.delays)
 
         ## delays
         # delays can be turned off for frequency domain calculations
-        delays_in_seconds = self.delays * float(not self.env.freqdomain)
+        delays_in_seconds = self.delays * float(not env.freqdomain)
         # resulting delays in terms of the simulation timestep:
-        if self.env.dt is not None:
-            delays_in_timesteps = (delays_in_seconds / self.env.dt + 0.5).long()
+        if env.dt is not None:
+            delays_in_timesteps = (delays_in_seconds / env.dt + 0.5).long()
         else:
             delays_in_timesteps = torch.zeros_like(delays_in_seconds).long()
 
@@ -520,7 +512,7 @@ class Network(Component):
             # We do this in 5 steps:
 
             # 1. Calculation of the helper matrix P = I - Cmlml@Smlml
-            ones = torch.ones((self.env.num_wl, 1, 1), device=self.device)
+            ones = torch.ones((env.num_wl, 1, 1), device=self.device)
             rP = ones * torch.eye(self.nml, device=self.device)[None, :, :]
             rCmlml, _ = torch.broadcast_tensors(rCmlml[None], rSmlml)
             rP = rP - (rCmlml).bmm(rSmlml)
@@ -560,9 +552,8 @@ class Network(Component):
         )
         self.buffermask[:, delays_in_timesteps[mc], :, range(self.nmc), :] = 1.0
 
-        self.initialized = True
-
         # finish initialization:
+        self._env = env
         return self
 
     def _simulation_buffer(self, num_batches):
@@ -845,30 +836,48 @@ class Network(Component):
             )
             idx += comp.num_ports
 
-    def get_delays(self):
-        """ get all the delays in the network """
-        return torch.cat([comp.delays for comp in self.components.values()])
-
-    def get_detectors_at(self):
-        """ get the locations of the detectors in the network """
-        return torch.cat([comp.detectors_at for comp in self.components.values()])
-
-    def get_sources_at(self):
-        """ get the locations of the sources in the network """
-        return torch.cat([comp.sources_at for comp in self.components.values()])
-
-    def get_actions_at(self):
-        """ get the locations of the functions in the network """
-        return torch.cat([comp.actions_at for comp in self.components.values()])
-
-    def get_S(self):
+    def set_S(self, S):
         """ get the combined S-matrix of all the components in the network """
-        rS = block_diag(*(comp.S[0] for comp in self.components.values()))
-        iS = block_diag(*(comp.S[1] for comp in self.components.values()))
-        return torch.stack([rS, iS])
+        idx = 0
+        for comp in self.components.values():
+            comp.set_S(S[:, :, idx : idx + comp.num_ports, idx : idx + comp.num_ports])
+            idx += comp.num_ports
+        S[:] = S[:, :, self._port_order, :][:, :, :, self._port_order]
 
-    def get_C(self):
-        """ get the combined connection matrix of all the components in the network
+    def set_delays(self, delays):
+        """ set all the delays in the network """
+        idx = 0
+        for comp in self.components.values():
+            comp.set_delays(delays[idx : idx + comp.num_ports])
+            idx += comp.num_ports
+        delays[:] = delays[self._port_order]
+
+    def set_detectors_at(self, detectors_at):
+        """ set the locations of the detectors in the network """
+        idx = 0
+        for comp in self.components.values():
+            comp.set_detectors_at(detectors_at[idx : idx + comp.num_ports])
+            idx += comp.num_ports
+        detectors_at[:] = detectors_at[self._port_order]
+
+    def set_sources_at(self, sources_at):
+        """ set the locations of the sources in the network """
+        idx = 0
+        for comp in self.components.values():
+            comp.set_sources_at(sources_at[idx : idx + comp.num_ports])
+            idx += comp.num_ports
+        sources_at[:] = sources_at[self._port_order]
+
+    def set_actions_at(self, actions_at):
+        """ set the locations of the functions in the network """
+        idx = 0
+        for comp in self.components.values():
+            comp.set_actions_at(actions_at[idx : idx + comp.num_ports])
+            idx += comp.num_ports
+        actions_at[:] = actions_at[self._port_order]
+
+    def set_C(self, C):
+        """ set the combined connection matrix of all the components in the network
 
         Returns:
             binary tensor with only 1's and 0's.
@@ -877,7 +886,7 @@ class Network(Component):
             To create the connection matrix, the connection strings are parsed.
         """
 
-        C = block_diag(*(comp.C for comp in self.components.values()))
+        C[:] = block_diag(*(comp.C for comp in self.components.values()))
 
         start_idxs = list(
             np.cumsum([0] + [comp.num_ports for comp in self.components.values()])[:-1]
@@ -911,7 +920,7 @@ class Network(Component):
             if i is not None:
                 C[i, j] = C[j, i] = 1.0
 
-        return C
+        C[:] = C[self._port_order, :][:, self._port_order]
 
     def _get_port_order(self):
         """ Get the reordering indices for the ports of the network """

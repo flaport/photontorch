@@ -82,7 +82,7 @@ class Mzi(Component):
     def set_delays(self, delays):
         delays[:] = self.ng * self.length / self.env.c
 
-    def get_S(self):
+    def set_S(self, S):
         wls = torch.tensor(self.env.wl, dtype=torch.float64, device=self.device)
 
         # neff depends on the wavelength:
@@ -98,7 +98,6 @@ class Mzi(Component):
         cos_theta = torch.cos(self.theta).to(torch.get_default_dtype())
         sin_theta = torch.sin(self.theta).to(torch.get_default_dtype())
         # scattering matrix
-        S = torch.zeros((2, self.env.num_wl, 4, 4), device=self.device)
         S[0, :, 0, 1] = S[0, :, 1, 0] = cos_phi1 * cos_theta
         S[1, :, 0, 1] = S[1, :, 1, 0] = sin_phi1 * cos_theta
         S[0, :, 0, 2] = S[0, :, 2, 0] = cos_phi1 * sin_theta

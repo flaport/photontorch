@@ -29,7 +29,7 @@ class Component(Module):
         it should not be used directly.
 
         To define your own component, subclass Component and overwrite the
-        __init__ and the get_* methods.
+        __init__ and the set_* methods.
     """
 
     num_ports = 0
@@ -57,10 +57,22 @@ class Component(Module):
 
     def _set_buffers(self):
         """ create all buffers for the component """
-        self.C = Buffer(self.get_C())
-        self.sources_at = Buffer(self.get_sources_at())
-        self.detectors_at = Buffer(self.get_detectors_at())
-        self.actions_at = Buffer(self.get_actions_at())
+        self.C = Buffer(
+            torch.zeros((self.num_ports, self.num_ports), device=self.device)
+        )
+        self.sources_at = Buffer(
+            torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
+        )
+        self.detectors_at = Buffer(
+            torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
+        )
+        self.actions_at = Buffer(
+            torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
+        )
+        self.set_C(self.C.data)
+        self.set_sources_at(self.sources_at.data)
+        self.set_detectors_at(self.detectors_at)
+        self.set_actions_at(self.actions_at)
         self.free_ports_at = Buffer(((self.C.sum(0) > 0) | (self.C.sum(1) > 0)).ne(1))
         self.terminated = bool(self.free_ports_at.any().ne(1).item())
         self.num_sources = int(self.sources_at.sum())
@@ -69,11 +81,11 @@ class Component(Module):
         self.num_free_ports = int(self.free_ports_at.sum())
 
         if (self.sources_at & self.detectors_at).any():
-            raise ValueError("Source ports and Detector ports cannot be combined.")
+            raise ValueError("source ports and detector ports cannot be combined.")
         if (self.sources_at & self.actions_at).any():
-            raise ValueError("Source ports and Active ports cannot be combined.")
+            raise ValueError("source ports and active ports cannot be combined.")
         if (self.detectors_at & self.actions_at).any():
-            raise ValueError("Detector ports and Active ports cannot be combined.")
+            raise ValueError("detector ports and active ports cannot be combined.")
 
         if self.actions_at.any() and not (
             self.actions_at.all() or isinstance(self, Network)
@@ -182,86 +194,7 @@ class Component(Module):
 
         """
         self._env = env = current_environment()
-
-        self.zero_grad()
-
-        self.delays = self.get_delays()
-        self.S = self.get_S()
-
-        return self  # return the initialized component, so operations can be chained
-
-    def get_S(self):
-        """ get the scattering matrix of the component
-
-        Returns:
-            Tensor[2, #wavelengths, #ports, #ports]: the scattering
-                matrix of the component (defined for each
-                wavelength of the simulation). The first dimension of size two
-                denotes the stacked real and imaginary part.
-        """
-        S = torch.zeros(
-            (2, self.env.num_wl, self.num_ports, self.num_ports), device=self.device,
-        )
-        self.set_S(S)
-        return S
-
-    def get_C(self):
-        """ get the connection matrix of the component.
-
-        Returns:
-            Tensor[2, #ports, #ports]: the connection matrix for the
-                component. The first dimension of size two denotes the stacked
-                real and imaginary part.
-
-        """
-        C = torch.zeros((self.num_ports, self.num_ports), device=self.device)
-        self.set_C(C)
-        return C
-
-    def get_delays(self):
-        """ Get the delays introduced by the component.
-
-        Returns:
-            Tensor[#ports]: the delay tensor for the component.
-                The delay tensor signifies the delay each port of the component
-                introduces.
-        """
-        delays = torch.zeros(self.num_ports, device=self.device)
-        self.set_delays(delays)
-        return delays
-
-    def get_sources_at(self):
-        """ Get the locations of the sources in the component.
-
-        Returns:
-            Tensor[#ports]: the boolean tensor for the component
-                which signifies which ports of the component act as a source.
-        """
-        sources_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
-        self.set_sources_at(sources_at)
-        return sources_at
-
-    def get_detectors_at(self):
-        """ Get the locations of the detectors in the component.
-
-        Returns:
-            Tensor[#ports]: the boolean tensor for the component
-                which signifies which ports of the component act as a detector.
-        """
-        detectors_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
-        self.set_detectors_at(detectors_at)
-        return detectors_at
-
-    def get_actions_at(self):
-        """ Get the locations of the active nodes in the component.
-
-        Returns:
-            Tensor[#ports]: the boolean tensor for the component
-                which signifies which ports of the component act actively.
-        """
-        actions_at = torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
-        self.set_actions_at(actions_at)
-        return actions_at
+        return self
 
     def __repr__(self):
         """ String Representation of the component """
