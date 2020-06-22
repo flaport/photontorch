@@ -23,7 +23,7 @@ def check_unitarity(nw):
         T = torch.tensor(np.stack([np.real(I), np.imag(I)], 0), names=["c", "s", "b"])
         R = nw(T, power=False)[:, 0, 0, :, :].data.cpu().numpy()
         R = R[0] + 1j * R[1]
-        J = R @ R.T.conj()
+        J = np.dot(R, R.T.conj())
         np.testing.assert_array_almost_equal(I, J)
 
 

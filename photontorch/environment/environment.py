@@ -11,6 +11,7 @@ network for a simulation.
 
 # Standard Library
 import re
+import sys
 import inspect
 from collections import deque
 
@@ -19,6 +20,8 @@ import torch
 
 # Other
 import numpy as np
+
+py2 = sys.version_info.major == 2
 
 
 #############
@@ -436,7 +439,10 @@ class Environment(object):
             name (str): name of the environment
             **kwargs (optional): any number of extra keyword arguments will be stored as attributes to the environment.
         """
-        init_argspec = inspect.getfullargspec(self.__class__)
+        if py2:
+            init_argspec = inspect.getargspec(self.__init__)
+        else:
+            init_argspec = inspect.getfullargspec(self.__class__)
         default_kwargs = dict(zip(init_argspec.args[1:], init_argspec.defaults))
         new = {
             k: (_convert_default(v) if v is not None else default_kwargs.get(k))
