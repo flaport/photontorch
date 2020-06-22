@@ -496,24 +496,23 @@ class Network(Component):
         iSmcmc = self.S[1, :, mc, :][:, :, mc]
 
         # MC subset of Connection matrix
-        C, _ = torch.broadcast_tensors(self.C[None], self.S[0])
-        rCmcmc = C[:, mc, :][:, :, mc]
+        rCmcmc = self.C[mc, :][:, mc]
 
         if self.nml == 0:
-            rC = rCmcmc
-            iC = torch.zeros_like(rC)
+            rC, iC = torch.broadcast_tensors(rCmcmc[None], torch.zeros_like(self.S[0]))
         else:
             # Only do the following steps if there is at least one ml node:
 
             # ML subsets of scattering matrix:
-            iSmlmc = self.S[0, :, ml, :][:, :, mc]
+            rSmlmc = self.S[0, :, ml, :][:, :, mc]
+            rSmcml = self.S[0, :, mc, :][:, :, ml]
             rSmlml = self.S[0, :, ml, :][:, :, ml]
             iSmlml = self.S[1, :, ml, :][:, :, ml]
 
             # ML subsets of connection matrix:
-            rCmcml = C[:, mc, :][:, :, ml]
-            rCmlmc = C[:, ml, :][:, :, mc]
-            rCmlml = C[:, ml, :][:, :, ml]
+            rCmcml = self.C[mc, :][:, ml]
+            rCmlmc = self.C[ml, :][:, mc]
+            rCmlml = self.C[ml, :][:, ml]
 
             ## reduced connection matrix
             # C = Cmcml@Smlml@inv(P)@Cmlmc + Cmcmc
@@ -523,12 +522,15 @@ class Network(Component):
             # 1. Calculation of the helper matrix P = I - Cmlml@Smlml
             ones = torch.ones((self.env.num_wl, 1, 1), device=self.device)
             rP = ones * torch.eye(self.nml, device=self.device)[None, :, :]
+            rCmlml, _ = torch.broadcast_tensors(rCmlml[None], rSmlml)
             rP = rP - (rCmlml).bmm(rSmlml)
             iP = -(rCmlml).bmm(iSmlml)
 
             # 2. Calculate inv(P)@Cmlmc [using torch.solve]
             M = torch.cat([torch.cat([rP, -iP], -1), torch.cat([iP, rP], -1)], -2)
-            Cmlmc = torch.cat([rCmlmc, torch.zeros_like(rCmlmc)], -2)
+            Cmlmc = torch.cat(
+                torch.broadcast_tensors(rCmlmc[None], torch.zeros_like(rSmlmc)), -2
+            )
             x, _ = torch.solve(Cmlmc, M)
             rx, ix = torch.split(x, x.shape[-2] // 2, -2)
 
@@ -539,10 +541,11 @@ class Network(Component):
             )
 
             # 4. Calculate Cmcml@Smlml@inv(P)@Cmlmc
+            rCmcml, _ = torch.broadcast_tensors(rCmcml[None], rSmcml)
             rx, ix = ((rCmcml).bmm(rx), (rCmcml).bmm(ix))
 
             # 5. C = x + Cmcmc
-            rC = rx + rCmcmc
+            rC = rx + rCmcmc[None]
             iC = ix
 
         ## Save the reduced matrices
