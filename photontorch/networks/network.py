@@ -555,9 +555,7 @@ class Network(Component):
         self.buffermask = torch.zeros(
             (2, int(delays_in_timesteps.max()) + 1, 1, self.nmc, 1), device=self.device
         )
-        self.buffermask[
-            :, delays_in_timesteps[mc] - 1, :, range(self.nmc), :
-        ] = 1.0  # delay == 1 -> index 0
+        self.buffermask[:, delays_in_timesteps[mc], :, range(self.nmc), :] = 1.0
 
         self.initialized = True
 
@@ -810,7 +808,7 @@ class Network(Component):
         else:
             x = torch.stack([rx, ix], 0)
             x = (x + srcvalue).permute(2, 0, 1, 3)
-            x, x_in = torch.zeros_like(x), x
+            x, x_in = x.clone(), x
             self.action(t, x_in, x)
             rx, ix = x.permute(1, 2, 0, 3)
 
@@ -834,12 +832,15 @@ class Network(Component):
         """ Perform the action of an active components in the network """
         x_out[:] = x_in[:]
 
-        idxs = self.action_idxs
-        for comp, i, j in zip(self.components_with_action, idxs[:-1], idxs[1:]):
-            _x_in = x_in[i:j]
-            _x_out = x_out[i:j]
-            _x_out[:] = 0
-            comp.action(t, _x_in, _x_out)
+        idx = self.num_sources
+        for comp in self.components.values():
+            if not comp.actions_at.any():
+                continue
+            x_out[idx : idx + comp.num_ports] = 0
+            comp.action(
+                t, x_in[idx : idx + comp.num_ports], x_out[idx : idx + comp.num_ports]
+            )
+            idx += comp.num_ports
 
     def get_delays(self):
         """ get all the delays in the network """

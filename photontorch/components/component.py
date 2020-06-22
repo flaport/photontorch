@@ -68,6 +68,21 @@ class Component(Module):
         self.num_actions = int(self.actions_at.sum())
         self.num_free_ports = int(self.free_ports_at.sum())
 
+        if (self.sources_at & self.detectors_at).any():
+            raise ValueError("Source ports and Detector ports cannot be combined.")
+        if (self.sources_at & self.actions_at).any():
+            raise ValueError("Source ports and Active ports cannot be combined.")
+        if (self.detectors_at & self.actions_at).any():
+            raise ValueError("Detector ports and Active ports cannot be combined.")
+
+        if self.actions_at.any() and not (
+            self.actions_at.all() or isinstance(self, Network)
+        ):
+            raise ValueError(
+                "Sources and Detectors cannot be combined in the same node."
+                "Active components should have an action defined for all their ports"
+            )
+
     ## The following methods should be overwritten by subclasses:
 
     def set_S(self, S):
@@ -169,24 +184,9 @@ class Component(Module):
         self._env = env = current_environment()
 
         self.zero_grad()
-        if (self.sources_at & self.detectors_at).any():
-            raise ValueError(
-                "Sources and Detectors cannot be combined in the same node."
-            )
 
         self.delays = self.get_delays()
         self.S = self.get_S()
-
-        if not isinstance(self, Network):
-            self._delays = self.delays
-            self._rS = self.S[0]
-            self._iS = self.S[1]
-            self._rC = self.C
-            self._iC = torch.zeros_like(self.C)
-            self._sources_at = self.sources_at
-            self._actions_at = self.actions_at
-            self._detectors_at = self.detectors_at
-            self._free_ports_at = self.free_ports_at
 
         return self  # return the initialized component, so operations can be chained
 
