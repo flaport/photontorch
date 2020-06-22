@@ -38,7 +38,6 @@ from .visualize import plot, graph
 from ..nn.nn import Buffer
 from ..components.component import Component
 from ..components.terms import Term
-from ..nn.autograd import block_diag
 from ..environment import current_environment
 
 
@@ -885,8 +884,10 @@ class Network(Component):
         Note:
             To create the connection matrix, the connection strings are parsed.
         """
-
-        C[:] = block_diag(*(comp.C for comp in self.components.values()))
+        idx = 0
+        for comp in self.components.values():
+            comp.set_C(C[idx : idx + comp.num_ports, idx : idx + comp.num_ports])
+            idx += comp.num_ports
 
         start_idxs = list(
             np.cumsum([0] + [comp.num_ports for comp in self.components.values()])[:-1]

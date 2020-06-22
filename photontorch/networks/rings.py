@@ -23,7 +23,6 @@ from ..components.mzis import Mzi
 from ..components.waveguides import Waveguide
 from ..components.directionalcouplers import DirectionalCoupler
 from ..nn.nn import Buffer, Parameter
-from ..nn import block_diag
 
 
 ###################

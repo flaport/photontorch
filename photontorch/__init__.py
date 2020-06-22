@@ -102,16 +102,11 @@ from .detectors.lowpassdetector import LowpassDetector
 
 ## PyTorch extensions
 
-# autograd
-from .nn.autograd import block_diag
-
 # neural networks
 from .nn import nn
 from .nn.nn import Buffer
 from .nn.nn import BoundedParameter
 from .nn.nn import Module
-
-# custom functional additions
-from .nn.functional import BERLoss
-from .nn.functional import MSELoss
-from .nn.functional import BitStreamGenerator
+from .nn.nn import BERLoss
+from .nn.nn import MSELoss
+from .nn.nn import BitStreamGenerator
