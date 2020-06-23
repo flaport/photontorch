@@ -68,6 +68,27 @@ def test_str(tenv, fenv):
     assert isinstance(str(fenv), str)
 
 
+def test_environment_with_many_wavelengths():
+    env = pt.Environment(wl0=1500e-9, wl1=1600e-9, num_wl=10000)
+    assert env.num_wl == 10000
+    assert env.wl0 == pytest.approx(1500e-9)
+    assert env.wl1 == pytest.approx(1600e-9)
+
+
+def test_environment_with_many_frequencies():
+    env = pt.Environment(f0=200e12, f1=198e12, num_wl=10000)
+    assert env.num_f == 10000
+    assert env.f0 == pytest.approx(200e12)
+    assert env.f1 == pytest.approx(198e12)
+
+
+def test_environment_with_many_timesteps():
+    env = pt.Environment(t0=0, t1=1e-9, dt=1e-13, f=198e12)
+    assert env.num_t == 10000
+    assert env.t0 == pytest.approx(0)
+    assert env.t1 == pytest.approx(1e-9)
+
+
 ###############
 ## Run Tests ##
 ###############

@@ -88,11 +88,13 @@ class _Array(np.ndarray):
     def __str__(self):
         if self.ndim != 1:
             return super(_Array, self).__str__()
-        if self.ndim == 1 and self.shape[0] > 4:
+        elif self.shape[0] > 4:
             return "[%.3e, %.3e, ..., %.3e]" % (self[0], self[1], self[-1])
+        elif self.shape[0] > 1:
+            fmt = "[" + ",".join("%.3e" for _ in self) + "]"
+            return fmt % tuple(float(x) for x in self)
         else:
-            s = "[" + "%.3e " * self.shape[0] + "]"
-            return s % self
+            return "%.3e" % float(self)
 
 
 class _DefaultArray(_Array, _DefaultArgument):
@@ -104,8 +106,20 @@ class _DefaultArray(_Array, _DefaultArgument):
 
 def _array(arr, default_array=False):
     """ create either an _Array or a _DefaultArray. """
-    arr = arr.view(_DefaultArray) if default_array else arr.view(_Array)
-    return arr
+    if default_array:
+        return np.asarray(arr).view(_DefaultArray)
+    return np.asarray(arr).view(_Array)
+
+
+def _arange(start, stop, step, default_array=False):
+    """ create an arange """
+    num = int((stop - start) / step)
+    if num == 0:
+        return _array([start])
+    return _array(
+        start + step * np.arange(0, num, 2 * int(num > 0) - 1),
+        default_array=default_array,
+    )
 
 
 def _is_default(arg):
@@ -157,7 +171,7 @@ class Environment(object):
         num_t=_int(100),
         t0=_float(0),
         t1=_float(1e-12),
-        t=_array(np.arange(0, 1e-12, 1e-14), default_array=True),
+        t=_arange(0, 1e-12, 1e-14, default_array=True),
         bitrate=None,
         bitlength=None,
         wl=_float(1.55e-6),
@@ -280,7 +294,7 @@ class Environment(object):
                 t = _array(np.linspace(t0, t0 + num_t * dt, num_t, endpoint=False))
             else:
                 try:
-                    t = _array(np.arange(t0, t1, dt))
+                    t = _arange(t0, t1, dt)
                 except ValueError:
                     raise ValueError(
                         "Cannot create time range. Are dt or num_t, t0 and t1 all specified?"
@@ -315,7 +329,7 @@ class Environment(object):
                 f0 = float(f0)
                 try:
                     df = float((f1 - f0) / num_f)
-                    wl = c / np.arange(f0, f1, df)
+                    wl = c / _arange(f0, f1, df)
                 except ValueError:
                     raise ValueError(
                         "Cannot create frequency range. Are df or num_f, f0 and f1 all specified?"
@@ -329,7 +343,7 @@ class Environment(object):
                 f0 = float(f0)
                 try:
                     df = float(abs(df) if f1 >= f0 else -abs(df))
-                    wl = c / np.arange(f0, f1, df)
+                    wl = c / _arange(f0, f1, df)
                 except ValueError:
                     raise ValueError(
                         "Cannot create frequency range. Are df or num_f, f0 and f1 all specified?"
@@ -345,7 +359,7 @@ class Environment(object):
                     dwl = (wl1 - wl0) / num_wl
                 dwl = float(dwl)
                 try:
-                    wl = np.arange(wl0, wl1, dwl)
+                    wl = _arange(wl0, wl1, dwl)
                 except ValueError:
                     raise ValueError(
                         "Cannot create frequency range. Are dwl or num_wl, wl0 and wl1 all specified?"
