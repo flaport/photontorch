@@ -7,7 +7,7 @@ neural network. This enables the use of native PyTorch optimizers to optimize th
 
 """
 
-__version__ = "0.0.4"
+__version__ = "0.1.0"
 
 # Test pytorch version
 import torch
