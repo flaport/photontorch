@@ -69,6 +69,10 @@ class Component(Module):
         self.actions_at = Buffer(
             torch.zeros(self.num_ports, device=self.device, dtype=torch.bool)
         )
+        self.port_order = Buffer(
+            torch.zeros(self.num_ports, device=self.device, dtype=torch.int64)
+        )
+        self.set_port_order(self.port_order)
         self.set_C(self.C.data)
         self.set_sources_at(self.sources_at.data)
         self.set_detectors_at(self.detectors_at)
@@ -86,6 +90,11 @@ class Component(Module):
             raise ValueError("source ports and active ports cannot be combined.")
         if (self.detectors_at & self.actions_at).any():
             raise ValueError("detector ports and active ports cannot be combined.")
+        if (
+            self.port_order.sort()[0]
+            != torch.arange(0, self.num_ports, 1, dtype=torch.int64, device=self.device)
+        ).all():
+            raise ValueError("invalid port order for component %s" % comp.name)
 
         if self.actions_at.any() and not (
             self.actions_at.all() or isinstance(self, Network)
@@ -164,6 +173,21 @@ class Component(Module):
                 ports of the component act actively.
         """
         pass
+
+    def set_port_order(self, port_order):
+        """ Set the port ordering
+
+        Args:
+            port_order (Tensor[#ports]): the indices denoting the port order.
+
+        Note:
+            The port order will NOT be reflected in the S-matrix of the
+            component. It will however be used when components are connected
+            together into a network.
+        """
+        port_order[:] = torch.arange(
+            0, self.num_ports, 1, dtype=torch.int64, device=self.device
+        )
 
     def action(self, t, x_in, x_out):
         """ Nonlinear action of the component on its active nodes

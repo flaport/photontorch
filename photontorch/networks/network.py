@@ -313,7 +313,6 @@ class Network(Component):
             self.components[name].name = name
 
         # set buffers
-        o = self._port_order = self._get_port_order()
         super(Network, self)._set_buffers()
 
     # terminate a network
@@ -841,7 +840,6 @@ class Network(Component):
         for comp in self.components.values():
             comp.set_S(S[:, :, idx : idx + comp.num_ports, idx : idx + comp.num_ports])
             idx += comp.num_ports
-        S[:] = S[:, :, self._port_order, :][:, :, :, self._port_order]
 
     def set_delays(self, delays):
         """ set all the delays in the network """
@@ -849,7 +847,6 @@ class Network(Component):
         for comp in self.components.values():
             comp.set_delays(delays[idx : idx + comp.num_ports])
             idx += comp.num_ports
-        delays[:] = delays[self._port_order]
 
     def set_detectors_at(self, detectors_at):
         """ set the locations of the detectors in the network """
@@ -857,7 +854,6 @@ class Network(Component):
         for comp in self.components.values():
             comp.set_detectors_at(detectors_at[idx : idx + comp.num_ports])
             idx += comp.num_ports
-        detectors_at[:] = detectors_at[self._port_order]
 
     def set_sources_at(self, sources_at):
         """ set the locations of the sources in the network """
@@ -865,7 +861,6 @@ class Network(Component):
         for comp in self.components.values():
             comp.set_sources_at(sources_at[idx : idx + comp.num_ports])
             idx += comp.num_ports
-        sources_at[:] = sources_at[self._port_order]
 
     def set_actions_at(self, actions_at):
         """ set the locations of the functions in the network """
@@ -873,7 +868,6 @@ class Network(Component):
         for comp in self.components.values():
             comp.set_actions_at(actions_at[idx : idx + comp.num_ports])
             idx += comp.num_ports
-        actions_at[:] = actions_at[self._port_order]
 
     def set_C(self, C):
         """ set the combined connection matrix of all the components in the network
@@ -894,7 +888,12 @@ class Network(Component):
         )
         start_idxs = OrderedDict(zip(self.components.keys(), start_idxs))
         free_idxs = [
-            torch.where(comp.free_ports_at)[0] for comp in self.components.values()
+            [
+                idx
+                for idx in comp.port_order
+                if idx in torch.where(comp.free_ports_at)[0]
+            ]
+            for comp in self.components.values()
         ]
         free_idxs = OrderedDict(zip(self.components.keys(), free_idxs))
 
@@ -921,20 +920,33 @@ class Network(Component):
             if i is not None:
                 C[i, j] = C[j, i] = 1.0
 
-        C[:] = C[self._port_order, :][:, self._port_order]
+    def set_port_order(self, port_order):
+        """ set the reordering indices for the ports of the network """
 
-    def _get_port_order(self):
-        """ Get the reordering indices for the ports of the network """
+        # TODO: this method needs refactoring
+
+        idx = 0
+        for comp in self.components.values():
+            p = comp.num_ports
+            comp.set_port_order(port_order[idx : idx + p])
+            port_order[idx : idx + p] += idx
+            idx += p
+
         start_idxs = list(
             np.cumsum([0] + [comp.num_ports for comp in self.components.values()])[:-1]
         )
         start_idxs = OrderedDict(zip(self.components.keys(), start_idxs))
         free_idxs = [
-            torch.where(comp.free_ports_at)[0] for comp in self.components.values()
+            [
+                idx
+                for idx in comp.port_order
+                if idx in torch.where(comp.free_ports_at)[0]
+            ]
+            for comp in self.components.values()
         ]
         free_idxs = OrderedDict(zip(self.components.keys(), free_idxs))
 
-        def parse_connection(conn):
+        def parse_output_connection(conn):
             conn_list = conn.split(":")
             if len(conn_list) == 4:
                 return None, None
@@ -945,7 +957,7 @@ class Network(Component):
 
         order_dict = {}
         for conn in self.connections:
-            i, j = parse_connection(conn)
+            i, j = parse_output_connection(conn)
             if i is not None:
                 order_dict[j] = i
 
@@ -959,7 +971,9 @@ class Network(Component):
             if i not in order_dict.values():
                 order.append(i)
 
-        return order
+        port_order_clone = port_order.clone()
+        for i, idx in enumerate(order):
+            port_order[i] = port_order_clone[idx]
 
     def plot(self, detected, **kwargs):
         """ Plot detected power versus time or wavelength
