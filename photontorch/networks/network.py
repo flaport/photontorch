@@ -448,10 +448,10 @@ class Network(Component):
         )  # memory-containing nodes:
         ml = torch.where(mc.ne(1))[0]  # negation of mc: memory-less nodes
         mc = torch.where(mc)[0]
-        self.nmc = len(mc)
-        self.nml = len(ml)
+        self.num_mc = len(mc)
+        self.num_ml = len(ml)
 
-        if not self.terminated or self.nmc == 0:
+        if not self.terminated or self.num_mc == 0:
             # break off initialization; network is probably part of a bigger network
             return self
 
@@ -488,14 +488,12 @@ class Network(Component):
         # MC subset of Connection matrix
         rCmcmc = self.C[mc, :][:, mc]
 
-        if self.nml == 0:
-            rC, iC = torch.broadcast_tensors(rCmcmc[None], torch.zeros_like(self.S[0]))
+        if self.num_ml == 0:
+            rC, iC = torch.broadcast_tensors(rCmcmc[None], torch.zeros_like(rSmcmc))
         else:
             # Only do the following steps if there is at least one ml node:
 
             # ML subsets of scattering matrix:
-            rSmlmc = self.S[0, :, ml, :][:, :, mc]
-            rSmcml = self.S[0, :, mc, :][:, :, ml]
             rSmlml = self.S[0, :, ml, :][:, :, ml]
             iSmlml = self.S[1, :, ml, :][:, :, ml]
 
@@ -511,7 +509,7 @@ class Network(Component):
 
             # 1. Calculation of the helper matrix P = I - Cmlml@Smlml
             ones = torch.ones((env.num_wl, 1, 1), device=self.device)
-            rP = ones * torch.eye(self.nml, device=self.device)[None, :, :]
+            rP = ones * torch.eye(self.num_ml, device=self.device)[None, :, :]
             rCmlml, _ = torch.broadcast_tensors(rCmlml[None], rSmlml)
             rP = rP - (rCmlml).bmm(rSmlml)
             iP = -(rCmlml).bmm(iSmlml)
@@ -519,7 +517,13 @@ class Network(Component):
             # 2. Calculate inv(P)@Cmlmc [using torch.solve]
             M = torch.cat([torch.cat([rP, -iP], -1), torch.cat([iP, rP], -1)], -2)
             Cmlmc = torch.cat(
-                torch.broadcast_tensors(rCmlmc[None], torch.zeros_like(rSmlmc)), -2
+                torch.broadcast_tensors(
+                    rCmlmc[None],
+                    torch.zeros(
+                        env.num_wl, self.num_ml, self.num_mc, device=self.device
+                    ),
+                ),
+                -2,
             )
             x, _ = torch.solve(Cmlmc, M)
             rx, ix = torch.split(x, x.shape[-2] // 2, -2)
@@ -531,7 +535,10 @@ class Network(Component):
             )
 
             # 4. Calculate Cmcml@Smlml@inv(P)@Cmlmc
-            rCmcml, _ = torch.broadcast_tensors(rCmcml[None], rSmcml)
+            rCmcml, _ = torch.broadcast_tensors(
+                rCmcml[None],
+                torch.zeros(env.num_wl, self.num_mc, self.num_ml, device=self.device),
+            )
             rx, ix = ((rCmcml).bmm(rx), (rCmcml).bmm(ix))
 
             # 5. C = x + Cmcmc
@@ -546,9 +553,10 @@ class Network(Component):
 
         # Create buffermask (# time, # wavelengths = 1, # mc nodes, # batches = 1)
         self.buffermask = torch.zeros(
-            (2, int(delays_in_timesteps.max()) + 1, 1, self.nmc, 1), device=self.device
+            (2, int(delays_in_timesteps.max()) + 1, 1, self.num_mc, 1),
+            device=self.device,
         )
-        self.buffermask[:, delays_in_timesteps[mc], :, range(self.nmc), :] = 1.0
+        self.buffermask[:, delays_in_timesteps[mc], :, range(self.num_mc), :] = 1.0
 
         # finish initialization:
         self._env = env
@@ -566,7 +574,7 @@ class Network(Component):
         """
         max_delay = 0 if self.env.freqdomain else int(self._delays.max() / self.env.dt)
         buffer = torch.zeros(
-            (2, max_delay + 1, self.env.num_wl, self.nmc, num_batches,),
+            (2, max_delay + 1, self.env.num_wl, self.num_mc, num_batches,),
             device=self.device,
         )
         return buffer
@@ -697,7 +705,7 @@ class Network(Component):
             [
                 source,
                 torch.zeros(
-                    source.shape[:3] + (self.nmc - source.shape[3], source.shape[4]),
+                    source.shape[:3] + (self.num_mc - source.shape[3], source.shape[4]),
                     dtype=torch.get_default_dtype(),
                     device=source.device,
                 ),
