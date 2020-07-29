@@ -12,7 +12,7 @@ __version__ = "0.1.0"
 # Test pytorch version
 import torch
 
-torch_version = tuple(int(v) for v in torch.__version__.split("."))
+torch_version = tuple(int(v) for v in torch.__version__.split(".")[:3])
 if torch_version[0] < 1 or (torch_version[0] < 2 and torch_version[1] < 3):
     raise ImportError(
         "Photontorch requires PyTorch>=1.3.0. Your version: %s" % torch.__version__
