@@ -572,7 +572,7 @@ class Network(Component):
             torch.Tensor[2, #timesteps, #wavelengths, #mc nodes, num_batches]
 
         """
-        max_delay = 0 if self.env.freqdomain else int(self._delays.max() / self.env.dt)
+        max_delay = 0 if self.env.freqdomain else int(self._delays.max() / self.env.dt + 0.5)
         buffer = torch.zeros(
             (2, max_delay + 1, self.env.num_wl, self.num_mc, num_batches,),
             device=self.device,
