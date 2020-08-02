@@ -448,8 +448,8 @@ class Network(Component):
         )  # memory-containing nodes:
         ml = torch.where(mc.ne(1))[0]  # negation of mc: memory-less nodes
         mc = torch.where(mc)[0]
-        self.num_mc = len(mc)
-        self.num_ml = len(ml)
+        self.num_mc = mc.shape[0]
+        self.num_ml = ml.shape[0]
 
         if not self.terminated or self.num_mc == 0:
             # break off initialization; network is probably part of a bigger network
@@ -510,23 +510,27 @@ class Network(Component):
             # 1. Calculation of the helper matrix P = I - Cmlml@Smlml
             ones = torch.ones((env.num_wl, 1, 1), device=self.device)
             rP = ones * torch.eye(self.num_ml, device=self.device)[None, :, :]
-            rCmlml, _ = torch.broadcast_tensors(rCmlml[None], rSmlml)
+            rCmlml = rCmlml[None].expand(env.num_wl, self.num_ml, self.num_ml)
             rP = rP - (rCmlml).bmm(rSmlml)
             iP = -(rCmlml).bmm(iSmlml)
 
-            # 2. Calculate inv(P)@Cmlmc [using torch.solve]
-            M = torch.cat([torch.cat([rP, -iP], -1), torch.cat([iP, rP], -1)], -2)
-            Cmlmc = torch.cat(
-                torch.broadcast_tensors(
-                    rCmlmc[None],
-                    torch.zeros(
-                        env.num_wl, self.num_ml, self.num_mc, device=self.device
-                    ),
-                ),
-                -2,
+            # 2. Calculate x=inv(P)@Cmlmc [using torch.solve]
+            # [ +rP   -iP ] [ rx ] _ [ rCmlmc ]
+            # [ +iP   +rP ] [ ix ] - [    0   ]
+            P = torch.zeros(
+                (rP.shape[0], 2 * self.num_ml, 2 * self.num_ml),
+                dtype=rP.dtype,
+                device=rP.device,
             )
-            x, _ = torch.solve(Cmlmc, M)
-            rx, ix = torch.split(x, x.shape[-2] // 2, -2)
+            P[:, : self.num_ml, : self.num_ml] = rP
+            P[:, : self.num_ml, self.num_ml :] = -iP
+            P[:, self.num_ml :, : self.num_ml] = iP
+            P[:, self.num_ml :, self.num_ml :] = rP
+            Cmlmc = torch.cat([rCmlmc, torch.zeros_like(rCmlmc)], 0)[None].expand(
+                env.num_wl, 2 * self.num_ml, self.num_mc
+            )
+            x, _ = torch.solve(Cmlmc, P)
+            rx, ix = torch.split(x, self.num_ml, 1)
 
             # 3. Calculate Smlml@inv(P)@Cmlmc
             rx, ix = (
@@ -535,10 +539,7 @@ class Network(Component):
             )
 
             # 4. Calculate Cmcml@Smlml@inv(P)@Cmlmc
-            rCmcml, _ = torch.broadcast_tensors(
-                rCmcml[None],
-                torch.zeros(env.num_wl, self.num_mc, self.num_ml, device=self.device),
-            )
+            rCmcml = rCmcml[None].expand(env.num_wl, self.num_mc, self.num_ml)
             rx, ix = ((rCmcml).bmm(rx), (rCmcml).bmm(ix))
 
             # 5. C = x + Cmcmc
@@ -572,7 +573,9 @@ class Network(Component):
             torch.Tensor[2, #timesteps, #wavelengths, #mc nodes, num_batches]
 
         """
-        max_delay = 0 if self.env.freqdomain else int(self._delays.max() / self.env.dt + 0.5)
+        max_delay = (
+            0 if self.env.freqdomain else int(self._delays.max() / self.env.dt + 0.5)
+        )
         buffer = torch.zeros(
             (2, max_delay + 1, self.env.num_wl, self.num_mc, num_batches,),
             device=self.device,
