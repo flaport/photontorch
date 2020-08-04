@@ -14,16 +14,17 @@ import shutil
 import textwrap
 
 sys.path.insert(0, os.path.abspath(".."))
+import photontorch
 
 
 # -- Project information -----------------------------------------------------
 
-project = "Photontorch"
-copyright = "2020, Floris Laporte"
-author = "Floris Laporte"
+project = photontorch.__name__.capitalize()
+author = photontorch.__author__
+copyright = "2020, " + photontorch.__author__
 
 # The full version, including alpha/beta/rc tags
-release = "0.1.0"
+release = photontorch.__version__
 
 
 # -- General configuration ---------------------------------------------------
@@ -36,6 +37,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
     "sphinx.ext.mathjax",
+    "sphinx.ext.viewcode",
     "nbsphinx",
 ]
 

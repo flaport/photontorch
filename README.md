@@ -8,9 +8,9 @@ view the photonic circuit as essentially a recurrent neural network.
 This enables the use of native PyTorch optimizers to optimize the
 (physical) parameters of the circuit.
 
-- Floris Laporte ( [floris.laporte@ugent.be](mailto:floris.laporte@gmail.com) )
-- Peter Bienstman ( [peter.bienstman@ugent.be](mailto:peter.bienstman@ugent.be) )
-- Website: [http://photontorch.com](http://photontorch.com)
+- Floris Laporte [[floris.laporte@ugent.be](mailto:floris.laporte@gmail.com)]
+- Peter Bienstman [[peter.bienstman@ugent.be](mailto:peter.bienstman@ugent.be)]
+- Website: [photontorch.com](http://photontorch.com)
 
 ## Installation
 
@@ -49,18 +49,19 @@ Read the full documentation here: [https://docs.photontorch.com](https://docs.ph
 
 ### Required dependencies
 
-- Python 2.7 (Linux only) or 3.6+. It's recommended to use the [Anaconda](http://www.anaconda.com/download/) distribution.
-- [`pytorch>=1.5.0`](http://pytorch.org/): `conda install pytorch` (see [pytorch.org](https://pytorch.org) for more installation options for your CUDA version)
-- [`numpy`](http://www.numpy.org/): `conda install numpy`
-- [`scipy`](http://www.scipy.org/): `conda install scipy`
+- Python 2.7 (Linux only) or 3.6+. It's recommended to use the [Anaconda](http://www.anaconda.com/download) distribution.
+- [`pytorch>=1.5.0`](http://pytorch.org): `conda install pytorch` (see [pytorch.org](https://pytorch.org) for more installation options for your CUDA version)
+- [`numpy`](http://www.numpy.org): `conda install numpy`
+- [`scipy`](http://www.scipy.org): `conda install scipy`
 
 ### Optional (but recommended) dependencies
 
-- [`tqdm`](http://pypi.python.org/pypi/tqdm): `conda install tqdm`
-- [`networkx`](http://networkx.github.io): `conda install networkx`
-- [`matplotlib`](http://matplotlib.org/): `conda install matplotlib`
-- [`pytest`](http://docs.pytest.org/): `conda install pytest`
-- [`sphinx`](https://www.sphinx-doc.org): `pip install sphinx nbsphinx`
+- [`tqdm`](http://pypi.python.org/pypi/tqdm): `conda install tqdm` [progress bars]
+- [`networkx`](http://networkx.github.io): `conda install networkx` [network visualization]
+- [`matplotlib`](http://matplotlib.org): `conda install matplotlib` [visualization]
+- [`pytest`](http://docs.pytest.org): `conda install pytest` [to run tests]
+- [`pandoc`](https://pandoc.org): `conda install pandoc` [to generate docs]
+- [`sphinx`](https://www.sphinx-doc.org): `pip install sphinx nbsphinx` [to generate docs]
 
 ## Reference
 
@@ -70,6 +71,19 @@ we ask you to cite us in your work:
 Floris Laporte, Joni Dambre, and Peter Bienstman. _"Highly parallel simulation
 and optimization of photonic circuits in time and frequency domain based on the
 deep-learning framework PyTorch."_ Scientific reports 9.1 (2019): 5918.
+
+## Known issues
+
+- Complex tensor support. Complex tensors are not supported in
+  PyTorch/Photontorch. Wherever complex tensors would be applicable,
+  Photontorch expects a real-valued tensor with the real and imag part
+  stacked in the first dimension. The Photontorch issue can be
+  followed [here](https://github.com/flaport/photontorch/issues/4) and
+  the PyTorch issue [here](https://github.com/pytorch/pytorch/issues/755).
+- Sparse tensor support. A lot of memory usage can probably be avoided
+  when transitioning to sparse tensor representations under the hood.
+  The Photontorch issue can be followed
+  [here](https://github.com/flaport/photontorch/issues/5)
 
 ## License
 

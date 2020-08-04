@@ -1,5 +1,6 @@
 Photontorch
 ===========
+
 :ref:`examples` · :ref:`documentation` · :ref:`genindex` · :ref:`modindex`
 
 Photontorch is a photonic simulator for highly parallel simulation and
@@ -9,6 +10,7 @@ photonic circuits. It leverages the deep learning framework PyTorch to
 view the photonic circuit as essentially a recurrent neural network.
 This enables the use of native PyTorch optimizers to optimize the
 (physical) parameters of the circuit.
+
 
 Installation
 ------------
@@ -35,6 +37,7 @@ of the git-repository::
 
     pytest tests
 
+
 Dependencies
 ------------
 
@@ -49,11 +52,13 @@ Required dependencies
 Recommended dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-    - `tqdm <https://pypi.python.org/pypi/tqdm>`_ : ``conda install tqdm``
-    - `matplotlib <https://matplotlib.org>`_ : ``conda install matplotlib``
-    - `networkx <https://networkx.github.io>`_ : ``conda install networkx``
-    - `pytest <http://docs.pytest.org>`_ : ``conda install pytest``
-    - `sphinx <https://www.sphinx-doc.org>`_ : ``pip install sphinx nbsphinx``
+    - `tqdm <https://pypi.python.org/pypi/tqdm>`_ : ``conda install tqdm`` [progress bars]
+    - `matplotlib <https://matplotlib.org>`_ : ``conda install matplotlib`` [network visualization]
+    - `networkx <https://networkx.github.io>`_ : ``conda install networkx`` [visualization]
+    - `pytest <http://docs.pytest.org>`_ : ``conda install pytest`` [to run tests]
+    - `pandoc <https://pandoc.org>`_: ``conda install pandoc`` [to generate docs]
+    - `sphinx <https://www.sphinx-doc.org>`_ : ``pip install sphinx nbsphinx`` [to generate docs]
+
 
 Table of contents
 -----------------
@@ -74,9 +79,11 @@ Floris Laporte, Joni Dambre, and Peter Bienstman. *"Highly parallel simulation
 and optimization of photonic circuits in time and frequency domain based on the
 deep-learning framework PyTorch."* Scientific reports 9.1 (2019): 5918.
 
+
 Where to go from here?
 ----------------------
 Check out the first example: `A brief introduction to Photontorch <examples/00_introduction_to_photontorch.html>`_.
+
 
 License
 -------
