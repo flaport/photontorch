@@ -188,7 +188,10 @@ class Module(_Module_):
         new = super(Module, self).to(*args, **kwargs)
         for k, v in self._modules.items():
             self._modules[k] = v.to(*args, **kwargs)
-        new.device, _, _ = torch._C._nn._parse_to(*args, **kwargs)
+        try:
+            new.device, _, _ = torch._C._nn._parse_to(*args, **kwargs)
+        except ValueError:
+            new.device, _, _, _ = torch._C._nn._parse_to(*args, **kwargs)
         return new
 
     def cpu(self):
