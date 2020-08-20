@@ -56,12 +56,13 @@ Read the full documentation here: [https://docs.photontorch.com](https://docs.ph
 
 ### Optional (but recommended) dependencies
 
-- [`tqdm`](http://pypi.python.org/pypi/tqdm): `conda install tqdm` [progress bars]
+- [`tqdm`](https://github.com/tqdm/tqdm): `conda install tqdm` [progress bars]
 - [`networkx`](http://networkx.github.io): `conda install networkx` [network visualization]
 - [`matplotlib`](http://matplotlib.org): `conda install matplotlib` [visualization]
 - [`pytest`](http://docs.pytest.org): `conda install pytest` [to run tests]
 - [`pandoc`](https://pandoc.org): `conda install pandoc` [to generate docs]
 - [`sphinx`](https://www.sphinx-doc.org): `pip install sphinx nbsphinx` [to generate docs]
+- [`torch-lfilter`](https://github.com/flaport/torch_lfilter): `pip install torch-lfilter` [faster lfilter for detectors]
 
 ## Reference
 

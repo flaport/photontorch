@@ -52,12 +52,13 @@ Required dependencies
 Recommended dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-    - `tqdm <https://pypi.python.org/pypi/tqdm>`_ : ``conda install tqdm`` [progress bars]
+    - `tqdm <https://github.com/tqdm/tqdm>`_ : ``conda install tqdm`` [progress bars]
     - `matplotlib <https://matplotlib.org>`_ : ``conda install matplotlib`` [network visualization]
     - `networkx <https://networkx.github.io>`_ : ``conda install networkx`` [visualization]
     - `pytest <http://docs.pytest.org>`_ : ``conda install pytest`` [to run tests]
     - `pandoc <https://pandoc.org>`_: ``conda install pandoc`` [to generate docs]
     - `sphinx <https://www.sphinx-doc.org>`_ : ``pip install sphinx nbsphinx`` [to generate docs]
+    - `torch-lfilter <https://github.com/flaport/torch_lfilter>`_ : ``pip install torch-lfilter`` [faster lfilter for detectors]
 
 
 Table of contents

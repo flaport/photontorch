@@ -7,7 +7,7 @@ neural network. This enables the use of native PyTorch optimizers to optimize th
 
 """
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 
 # Test pytorch version
 import torch
@@ -96,8 +96,9 @@ from .environment.environment import current_environment
 
 ## Detectors
 
-from .detectors.photodetector import Photodetector
+from .detectors.lowpassdetector import lfilter
 from .detectors.lowpassdetector import LowpassDetector
+from .detectors.photodetector import Photodetector
 
 
 ## PyTorch extensions

@@ -226,7 +226,10 @@ class BitStreamGenerator(Module):
             device (torch.device): device to generate the bits on. None -> "cpu"
 
         Note:
-            Although the causality of using negative latencies is questionable, they *are* allowed. However, each (fractional) negative latency should be compensated with an (integer) number of warmup bits (rounded up) to make it work.
+            Although the causality of using negative latencies is questionable,
+            they *are* allowed. However, each (fractional) negative latency
+            should be compensated with an (integer) number of warmup bits
+            (rounded up) to make it work.
 
         """
         super(BitStreamGenerator, self).__init__()
@@ -266,12 +269,16 @@ class BitStreamGenerator(Module):
             device (optional, torch.device): override device to generate the bits on. None -> "cpu"
 
         Note:
-            If a bitrate and/or samplerate can be found in the current environment,
-            those values will be regarded as keyword arguments and hence get precedence over
-            the values given during the BitStreamGenerator initialization.
+            If a bitrate and/or samplerate can be found in the current
+            environment, those values will be regarded as keyword arguments and
+            hence get precedence over the values given during the
+            BitStreamGenerator initialization.
 
         Note:
-            Although the causality of using negative latencies is questionable, they *are* allowed. However, each (fractional) negative latency should be compensated with an (integer) number of warmup bits (rounded up) to make it work.
+            Although the causality of using negative latencies is questionable,
+            they *are* allowed. However, each (fractional) negative latency
+            should be compensated with an (integer) number of warmup bits
+            (rounded up) to make it work.
         """
 
         try:

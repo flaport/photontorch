@@ -81,8 +81,6 @@ class Photodetector(LowpassDetector):
     def forward(
         self,
         signal,
-        num_splits=1,
-        split_padding=5,
         bitrate=None,
         samplerate=None,
         cutoff_frequency=None,
@@ -95,8 +93,6 @@ class Photodetector(LowpassDetector):
 
         Args:
             signal (Tensor): signal to detect.
-            num_splits (int): number of parallel parts to split the timestream in
-            split_padding (int): number of bits padding when splitting the timstream in parts.
             bitrate (optional, float): [1/s] override data rate of the signal to filter
             samplerate (optional, float): [1/s] override sample rate of the signal to filter
             cutoff_frequency (optional, float): [1/s] override cutoff frequency of the detector
@@ -112,15 +108,9 @@ class Photodetector(LowpassDetector):
             initialization.
 
         Note:
-            Splitting the signal in parts to be processed in parallel can considerably
-            speed up the detection process. However, it remains an approximation, as
-            in theory each detected signal point depends (with an exponentially
-            decreasing factor) on all previous detected signals.
-
-            To partly circumvent any large discontinuities when recomposing the
-            detected signal from the detected parts, a `split_padding` should be
-            defined, which pads a number of bits from the previous / next
-            signal part before and after the current signal part to detect.
+            The detector is quite efficient on CPU-tensors, but not on CUDA
+            (GPU) tensors. Consider converting the signal to CPU before
+            detecting.
         """
         cutoff_frequency = (
             self.cutoff_frequency
@@ -166,8 +156,6 @@ class Photodetector(LowpassDetector):
         # note that the lowpass detector takes responsivity into account.
         signal = super(Photodetector, self).forward(
             signal=signal + noise,
-            num_splits=num_splits,
-            split_padding=split_padding,
             bitrate=bitrate,
             samplerate=samplerate,
             cutoff_frequency=cutoff_frequency,

@@ -5,5 +5,6 @@ power of the fields.
 
 """
 
-from .photodetector import Photodetector
+from .lowpassdetector import lfilter
 from .lowpassdetector import LowpassDetector
+from .photodetector import Photodetector
