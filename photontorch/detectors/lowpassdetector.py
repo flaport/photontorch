@@ -41,7 +41,7 @@ try:
     from torch_lfilter import lfilter  # C++ compiled version of lfilter below
 except ImportError:
     from warnings import warn
-    warn("Please install `torch_lfilter` for better detector performance")
+
     def lfilter(b, a, x):
         """PyTorch lfilter
 
@@ -54,6 +54,13 @@ except ImportError:
         Note:
             The filtering happens along dimension (axis) 0.
         """
+
+        warn(
+            "the python package `torch_lfilter` is not installed.\n"
+            "Falling back on a pure python `lfilter` implementation for detection.\n"
+            "This is much slower. Consider installing `torch_lfilter`."
+        )
+
         if not (b.ndim == a.ndim == 1):
             raise ValueError("filter vectors b and a should be 1D.")
         b = torch.tensor(

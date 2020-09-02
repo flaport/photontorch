@@ -68,7 +68,7 @@ def test_lowpass_detector_forward(gen, lpdet):
             filter_order=lpdet.filter_order,
         )
         assert np.allclose(detected, detected_scipy, atol=1e-6)
-        detected2 = lpdet(stream, num_splits=3).detach().cpu().numpy()
+        detected2 = lpdet(stream).detach().cpu().numpy()
         assert np.allclose(detected2, detected_scipy, atol=1e-2)
 
 
