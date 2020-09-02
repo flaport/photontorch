@@ -296,16 +296,6 @@ class Network(Component):
         for i, conn in enumerate(self.connections):
             self.connections[i] = ":".join(part.strip() for part in conn.split(":"))
 
-        # sort connections (not truly necessary, but useful during manual inspecting)
-        def _conn_sort_key(conn):
-            try:
-                comp, idx, out = conn.split(":")
-                return "%03d" % int(out) + conn
-            except ValueError:
-                return conn
-
-        self.connections.sort(key=_conn_sort_key)
-
         # add components to components dict
         self.components = OrderedDict()
         for name in self._get_used_component_names():
