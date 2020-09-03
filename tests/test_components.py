@@ -32,20 +32,12 @@ def test_initialization_with_sources_detectors_at_same_port(tenv):
 
 
 def test_agrawal_soa():
-    target = np.array(
-        [
-            0.00000,
-            0.00814,
-            0.10276,
-            0.04285,
-            0.02142,
-            0.12841,
-            0.03331,
-            0.04192,
-            0.14501,
-            0.02096,
-        ]
-    )
+    # fmt: off
+    # single delay too many in buffermask:
+    # target = np.array([0.00000, 0.00814, 0.10276, 0.04285, 0.02142, 0.12841, 0.03331, 0.04192, 0.14501, 0.02096])
+    # delay compensated in buffermask:
+    target = np.array([0.00000, 0.01252, 0.10493, 0.03503, 0.02863, 0.12833, 0.02530, 0.05175, 0.14189, 0.01401])
+    # fmt: on
     with pt.Network() as nw:
         nw.src = pt.Source()
         nw.soa = pt.AgrawalSoa()

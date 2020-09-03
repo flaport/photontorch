@@ -547,7 +547,9 @@ class Network(Component):
             (2, int(delays_in_timesteps.max()) + 1, 1, self.num_mc, 1),
             device=self.device,
         )
-        self.buffermask[:, delays_in_timesteps[mc], :, range(self.num_mc), :] = 1.0
+        # effectively, MC nodes with 0 delay will have 1 timestep delay...
+        time_index = torch.max(delays_in_timesteps[mc] - 1, torch.tensor([0]))
+        self.buffermask[:, time_index, :, range(self.num_mc), :] = 1.0
 
         # finish initialization:
         self._env = env
