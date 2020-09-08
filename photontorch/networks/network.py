@@ -54,7 +54,7 @@ _current_networks = deque()
 
 
 class Network(Component):
-    """ a Network (circuit) of Components
+    """a Network (circuit) of Components
 
     The Network is the core of Photontorch. This is where everything comes
     together.  The Network is a special kind of torch.nn.Module, where all
@@ -80,7 +80,7 @@ class Network(Component):
 
     # network initialization method
     def __init__(self, components=None, connections=None, name=None):
-        """ Network initialization
+        """Network initialization
 
         Args:
             components (dict): a dictionary containing the components of the network.
@@ -142,7 +142,7 @@ class Network(Component):
 
     # add a component to the network
     def add_component(self, name, comp):
-        """ Add a component to the network
+        """Add a component to the network
 
         Pytorch requires submodules to be registered as attributes of a module.
         This method register a component as a torch module in the _modules
@@ -177,7 +177,7 @@ class Network(Component):
 
     # link components together
     def link(self, *ports):
-        """ link components together
+        """link components together
 
         Args:
             *ports[str]: the components and ports to link together.
@@ -307,7 +307,7 @@ class Network(Component):
 
     # terminate a network
     def terminate(self, term=None, name=None):
-        """ Terminate open conections with the Term of your choice
+        """Terminate open conections with the Term of your choice
 
         Args:
             term: (Term|list|dict): Which term to use. Defaults to Term. If a
@@ -350,7 +350,7 @@ class Network(Component):
 
     # undo a termination of a network:
     def unterminate(self):
-        """ remove termination of network
+        """remove termination of network
 
         Returns:
             unterminated network.
@@ -361,7 +361,7 @@ class Network(Component):
     # ---------------------------------
 
     def initialize(self):
-        r""" Initializer of the network.
+        r"""Initializer of the network.
 
         The goal of this initialization is to split the network into
         memory-containing nodes (nodes that introduce delay, sources,
@@ -548,7 +548,10 @@ class Network(Component):
             device=self.device,
         )
         # effectively, MC nodes with 0 delay will have 1 timestep delay...
-        time_index = torch.max(delays_in_timesteps[mc] - 1, torch.tensor([0]))
+        zero = torch.tensor(
+            [0], dtype=delays_in_timesteps.dtype, device=delays_in_timesteps.device
+        )
+        time_index = torch.max(delays_in_timesteps[mc] - 1, zero)
         self.buffermask[:, time_index, :, range(self.num_mc), :] = 1.0
 
         # finish initialization:
@@ -556,7 +559,7 @@ class Network(Component):
         return self
 
     def _simulation_buffer(self, num_batches):
-        """ Create cyclic buffer to keep the time-delayed states of the network.
+        """Create cyclic buffer to keep the time-delayed states of the network.
 
         Args:
             num_batches (int): number of batches to create the buffer for
@@ -569,13 +572,19 @@ class Network(Component):
             0 if self.env.freqdomain else int(self._delays.max() / self.env.dt + 0.5)
         )
         buffer = torch.zeros(
-            (2, max_delay + 1, self.env.num_wl, self.num_mc, num_batches,),
+            (
+                2,
+                max_delay + 1,
+                self.env.num_wl,
+                self.num_mc,
+                num_batches,
+            ),
             device=self.device,
         )
         return buffer
 
     def _handle_source(self, source):
-        """ bring a source tensor in a usable form to use in forward pass.
+        """bring a source tensor in a usable form to use in forward pass.
 
         Args:
             source (Tensor): The source tensor to validate and handle.
@@ -711,7 +720,7 @@ class Network(Component):
         return source
 
     def forward(self, source=0.0, power=True, detector=None):
-        """ calculate the network's response to an applied source.
+        """calculate the network's response to an applied source.
 
         Args:
             source (Tensor): The source tensor to calculate the response for.
@@ -751,7 +760,12 @@ class Network(Component):
         num_batches = source.shape[-1]
 
         detected = torch.zeros(
-            (self.env.num_t, self.env.num_wl, self.num_detectors, num_batches,),
+            (
+                self.env.num_t,
+                self.env.num_wl,
+                self.num_detectors,
+                num_batches,
+            ),
             device=self.device,
         )
         if not power:
@@ -775,7 +789,7 @@ class Network(Component):
         return detected
 
     def step(self, t, srcvalue, buffer):
-        """ Single step forward pass through the network
+        """Single step forward pass through the network
 
         Args:
             t (float): the time of the simulation
@@ -873,7 +887,7 @@ class Network(Component):
             idx += comp.num_ports
 
     def set_C(self, C):
-        """ set the combined connection matrix of all the components in the network
+        """set the combined connection matrix of all the components in the network
 
         Returns:
             binary tensor with only 1's and 0's.
@@ -979,7 +993,7 @@ class Network(Component):
             port_order[i] = port_order_clone[idx]
 
     def plot(self, detected, **kwargs):
-        """ Plot detected power versus time or wavelength
+        """Plot detected power versus time or wavelength
 
         Args:
             detected (np.ndarray|Tensor): detected power. Allowed shapes:
@@ -1003,7 +1017,7 @@ class Network(Component):
         return plot(self, detected, **kwargs)
 
     def graph(self, draw=True):
-        """ create a graph visualization of the network
+        """create a graph visualization of the network
 
         Args:
             draw (bool): draw the graph with matplotlib
@@ -1045,7 +1059,7 @@ def current_network():
 
 
 def link(*ports):
-    """ link components together
+    """link components together
 
     Args:
         *ports: the ports to link together. The first and last port can be an integer
