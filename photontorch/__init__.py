@@ -7,12 +7,12 @@ neural network. This enables the use of native PyTorch optimizers to optimize th
 
 """
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 
 # Test pytorch version
 import torch
 
-torch_version = tuple(int(v) for v in torch.__version__.split(".")[:3])
+torch_version = tuple(int(v) for v in torch.__version__.split(".")[:2])
 if torch_version[0] < 1 or (torch_version[0] < 2 and torch_version[1] < 3):
     raise ImportError(
         "Photontorch requires PyTorch>=1.5.0. Your version: %s" % torch.__version__
