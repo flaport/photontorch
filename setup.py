@@ -22,7 +22,7 @@ setuptools.setup(
         "Programming Language :: Python :: 2.7",
         "Development Status :: 3 - Alpha",
         "Operating System :: OS Independent",
-        "License :: Free for non-commercial use",
+        "License :: OSI Approved :: GNU Affero General Public License v3",
         "Topic :: Scientific/Engineering",
         "Topic :: Scientific/Engineering :: Physics",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",

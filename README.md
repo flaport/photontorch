@@ -9,7 +9,6 @@ This enables the use of native PyTorch optimizers to optimize the
 (physical) parameters of the circuit.
 
 - Floris Laporte [[floris.laporte@ugent.be](mailto:floris.laporte@gmail.com)]
-- Peter Bienstman [[peter.bienstman@ugent.be](mailto:peter.bienstman@ugent.be)]
 - Website: [photontorch.com](http://photontorch.com)
 
 ## Installation
@@ -82,15 +81,13 @@ deep-learning framework PyTorch."_ Scientific reports 9.1 (2019): 5918.
   followed [here](https://github.com/flaport/photontorch/issues/4) and
   the PyTorch issue [here](https://github.com/pytorch/pytorch/issues/755).
 - Sparse tensor support. A lot of memory usage can probably be avoided
-  when transitioning to sparse tensor representations under the hood.
-  The Photontorch issue can be followed
-  [here](https://github.com/flaport/photontorch/issues/5)
+  when transitioning to a sparse tensor representation for the connection matrices and
+  scatter matrices. The Photontorch issue can be followed [here](https://github.com/flaport/photontorch/issues/5)
 
 ## License
 
-Photontorch is available under an [Academic License](LICENSE). This
-means that there are no restrictions on the usage in a purely
-non-commercial or academic context. For commercial applications you
-can always contact the authors.
+Photontorch used to be available under a custom Academic License, but Since October
+2020, Photontorch is now fully open source and available under the [AGPLv3](LICENSE). 
 
-Copyright © 2020, Floris Laporte - Universiteit Gent - Ghent University - [Academic License](LICENSE)
+Copyright © 2020, Floris Laporte - UGent - [AGPLv3](LICENSE)
+
