@@ -475,7 +475,7 @@ class Environment(object):
         """ exit the with block (close the current environment) """
         if _current_environments[0] is self:
             del _current_environments[0]
-        self._grad_manager.__exit__()
+        self._grad_manager.__exit__(error, value, traceback)
         if error is not None:
             raise  # raise the last error thrown
         return self
