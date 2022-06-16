@@ -519,7 +519,7 @@ class Network(Component):
             Cmlmc = torch.cat([rCmlmc, torch.zeros_like(rCmlmc)], 0)[None].expand(
                 env.num_wl, 2 * self.num_ml, self.num_mc
             )
-            x, _ = torch.solve(Cmlmc, P)
+            x = torch.linalg.solve(P, Cmlmc)
             rx, ix = torch.split(x, self.num_ml, 1)
 
             # 3. Calculate Smlml@inv(P)@Cmlmc
